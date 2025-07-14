@@ -23,13 +23,15 @@ export default function AdminLoginPage() {
   };
 
   const handleModalSubmit = () => {
-    if (fullName.trim() === "") {
-      alert("Full name is required.");
-      return;
-    }
-    setShowModal(false);
-    navigate("/admin");
-  };
+  if (fullName.trim() === "") {
+    alert("Full name is required.");
+    return;
+  }
+  localStorage.setItem("adminFullName", fullName); 
+  setShowModal(false);
+  navigate("/admin");
+};
+
 
   return (
     <div className="h-screen flex overflow-hidden">
