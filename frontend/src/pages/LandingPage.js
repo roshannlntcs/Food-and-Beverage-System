@@ -9,27 +9,18 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F3EA] text-gray-900 flex flex-col font-sans">
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-10 py-6 bg-[#F6F3EA] shadow relative">
-        {/* Left: Logo */}
-        <div className="flex items-center">
-          <img src="/logo.png" alt="Logo" className="h-10 w-10 mr-3" />
-          <span className="text-xl font-bold">POS System</span>
-        </div>
-
-        {/* Right Links Container */}
-        <div className="absolute left-[63%] transform -translate-x-1/2 flex gap-40 text-sm font-medium">
-          <a href="#about" className="hover:text-yellow-600 transition">About</a>
-          <a href="#contact" className="hover:text-yellow-600 transition">Contact</a>
-          <a href="#help" className="hover:text-yellow-600 transition">Help</a>
-        </div>
-      </nav>
+    <div className="relative min-h-screen bg-[#F6F3EA] text-gray-900 flex flex-col font-sans">
+      {/* Fixed CBA Logo at Top-Right */}
+      <img
+        src="/cbalogo.png"
+        alt="CBA Logo"
+        className="absolute top-6 right-6 h-16 w-auto z-50"
+      />
 
       {/* Hero Section */}
       <div className="flex flex-col md:flex-row h-full flex-grow">
         {/* Left Half with Red Image */}
-        <div className="relative w-full md:w-[37.3%] h-80 md:h-auto overflow-hidden flex items-center justify-center">
+        <div className="relative w-full md:w-[42.3%] h-80 md:h-auto overflow-hidden flex items-center justify-center">
           <img
             src="/red.png"
             alt="Red Background"
@@ -40,25 +31,31 @@ const LandingPage = () => {
           />
         </div>
 
-{/* Right Half with Content */}
-<div className="w-full md:w-1/2 flex flex-col justify-center items-start text-left px-10 md:px-28 py-16">
-  <h1 className="text-4xl md:text-5xl font-extrabold leading-snug mb-10">
-    Streamline Your <br /> Sales & Inventory
-  </h1>
-  <p className="text-gray-600 text-base md:text-lg mb-8">
-    Manage your business with a fast and easy POS system designed for food businesses.
-  </p>
-  <div className="w-full flex justify-end">
-    <button
-      onClick={handleGetStarted}
-      className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-3 px-6 rounded-full shadow transition-all transform hover:scale-105"
-    >
-      Get Started
-    </button>
-  </div>
-</div>
+        {/* Right Half with Content */}
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-10 md:px-28 py-16">
+          {/* Wrapper for text block */}
+          <div className="text-left w-full max-w-[500px]">
+            {/* Heading */}
+            <h1 className="text-4xl md:text-6xl font-extrabold leading-snug mb-10">
+              Streamline Your <br /> Sales & Inventory <br /> With Ease
+            </h1>
 
+            {/* Paragraph */}
+            <p className="text-gray-600 text-base md:text-lg mb-8">
+              Powerful POS and Inventory, Built for Speed.
+            </p>
 
+            {/* Button */}
+            <div className="flex justify-end w-full">
+              <button
+                onClick={handleGetStarted}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-3 px-6 rounded-full shadow transition-all transform hover:scale-105"
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

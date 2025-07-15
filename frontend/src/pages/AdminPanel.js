@@ -202,7 +202,7 @@ const [currentSupplier, setCurrentSupplier] = useState({
      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
   <h2 className="text-2xl font-bold">Product List</h2>
   <button
-  className="bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 w-fit self-end md:self-auto"
+  className="bg-[#800000] text-white px-4 py-2 rounded hover:bg-[#660000] w-fit self-end md:self-auto"
   onClick={() => {
     setCurrentItem({ name: "", price: "", category: "", qty: "", status: "Available" });
     setIsEditMode(false);
@@ -248,7 +248,7 @@ const [currentSupplier, setCurrentSupplier] = useState({
             setCurrentItem(item);
             setShowPopup(true);
           }}
-          className="bg-red-700 text-white px-3 py-1 rounded hover:bg-red-800"
+          className="bg-[#800000] text-white px-3 py-1 rounded hover:bg-[#660000]"
         >
           Edit
         </button>
@@ -273,7 +273,8 @@ const renderSuppliers = () => {
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <h2 className="text-2xl font-bold">Supplier Records</h2>
         <button
-          className="bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 w-fit self-end md:self-auto"
+          className="bg-[#800000] text-white px-4 py-2 rounded hover:bg-[#660000] w-fit self-end md:self-auto"
+
           onClick={() => {
             setIsEditSupplierMode(false);
             setCurrentSupplier({
@@ -326,7 +327,8 @@ const renderSuppliers = () => {
                 <td className="p-3 border">{supplier.status}</td>
                 <td className="p-3 border">
                   <button
-                    className="bg-red-700 text-white px-3 py-1 rounded hover:bg-red-800"
+                    className="bg-[#800000] text-white px-3 py-1 rounded hover:bg-[#660000]"
+
                     onClick={() => {
                       setIsEditSupplierMode(true);
                       setCurrentSupplier(supplier);
@@ -471,7 +473,7 @@ const handleSaveSupplier = () => {
         </button>
         <button
           onClick={handleSave}
-          className="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800"
+          className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
         >
           Save
         </button>
@@ -486,7 +488,14 @@ const handleSaveSupplier = () => {
     <div className="flex">
       {/* Sidebar */}
       <div className="w-64 bg-white border-r min-h-screen p-6 fixed top-0 left-0 z-10">
-        <h1 className="text-xl font-bold mb-6">🍴 Splice</h1>
+        <div className="flex justify-center mb-6">
+  <img
+    src="/poslogo.png"
+    alt="pos Logo"
+    className="h-16 w-auto"
+  />
+</div>
+
         <nav className="space-y-2">
           {navigationItems.map((item) => (
             <button
@@ -524,12 +533,11 @@ const handleSaveSupplier = () => {
               <button className="w-full text-left hover:bg-[#fff3d6] px-2 py-1 rounded">🔔 Notifications</button>
               <button className="w-full text-left hover:bg-[#fff3d6] px-2 py-1 rounded">⚙️ Settings</button>
               <div className="flex items-center justify-between px-2 py-1">
-                <span>🌙 Dark Theme</span>
-                <input type="checkbox" className="form-checkbox" />
               </div>
               <button
                 onClick={handleLogout}
-                className="w-full bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 mt-2"
+                className="w-full bg-[#800000] text-white px-4 py-2 rounded hover:bg-[#660000] mt-2"
+
               >
                 Log out
               </button>
@@ -612,7 +620,8 @@ const handleSaveSupplier = () => {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800"
+                  className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
+
                 >
                   Save
                 </button>
@@ -660,7 +669,7 @@ const handleSaveSupplier = () => {
         </button>
         <button
           onClick={handleSaveSupplier}
-          className="px-4 py-2 bg-red-700 text-white rounded hover:bg-red-800"
+          className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
         >
           Save
         </button>

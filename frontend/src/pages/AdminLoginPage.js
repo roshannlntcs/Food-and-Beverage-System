@@ -23,31 +23,41 @@ export default function AdminLoginPage() {
   };
 
   const handleModalSubmit = () => {
-  if (fullName.trim() === "") {
-    alert("Full name is required.");
-    return;
-  }
-  localStorage.setItem("adminFullName", fullName); 
-  setShowModal(false);
-  navigate("/admin");
-};
-
+    if (fullName.trim() === "") {
+      alert("Full name is required.");
+      return;
+    }
+    localStorage.setItem("adminFullName", fullName);
+    setShowModal(false);
+    navigate("/admin");
+  };
 
   return (
     <div className="h-screen flex overflow-hidden">
       {/* Left Side - Image */}
       <div className="w-2/5 h-full">
         <img
-          src="/loginpic.jpg"
+          src="/loginnpic.jpg"
           alt="Admin Illustration"
           className="w-full h-full object-cover"
         />
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="w-3/5 flex items-center justify-center bg-white p-8">
+      <div className="w-3/5 flex items-center justify-center bg-[#F6F3EA] p-8">
         <div className="w-full max-w-md">
-          <h2 className="text-3xl font-bold mb-6 text-gray-800">Admin Login</h2>
+          {/* Centered POS Logo */}
+          <div className="flex justify-center mb-6">
+            <img
+              src="/poslogo.png"
+              alt="POS Logo"
+              className="h-20 w-auto"
+            />
+          </div>
+
+          <div className="flex justify-center mb-6">
+            <h2 className="text-3xl font-bold text-gray-800">Admin Login</h2>
+          </div>
 
           {error && (
             <div className="mb-4 text-red-600 bg-red-100 p-2 rounded">
@@ -77,20 +87,22 @@ export default function AdminLoginPage() {
             />
           </div>
 
-          <button
-            onClick={handleLogin}
-            className="w-full bg-yellow-400 text-black py-2 px-4 rounded hover:bg-yellow-500 transition mb-4"
-          >
-            Login
-          </button>
+          {/* Buttons Centered */}
+         <div className="flex flex-col items-center space-y-4 mt-10">
+            <button
+              onClick={handleLogin}
+              className="h-[40px] w-[200px] bg-yellow-400 text-black py-2 px-4 rounded-[20px] hover:bg-yellow-500 transition"
+            >
+              Enter
+            </button>
 
-          {/* Go Back Button */}
-          <button
-            onClick={() => navigate("/roles")}
-            className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 transition"
-          >
-           Cancel
-          </button>
+            <button
+              onClick={() => navigate("/roles")}
+              className="h-[40px] w-[200px] bg-gray-200 text-gray-700 py-2 px-4 rounded-[20px] hover:bg-gray-300 transition"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
 
