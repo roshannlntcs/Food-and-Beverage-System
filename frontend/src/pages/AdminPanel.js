@@ -8,7 +8,93 @@ export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState("homepage");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+const [selectedTransaction, setSelectedTransaction] = useState(null);
+const [showReceiptModal, setShowReceiptModal] = useState(false);
 
+
+const [transactionData, setTransactionData] = useState([
+  {
+    date: "May 23, 2025 11:15 am",
+    userId: "Cashier 1",
+    transactionNo: "111-000191",
+    items: "Biplop with fries",
+    method: "Cash",
+    status: "Completed",
+    amount: "$54.60",
+    quantity: 2,
+    itemsList: [
+      { name: "Biplop", qty: 1, price: 25.00 },
+      { name: "Fries", qty: 1, price: 29.60 },
+    ],
+    total: 54.60,
+  },
+  {
+    date: "May 23, 2025 11:52 am",
+    userId: "Cashier 1",
+    transactionNo: "111-000192",
+    items: "Birgir with drinks",
+    method: "Cash",
+    status: "Completed",
+    amount: "$99.50",
+    quantity: 3,
+    itemsList: [
+      { name: "Birgir", qty: 2, price: 30.00 },
+      { name: "Drinks", qty: 1, price: 39.50 },
+    ],
+    total: 99.50,
+  },
+  {
+    date: "May 24, 2025 10:52 am",
+    userId: "Cashier 2",
+    transactionNo: "111-000193",
+    items: "Pastil Rice",
+    method: "Cash",
+    status: "Completed",
+    amount: "$12.50",
+    quantity: 1,
+    itemsList: [
+      { name: "Pastil Rice", qty: 1, price: 12.50 },
+    ],
+    total: 12.50,
+  },
+  ...Array(20).fill(0).map((_, i) => {
+    const even = i % 2 === 0;
+    return {
+      date: `May 25, 2025 10:${i.toString().padStart(2, '0')} am`,
+      userId: `Cashier ${i % 3 + 1}`,
+      transactionNo: `111-0002${i + 10}`,
+      items: even ? "Fried Chicken" : "Burger",
+      method: "Cash",
+      status: "Completed",
+      amount: `$${(10 + i * 2.5).toFixed(2)}`,
+      quantity: even ? 2 : 1,
+      itemsList: even
+        ? [
+            { name: "Fried Chicken", qty: 2, price: (10 + i * 2.5) / 2 },
+          ]
+        : [
+            { name: "Burger", qty: 1, price: 10 + i * 2.5 },
+          ],
+      total: parseFloat((10 + i * 2.5).toFixed(2)),
+    };
+  }),
+]);
+
+
+  const filteredData = transactionData.filter((entry) => {
+    const searchMatch = entry.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.transactionNo.includes(searchTerm) ||
+      entry.items.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const entryDate = new Date(entry.date.replace(/(\d{1,2})(am|pm)/, ' $1$2'));
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    const dateMatch = (!start || entryDate >= start) && (!end || entryDate <= end);
+    return searchMatch && dateMatch;
+  });
 
  //inventory state 
   const [inventoryData, setInventoryData] = useState([
@@ -22,8 +108,6 @@ export default function AdminPanel() {
   
   
 ]);
-
-
 
 const [showPopup, setShowPopup] = useState(false);
 const [isEditMode, setIsEditMode] = useState(false);
@@ -266,6 +350,69 @@ const [currentSupplier, setCurrentSupplier] = useState({
       </div>
     </div>
   );
+ const renderPOSMonitoring = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <h2 className="text-2xl font-bold">Transactions</h2>
+        <div className="flex gap-4 items-center">
+          <input type="date" className="border p-2 rounded" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <span>—</span>
+          <input type="date" className="border p-2 rounded" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        </div>
+      </div>
+
+      <input
+        type="text"
+        placeholder="Search"
+        className="w-full p-2 border border-gray-300 rounded"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+
+      <div className="overflow-x-auto max-h-[400px] overflow-y-scroll border rounded">
+        <table className="min-w-full bg-white border">
+         <thead>
+  <tr className="bg-gray-100 text-left">
+    <th className="p-3 border">Date</th>
+    <th className="p-3 border">User ID</th>
+    <th className="p-3 border">Transaction No.</th>
+    <th className="p-3 border">Ordered Items</th>
+    <th className="p-3 border">Quantity</th> {/* 🆕 Add this line */}
+    <th className="p-3 border">Payment Method</th>
+    <th className="p-3 border">Status</th>
+    <th className="p-3 border">Amount</th>
+  </tr>
+</thead>
+          <tbody>
+  {filteredData.map((row, index) => (
+    <tr key={index} className="border-t">
+      <td className="p-3 border">{row.date}</td>
+      <td className="p-3 border">{row.userId}</td>
+      <td
+        className="p-3 border text-blue-700 underline cursor-pointer"
+        onClick={() => setSelectedTransaction(row)}
+      >
+        {row.transactionNo}
+      </td>
+      <td className="p-3 border">{row.items}</td>
+      <td className="p-3 border">{row.quantity || (row.itemsList?.reduce((sum, item) => sum + item.qty, 0) || 0)}</td> {/* 🆕 Quantity */}
+      <td className="p-3 border">{row.method}</td>
+      <td className="p-3 border">{row.status}</td>
+      <td className="p-3 border">{row.amount}</td>
+    </tr>
+  ))}
+</tbody>
+        </table>
+      </div>
+
+      <div className="text-right">
+        <button className="bg-yellow-500 text-black px-4 py-2 rounded hover:bg-yellow-600">
+          View Sales Report
+        </button>
+      </div>
+    </div>
+  );
+
 const renderSuppliers = () => {
   return (
     <div className="space-y-6">
@@ -401,14 +548,17 @@ const handleSaveSupplier = () => {
   switch (activeSection) {
     case "homepage": return renderHomepage();
     case "inventory": return renderInventory();
-    case "pos": return <h2 className="text-2xl font-bold">POS Monitoring</h2>;
+   case "pos": return renderPOSMonitoring();
     case "suppliers": return renderSuppliers(); // ← change this line
     case "voidlogs": return <h2 className="text-2xl font-bold">Void Logs</h2>;
     default: return renderHomepage();
+    
   }
 };
 
-{renderContent()}
+{renderContent()
+  
+}
 
 {showPopup && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
@@ -677,6 +827,65 @@ const handleSaveSupplier = () => {
     </div>
   </div>
 )}
+{selectedTransaction && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white rounded-lg p-10 w-[40%] max-w-md shadow-lg relative font-sans text-gray-800">
+      {/* Splice Logo */}
+      <div className="flex justify-center mb-4">
+        <img src="/splice.png" alt="Splice Logo" className="w-24 h-24 object-contain" />
+      </div>
+
+      {/* Transaction Info */}
+      <div className="text-sm space-y-2">
+        <p><strong>Transaction Id:</strong> {selectedTransaction.transactionNo}</p>
+        <p><strong>Date & Time:</strong> {selectedTransaction.date}</p>
+        <p><strong>Cashier:</strong> {selectedTransaction.userId}</p>
+        <p><strong>Status:</strong> {selectedTransaction.status}</p>
+        <p className="mb-20"><strong>Mode of Payment:</strong> {selectedTransaction.method}</p>
+      </div>
+
+      {/* Items Table */}
+      <div className="mt-4 border-t border-b py-2">
+        <div className="flex font-semibold mb-1">
+          <div className="w-1/2">Items:</div>
+          <div className="w-1/4 text-center">Quantity</div>
+          <div className="w-1/4 text-right">Price</div>
+        </div>
+        {(selectedTransaction.itemsList || []).map((item, idx) => (
+          <div className="flex text-sm" key={idx}>
+            <div className="w-1/2">{item.name}</div>
+            <div className="w-1/4 text-center">{item.qty}</div>
+            <div className="w-1/4 text-right">{item.price}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Total */}
+     <div className="flex justify-between items-center font-bold mt-5 mb-100 text-sm leading-tight">
+  <span className="text-left">Total:</span>
+  <span className="text-right">₱{selectedTransaction.total || "0.00"}</span>
+</div>
+
+      {/* Buttons */}
+      <div className="flex flex-col gap-2 mt-6">
+        <button
+          onClick={() => window.print()} // Can be customized
+          className="bg-yellow-400 text-black py-2 rounded font-semibold hover:bg-yellow-500"
+        >
+          Print
+        </button>
+        <button
+          onClick={() => setSelectedTransaction(null)}
+          className="bg-black text-white py-2 rounded font-semibold hover:bg-gray-800"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
 
       </div>
     </div>
