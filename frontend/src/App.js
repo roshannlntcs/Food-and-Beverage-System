@@ -5,7 +5,7 @@ import RoleSelection from './pages/RoleSelection';
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminPanel from "./pages/AdminPanel"; 
 import UserLoginPage from './pages/UserLoginPage';
-import UserPanel from './pages/UserPanel';
+import POSMain from './pages/pos/POSMain';
 
 function App() {
   return (
@@ -16,7 +16,7 @@ function App() {
         <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route path="/admin" element={<AdminPanel />} /> 
         <Route path="/user-login" element={<UserLoginPage />} />
-        <Route path="/user" element={<UserPanel />} />
+        <Route path="/user" element={<POSMain />} />
       </Routes>
     </Router>
   );
