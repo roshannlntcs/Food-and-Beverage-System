@@ -1,7 +1,20 @@
 // src/POSMain.jsx
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import logoPos from '../../assets/logo-pos2.png';
+import avatar from "../../assets/avatar-ph.png";
+
+
 export default function POSMain() {
+
+  const navigate = useNavigate();
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // Retrieve current user info
+  const userName = localStorage.getItem("userName") || "Cashier";
+  const schoolId = localStorage.getItem("schoolId") || "N/A";
+
   const categories = [
     { key: "All Menu",    icon: "📋" },
     { key: "Main Dish",   icon: "🍛" },
@@ -583,13 +596,19 @@ export default function POSMain() {
             onChange={e => setSearchTerm(e.target.value)}
             className="flex-1 mx-6 h-12 px-4 border border-gray-200 rounded shadow"
           />
-          <button className="flex items-center space-x-1 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:bg-yellow-100">
-          <div className="w-8 h-8 flex items-center justify-center rounded-full text-3xl">
-  🧑‍💼
-</div>
-            <div className="text-left">
-              <div className="font-bold text-black">Viole Ragnvindr</div>
-              <div className="text-small text-black">Cashier</div>
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center space-x-1 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:bg-yellow-100"
+          >
+            <img
+  src={avatar}
+  alt="Avatar"
+  className="w-8 h-8 rounded-full object-cover"
+/>
+
+            <div className="text-left leading-tight">
+              <div className="font-bold">{userName}</div>
+              <div className="text-xs font-semibold">Cashier</div>
             </div>
           </button>
         </div>
@@ -597,7 +616,7 @@ export default function POSMain() {
         {/* MAIN BODY */}
         <div className="flex flex-1 overflow-hidden">
           {/* CATEGORY SIDEBAR */}
-          <div className="w-24 bg-[#F6F3EA] py-0.5 px-1 space-y-1.5 border-r border-transparent">
+          <div className="w-24 bg-[#F6F3EA] py-2 px-1 space-y-1.5 border-r border-transparent">
             {categories.map(cat => (
               <button
                 key={cat.key}
@@ -606,11 +625,11 @@ export default function POSMain() {
                   setSearchTerm("");
                 }}
                 className={`w-full aspect-square flex flex-col items-center justify-center rounded shadow bg-gray-200 hover:bg-white ${
-                  activeCategory === cat.key ? "bg-white font-semibold" : ""
+                  activeCategory === cat.key ? "bg-white font-bold" : ""
                 }`}
               >
                 <div className="text-lg mb-px">{cat.icon}</div>
-                <span className="uppercase text-center leading-tight text-[10px]">{cat.key}</span>
+                <span className="uppercase text-center leading-tight text-[12px]">{cat.key}</span>
               </button>
             ))}
           </div>
@@ -697,7 +716,23 @@ export default function POSMain() {
                         <div className="font-semibold mb-2">Order ID: {o.id}</div>
                         <div className="mb-1"><strong>Txn:</strong> {o.transactionID}</div>
                         <div className="mb-1"><strong>Date:</strong> {o.date}</div>
-                        <div className="text-sm"><strong>Items:</strong> {o.items.map(i=>i.name).join(", ")}</div>
+                        <div className="text-sm">
+  <strong>Items:</strong>
+  <ul className="list-disc list-inside">
+    {o.items.map((i, idx) => (
+      <li key={idx} className="mb-1">
+        {i.name} x{i.quantity}
+        <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
+          {i.size       && <li>Size:     {i.size.label || i.size}</li>}
+          {i.addons     && <li>Add‑ons:  {i.addons.map(a => a.label || a).join(", ")}</li>}
+          {i.notes      && <li>Notes:    {i.notes}</li>}
+        </ul>
+      </li>
+    ))}
+  </ul>
+</div>
+
+
                       </div>
                     ))}
                   </div>
@@ -764,8 +799,20 @@ export default function POSMain() {
             <div className="mb-1"><strong>Tax:</strong> ₱{tx.tax.toFixed(2)}</div>
 
             <div className="text-sm mb-1">
-              <strong>Items:</strong> {tx.items.map(i => `${i.name} x${i.quantity}`).join(", ")}
-            </div>
+  <strong>Items:</strong>
+  <ul className="list-disc list-inside">
+    {tx.items.map((i, idx) => (
+      <li key={idx} className="mb-1">
+        {i.name} x{i.quantity}
+        <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
+          {i.size   && <li>Size:     {i.size.label || i.size}</li>}
+          {i.addons && <li>Add‑ons:  {i.addons.map(a => a.label || a).join(", ")}</li>}
+          {i.notes  && <li>Notes:    {i.notes}</li>}
+        </ul>
+      </li>
+    ))}
+  </ul>
+</div>
             <div><strong>Total:</strong> ₱{tx.total.toFixed(2)}</div>
           </div>
         ))}
@@ -1156,6 +1203,40 @@ export default function POSMain() {
           </div>
         </div>
       )}
+
+{/* Profile Modal */}
+{showProfileModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl shadow-lg p-6 w-80 text-center">
+      <h2 className="text-xl font-bold mb-4">User Profile</h2>
+      <img
+  src={avatar}
+  alt="Avatar"
+  className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
+/>
+      <p className="mb-2"><strong>Name:</strong> {userName}</p>
+      <p className="mb-4"><strong>School ID:</strong> {schoolId}</p>
+      <div className="flex justify-center space-x-4">
+        <button
+          onClick={() => setShowProfileModal(false)}
+          className="bg-gray-200 px-4 py-2 rounded font-semibold"
+        >
+          Close
+        </button>
+        <button
+          onClick={() => {
+            localStorage.removeItem("userName");
+            localStorage.removeItem("schoolId");
+            navigate("/roles");
+          }}
+          className="bg-red-800 text-white px-4 py-2 rounded font-semibold"
+        >
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 } 

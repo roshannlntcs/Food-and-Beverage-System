@@ -13,8 +13,13 @@ export default function UserLoginPage() {
       setError("Please enter both School ID and Name.");
       return;
     }
+  
+    // Store user details in localStorage so POSMain can retrieve them
+    localStorage.setItem("schoolId", schoolId.trim());
+    localStorage.setItem("userName", name.trim());
+  
     navigate("/user");
-  };
+  };  
 
   return (
     <div className="h-screen flex overflow-hidden bg-[#F6F3EA]">
