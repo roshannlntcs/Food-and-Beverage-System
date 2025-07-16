@@ -1,5 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  Home,
+  ClipboardCheck,
+  Monitor,
+  Contact,
+  Flag,
+  Bell,
+} from "lucide-react";
 
 
 export default function AdminPanel() {
@@ -11,8 +19,20 @@ export default function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-const [selectedTransaction, setSelectedTransaction] = useState(null);
-const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [inventorySearchTerm, setInventorySearchTerm] = useState("");
+  const [supplierSearchTerm, setSupplierSearchTerm] = useState("");
+  const [voidSearchTerm, setVoidSearchTerm] = useState("");
+
+const [showNotifications, setShowNotifications] = useState(false);
+const [notifications, setNotifications] = useState([
+  { id: 1, message: "Low stock: French Fries" },
+  { id: 2, message: "Void request pending approval" },
+  { id: 3, message: "New supplier added: Fish Pen" },
+]);
+const notificationRef = useRef();
+
 
 
 const [transactionData, setTransactionData] = useState([
@@ -270,12 +290,13 @@ const [voidLogs, setVoidLogs] = useState([
   };
 
   const navigationItems = [
-    { id: "homepage", label: "Home" },
-    { id: "inventory", label: "Inventory" },
-    { id: "pos", label: "POS Monitoring" },
-    { id: "suppliers", label: "Supplier Records" },
-    { id: "voidlogs", label: "Void Logs" },
-  ];
+  { id: "homepage", label: "Home", icon: <Home size={18} className="text-black" /> },
+  { id: "inventory", label: "Inventory", icon: <ClipboardCheck size={18} className="text-black" /> },
+  { id: "pos", label: "POS Monitoring", icon: <Monitor size={18} className="text-black" /> },
+  { id: "suppliers", label: "Supplier Records", icon: <Contact size={18} className="text-black" /> },
+  { id: "voidlogs", label: "Void Logs", icon: <Flag size={18} className="text-black" /> },
+];
+
 
   const renderHomepage = () => (
   <div className="space-y-2">
@@ -344,6 +365,8 @@ const [voidLogs, setVoidLogs] = useState([
   type="text"
   placeholder="Search"
   className="w-1/4 p-2 border border-gray-300 rounded"
+  value={inventorySearchTerm}
+  onChange={(e) => setInventorySearchTerm(e.target.value)}
 />
 
       <div className="overflow-x-auto max-h-[400px] overflow-y-scroll rounded border">
@@ -361,7 +384,12 @@ const [voidLogs, setVoidLogs] = useState([
               </tr>
           </thead>
          <tbody>
-  {inventoryData.map((item, index) => (
+  {inventoryData
+  .filter(item =>
+    item.name.toLowerCase().includes(inventorySearchTerm.toLowerCase()) ||
+    item.category.toLowerCase().includes(inventorySearchTerm.toLowerCase())
+  )
+  .map((item, index) => (
     <tr key={index} className="border-t">
       <td className="p-3 border">{index + 1}</td>
       <td className="p-3 border">{item.name}</td>
@@ -396,22 +424,40 @@ const [voidLogs, setVoidLogs] = useState([
   );
  const renderPOSMonitoring = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <h2 className="text-2xl font-bold">Transactions</h2>
-        <div className="flex gap-4 items-center">
-          <input type="date" className="border p-2 rounded" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          <span>—</span>
-          <input type="date" className="border p-2 rounded" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </div>
-      </div>
+      {/* Title */}
+<h2 className="text-xl font-bold mb-4">POS Monitoring</h2>
 
-      <input
-       type="text"
+{/* Top row with search bar on left and date filters on right */}
+<div className="flex justify-between items-center flex-wrap gap-4 mb-4">
+  {/* Search bar on the left */}
+  <div className="flex-grow max-w-sm">
+    <input
+      type="text"
       placeholder="Search"
-      className="w-1/4 p-2 border border-gray-300 rounded"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
+      className="w-full p-2 border border-gray-300 rounded"
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+    />
+  </div>
+
+  {/* Date filters on the right */}
+  <div className="flex gap-2 items-center">
+    <input
+      type="date"
+      className="border p-2 rounded"
+      value={startDate}
+      onChange={(e) => setStartDate(e.target.value)}
+    />
+    <span className="self-center">—</span>
+    <input
+      type="date"
+      className="border p-2 rounded"
+      value={endDate}
+      onChange={(e) => setEndDate(e.target.value)}
+    />
+  </div>
+</div>
+
 
       <div className="overflow-x-auto max-h-[400px] overflow-y-scroll border rounded">
         <table className="min-w-full bg-white border">
@@ -489,7 +535,10 @@ const renderSuppliers = () => {
   type="text"
   placeholder="Search"
   className="w-1/4 p-2 border border-gray-300 rounded"
+  value={supplierSearchTerm}
+  onChange={(e) => setSupplierSearchTerm(e.target.value)}
 />
+
 
       {/* Scrollable Table */}
       <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded border">
@@ -507,7 +556,12 @@ const renderSuppliers = () => {
             </tr>
           </thead>
           <tbody>
-            {supplierData.map((supplier, index) => (
+            {supplierData
+  .filter(supplier =>
+    supplier.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
+    supplier.products.toLowerCase().includes(supplierSearchTerm.toLowerCase())
+  )
+  .map((supplier, index) => (
               <tr key={index} className="border-t">
                 <td className="p-3 border">{supplier.name}</td>
                 <td className="p-3 border">{supplier.contact}</td>
@@ -594,10 +648,13 @@ const renderVoidLogs = () => (
     </div>
 
     <input
-     type="text"
+  type="text"
   placeholder="Search"
   className="w-1/4 p-2 border border-gray-300 rounded"
-    />
+  value={voidSearchTerm}
+  onChange={(e) => setVoidSearchTerm(e.target.value)}
+/>
+
 
     <div className="overflow-x-auto max-h-[400px] overflow-y-scroll rounded border">
       <table className="min-w-full bg-white border">
@@ -613,7 +670,13 @@ const renderVoidLogs = () => (
           </tr>
         </thead>
         <tbody>
-          {voidLogs.map((log, index) => (
+          {voidLogs
+  .filter(log =>
+    log.transactionId.toLowerCase().includes(voidSearchTerm.toLowerCase()) ||
+    log.userName.toLowerCase().includes(voidSearchTerm.toLowerCase()) ||
+     log.adminName.toLowerCase().includes(voidSearchTerm.toLowerCase())
+  )
+  .map((log, index) => (
             <tr key={index} className="border-t">
               <td className="p-3 border">{log.voidId}</td>
               <td className="p-3 border">{log.transactionId}</td>
@@ -651,151 +714,82 @@ const renderContent = () => (
   </div>
 );
 
-{renderContent()
-  
-}
-
-{showPopup && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-    <div className="bg-white rounded p-6 w-[90%] max-w-md">
-      <h2 className="text-xl font-bold mb-4">
-        {isEditMode ? "Edit Item" : "Add Item"}
-      </h2>
-      <div className="space-y-3">
-        <input
-          type="text"
-          placeholder="Name"
-          value={currentItem.name}
-          onChange={(e) =>
-            setCurrentItem({ ...currentItem, name: e.target.value })
-          }
-          className="w-full border p-2 rounded"
-        />
-        <input
-          type="number"
-          placeholder="Price"
-          value={currentItem.price}
-          onChange={(e) =>
-            setCurrentItem({ ...currentItem, price: parseFloat(e.target.value) })
-          }
-          className="w-full border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Category"
-          value={currentItem.category}
-          onChange={(e) =>
-            setCurrentItem({ ...currentItem, category: e.target.value })
-          }
-          className="w-full border p-2 rounded"
-        />
-        <input
-          type="number"
-          placeholder="Quantity"
-          value={currentItem.qty}
-          onChange={(e) =>
-            setCurrentItem({ ...currentItem, qty: parseInt(e.target.value) })
-          }
-          className="w-full border p-2 rounded"
-        />
-        <select
-          value={currentItem.status}
-          onChange={(e) =>
-            setCurrentItem({ ...currentItem, status: e.target.value })
-          }
-          className="w-full border p-2 rounded"
-        >
-          <option value="Available">Available</option>
-          <option value="Unavailable">Unavailable</option>
-        </select>
-      </div>
-      <div className="flex justify-end mt-4 gap-2">
-        <button
-          onClick={() => setShowPopup(false)}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
- return (
+return (
   <div className="min-h-screen h-screen overflow-hidden bg-[#F6F3EA] text-gray-800">
     <div className="flex">
       {/* Sidebar */}
       <div className="w-64 bg-white border-r min-h-screen p-6 fixed top-0 left-0 z-10">
         <div className="flex justify-center mb-6">
-  <img
-    src="/poslogo.png"
-    alt="pos Logo"
-    className="h-16 w-auto"
-  />
-</div>
-
+          <img src="/splice.png" alt="pos Logo" className="h-18 w-auto" />
+        </div>
         <nav className="space-y-2">
           {navigationItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`w-full text-left px-4 py-2 rounded transition-colors ${
+              className={`w-full text-left px-4 py-2 rounded flex items-center gap-2 transition-colors ${
                 activeSection === item.id
                   ? "bg-[#F6EBCE] text-black font-semibold"
                   : "hover:bg-[#F6EBCE] text-gray-700"
               }`}
             >
+              {item.icon}
               {item.label}
             </button>
           ))}
         </nav>
       </div>
 
-      {/* Main Panel */}
-      <div className="flex-1 ml-64 h-screen relative overflow-hidden bg-[#F6F3EA] px-8 pt-8">
-        {/* Profile Button */}
-        <div className="absolute top-6 right-8 z-20">
+      {/* Top Right: Notifications + Profile */}
+      <div className="absolute top-6 right-8 z-20 flex items-center gap-4" ref={profileMenuRef}>
+        {/* Notification Bell */}
+        <div className="relative" ref={notificationRef}>
           <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="bg-[#EEE0C9] text-black px-4 py-2 rounded-full hover:bg-[#e6d6ba] transition"
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
           >
-            {adminName}
+            <Bell size={20} className="text-black" />
           </button>
-
-          {showProfileMenu && (
-            <div
-              ref={profileMenuRef}
-              className="absolute right-0 mt-2 w-56 bg-[#FDF7E7] border rounded shadow-lg z-50 p-4 space-y-3 animate-fade-in"
-            >
-              <button className="w-full text-left hover:bg-[#fff3d6] px-2 py-1 rounded">👤 Profile</button>
-              <button className="w-full text-left hover:bg-[#fff3d6] px-2 py-1 rounded">🔔 Notifications</button>
-              <button className="w-full text-left hover:bg-[#fff3d6] px-2 py-1 rounded">⚙️ Settings</button>
-              <div className="flex items-center justify-between px-2 py-1">
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-full bg-[#800000] text-white px-4 py-2 rounded hover:bg-[#660000] mt-2"
-
-              >
-                Log out
-              </button>
+          {showNotifications && (
+            <div className="absolute right-0 mt-2 w-64 bg-white border rounded shadow-lg z-10">
+              <div className="p-4 border-b font-semibold">Notifications</div>
+              <ul className="max-h-60 overflow-y-auto">
+                {notifications.map((notif) => (
+                  <li key={notif.id} className="p-3 text-sm hover:bg-gray-100 border-b">
+                    {notif.message}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
 
-        {/* Scrollable Main Content */}
-        <div className="mt-24 h-full pb-4 overflow-y-auto flex flex-col gap-8">
-          {renderContent()}
+        {/* Profile Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="bg-gray-200 text-black px-4 py-2 rounded hover:bg-gray-300"
+          >
+            {adminName}
+          </button>
+          {showProfileMenu && (
+            <div className="absolute right-0 mt-2 bg-white border rounded shadow z-10 w-40">
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* ✅ POPUP MODAL */}
+      {/* Main Scrollable Content */}
+     <div className="ml-64 mt-24 px-6 pb-8 overflow-y-auto w-full">
+        {renderContent()}
+
+        {/* Popup: Add/Edit Inventory */}
         {showPopup && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className="bg-white rounded p-6 w-[90%] max-w-md">
@@ -866,7 +860,6 @@ const renderContent = () => (
                 <button
                   onClick={handleSave}
                   className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
-
                 >
                   Save
                 </button>
@@ -874,117 +867,109 @@ const renderContent = () => (
             </div>
           </div>
         )}
-        {/* ✅ END POPUP MODAL */}
+
+        {/* Popup: Add/Edit Supplier */}
         {showSupplierPopup && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-    <div className="bg-white rounded p-6 w-[90%] max-w-md">
-      <h2 className="text-xl font-bold mb-4">
-        {isEditSupplierMode ? "Edit Supplier" : "Add Supplier"}
-      </h2>
-      <div className="space-y-3">
-        {["name", "contact", "phone", "email", "address", "products"].map((field) => (
-          <input
-            key={field}
-            type="text"
-            placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-            value={currentSupplier[field]}
-            onChange={(e) =>
-              setCurrentSupplier({ ...currentSupplier, [field]: e.target.value })
-            }
-            className="w-full border p-2 rounded"
-          />
-        ))}
-        <select
-          value={currentSupplier.status}
-          onChange={(e) =>
-            setCurrentSupplier({ ...currentSupplier, status: e.target.value })
-          }
-          className="w-full border p-2 rounded"
-        >
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
-      </div>
-      <div className="flex justify-end mt-4 gap-2">
-        <button
-          onClick={() => setShowSupplierPopup(false)}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSaveSupplier}
-          className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-{selectedTransaction && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-    <div className="bg-white rounded-lg p-10 w-[40%] max-w-md shadow-lg relative font-sans text-gray-800">
-      {/* Splice Logo */}
-      <div className="flex justify-center mb-4">
-        <img src="/splice.png" alt="Splice Logo" className="w-24 h-24 object-contain" />
-      </div>
-
-      {/* Transaction Info */}
-      <div className="text-sm space-y-2">
-        <p><strong>Transaction Id:</strong> {selectedTransaction.transactionNo}</p>
-        <p><strong>Date & Time:</strong> {selectedTransaction.date}</p>
-        <p><strong>Cashier:</strong> {selectedTransaction.userId}</p>
-        <p><strong>Status:</strong> {selectedTransaction.status}</p>
-        <p className="mb-20"><strong>Mode of Payment:</strong> {selectedTransaction.method}</p>
-      </div>
-
-      {/* Items Table */}
-      <div className="mt-4 border-t border-b py-2">
-        <div className="flex font-semibold mb-1">
-          <div className="w-1/2">Items:</div>
-          <div className="w-1/4 text-center">Quantity</div>
-          <div className="w-1/4 text-right">Price</div>
-        </div>
-        {(selectedTransaction.itemsList || []).map((item, idx) => (
-          <div className="flex text-sm" key={idx}>
-            <div className="w-1/2">{item.name}</div>
-            <div className="w-1/4 text-center">{item.qty}</div>
-            <div className="w-1/4 text-right">{item.price}</div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white rounded p-6 w-[90%] max-w-md">
+              <h2 className="text-xl font-bold mb-4">
+                {isEditSupplierMode ? "Edit Supplier" : "Add Supplier"}
+              </h2>
+              <div className="space-y-3">
+                {["name", "contact", "phone", "email", "address", "products"].map((field) => (
+                  <input
+                    key={field}
+                    type="text"
+                    placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                    value={currentSupplier[field]}
+                    onChange={(e) =>
+                      setCurrentSupplier({ ...currentSupplier, [field]: e.target.value })
+                    }
+                    className="w-full border p-2 rounded"
+                  />
+                ))}
+                <select
+                  value={currentSupplier.status}
+                  onChange={(e) =>
+                    setCurrentSupplier({ ...currentSupplier, status: e.target.value })
+                  }
+                  className="w-full border p-2 rounded"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+              <div className="flex justify-end mt-4 gap-2">
+                <button
+                  onClick={() => setShowSupplierPopup(false)}
+                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSupplier}
+                  className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Total */}
-     <div className="flex justify-between items-center font-bold mt-5 mb-100 text-sm leading-tight">
-  <span className="text-left">Total:</span>
-  <span className="text-right">₱{selectedTransaction.total || "0.00"}</span>
-</div>
-
-      {/* Buttons */}
-      <div className="flex flex-col gap-2 mt-6">
-        <button
-          onClick={() => window.print()} // Can be customized
-          className="bg-yellow-400 text-black py-2 rounded font-semibold hover:bg-yellow-500"
-        >
-          Print
-        </button>
-        <button
-          onClick={() => setSelectedTransaction(null)}
-          className="bg-black text-white py-2 rounded font-semibold hover:bg-gray-800"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-
+        {/* Popup: Transaction Details */}
+        {selectedTransaction && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white rounded-lg p-10 w-[40%] max-w-md shadow-lg relative font-sans text-gray-800">
+              <div className="flex justify-center mb-4">
+                <img src="/splice.png" alt="Splice Logo" className="w-24 h-24 object-contain" />
+              </div>
+              <div className="text-sm space-y-2">
+                <p><strong>Transaction Id:</strong> {selectedTransaction.transactionNo}</p>
+                <p><strong>Date & Time:</strong> {selectedTransaction.date}</p>
+                <p><strong>Cashier:</strong> {selectedTransaction.userId}</p>
+                <p><strong>Status:</strong> {selectedTransaction.status}</p>
+                <p className="mb-20"><strong>Mode of Payment:</strong> {selectedTransaction.method}</p>
+              </div>
+              <div className="mt-4 border-t border-b py-2">
+                <div className="flex font-semibold mb-1">
+                  <div className="w-1/2">Items:</div>
+                  <div className="w-1/4 text-center">Quantity</div>
+                  <div className="w-1/4 text-right">Price</div>
+                </div>
+                {(selectedTransaction.itemsList || []).map((item, idx) => (
+                  <div className="flex text-sm" key={idx}>
+                    <div className="w-1/2">{item.name}</div>
+                    <div className="w-1/4 text-center">{item.qty}</div>
+                    <div className="w-1/4 text-right">{item.price}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between items-center font-bold mt-5 text-sm leading-tight">
+                <span className="text-left">Total:</span>
+                <span className="text-right">₱{selectedTransaction.total || "0.00"}</span>
+              </div>
+              <div className="flex flex-col gap-2 mt-6">
+                <button
+                  onClick={() => window.print()}
+                  className="bg-yellow-400 text-black py-2 rounded font-semibold hover:bg-yellow-500"
+                >
+                  Print
+                </button>
+                <button
+                  onClick={() => setSelectedTransaction(null)}
+                  className="bg-black text-white py-2 rounded font-semibold hover:bg-gray-800"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   </div>
 );
+
 
 }

@@ -22,11 +22,12 @@ export default function RoleSelection() {
           onClick={() => navigate("/admin-login")}
           onMouseEnter={() => setHovered("admin")}
           onMouseLeave={() => setHovered(null)}
-          className="cursor-pointer w-40 h-40 rounded-lg flex items-center justify-center text-lg font-semibold shadow-md transition duration-300"
+          className="cursor-pointer w-40 h-40 rounded-lg flex flex-col items-center justify-center text-lg font-semibold shadow-md transition duration-300"
           style={{
             backgroundColor: hovered === "admin" ? hoverColor : baseColor,
-          }}
+          }}  
         >
+          <i className="fas fa-wrench text-3xl mb-2"></i>
           Admin
         </div>
 
@@ -35,11 +36,12 @@ export default function RoleSelection() {
           onClick={() => navigate("/user-login")}
           onMouseEnter={() => setHovered("user")}
           onMouseLeave={() => setHovered(null)}
-          className="cursor-pointer w-40 h-40 rounded-lg flex items-center justify-center text-lg font-semibold shadow-md transition duration-300"
+          className="cursor-pointer w-40 h-40 rounded-lg flex flex-col items-center justify-center text-lg font-semibold shadow-md transition duration-300"
           style={{
             backgroundColor: hovered === "user" ? hoverColor : baseColor,
           }}
         >
+          <i className="fas fa-user text-3xl mb-2"></i>
           User
         </div>
       </div>
