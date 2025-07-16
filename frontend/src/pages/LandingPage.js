@@ -32,11 +32,11 @@ const LandingPage = () => {
         </div>
 
         {/* Right Half with Content */}
-        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-10 md:px-28 py-16">
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-10 md:px-28 py-20">
           {/* Wrapper for text block */}
-          <div className="text-left w-full max-w-[500px]">
+          <div className="text-left w-full max-w-[600px]">
             {/* Heading */}
-            <h1 className="text-4xl md:text-6xl font-extrabold leading-snug mb-10">
+            <h1 className="text-3xl md:text-6xl font-extrabold leading-tight mb-10">
               Streamline Your <br /> Sales & Inventory <br /> With Ease
             </h1>
 

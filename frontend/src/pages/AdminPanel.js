@@ -278,7 +278,10 @@ const [voidLogs, setVoidLogs] = useState([
   ];
 
   const renderHomepage = () => (
-  <div className="space-y-6">
+  <div className="space-y-2">
+            <div className="absolute top-10 left-10 text-3xl font-bold text-gray-800">
+          Welcome, {adminName || "Admin"}!
+    </div>
     {/* Stats on top */}
     <div className="grid grid-cols-3 gap-4">
       <div className="bg-white p-4 rounded shadow">
@@ -345,16 +348,17 @@ const [voidLogs, setVoidLogs] = useState([
 
       <div className="overflow-x-auto max-h-[400px] overflow-y-scroll rounded border">
         <table className="min-w-full bg-white border">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="text-left p-3 border">No.</th>
-              <th className="text-left p-3 border">Name</th>
-              <th className="text-left p-3 border">Price</th>
-              <th className="text-left p-3 border">Category</th>
-              <th className="text-left p-3 border">Quantity</th>
-              <th className="text-left p-3 border">Status</th>
-              <th className="text-left p-3 border">Actions</th>
-            </tr>
+         <thead className="sticky top-0 bg-gray-100 z-20">
+  <tr className="text-left">
+  
+              <th className="p-3 border">No.</th>
+              <th className="p-3 border">Name</th>
+              <th className="p-3 border">Price</th>
+              <th className="p-3 border">Category</th>
+              <th className="p-3 border">Quantity</th>
+              <th className="p-3 border">Status</th>
+              <th className="p-3 border">Actions</th>
+              </tr>
           </thead>
          <tbody>
   {inventoryData.map((item, index) => (
@@ -540,7 +544,7 @@ const renderSuppliers = () => {
     </div>
   );
 };
- 
+
 
 const handleSave = () => {
   if (isEditMode) {
