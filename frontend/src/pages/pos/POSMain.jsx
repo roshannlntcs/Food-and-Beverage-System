@@ -1,485 +1,721 @@
 // src/POSMain.jsx
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import logoPos from '../../assets/logo-pos2.png';
-import avatar from "../../assets/avatar-ph.png";
+import { useNavigate } from "react-router-dom"; 
+import React, { useState, useEffect, useMemo } from "react";
 
+// Grab every image file in ../../assets
+const importAll = (r) =>
+  r.keys().reduce((acc, key) => {
+    // key looks like "./beef-mechado.jpg" → trim the "./"
+    const fileName = key.replace("./", "");
+    acc[fileName] = r(key);
+    return acc;
+  }, {});
+
+const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
 
 export default function POSMain() {
 
   const navigate = useNavigate();
-
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("All Menu");
+  const [activeTab, setActiveTab] = useState("Menu");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [products, setProducts] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [itemAvailability, setItemAvailability] = useState({});
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountType, setDiscountType] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [discountPct, setDiscountPct] = useState(0);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalProduct, setModalProduct] = useState(null);
+  const [showVoidPassword, setShowVoidPassword] = useState(false);
+  const [voidPasswordInput, setVoidPasswordInput] = useState("");
+  const [voidContext, setVoidContext] = useState({ type: null, index: null });
+  const [paymentMethod, setPaymentMethod] = useState("");
 
-  // Retrieve current user info
+  // get user info
   const userName = localStorage.getItem("userName") || "Cashier";
-  const schoolId = localStorage.getItem("schoolId") || "N/A";
-
-  const categories = [
-    { key: "All Menu",    icon: "📋" },
-    { key: "Main Dish",   icon: "🍛" },
-    { key: "Appetizers",  icon: "🍢" },
-    { key: "Side Dish",   icon: "🍟" },
-    { key: "Soup",        icon: "🥣" },
-    { key: "Desserts",    icon: "🍮" },
-    { key: "Drinks",      icon: "☕️" }
-  ];
-
-  const tabs = [
-    { key: "Menu",         icon: "📖" },
-    { key: "Orders",       icon: "📝" },
-    { key: "Transactions", icon: "💳" },
-    { key: "Items",        icon: "📦" },
-    { key: "Discount",     icon: "🏷️" }
-  ];
+  const schoolId = localStorage.getItem("schoolId") || "";
 
   const basePassword = "123456";
 
-  const placeholders = {
-    "Main Dish": [
-      {
-        name: "Humba",
-        price: 120,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 20 }],
-        addons: [{ label: "Extra Sauce", price: 10 }],
-        allergens: "Soy, Pork"
-      },
-      {
-        name: "Kaldereta",
-        price: 130,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 20 }],
-        addons: [{ label: "Cheese", price: 15 }],
-        allergens: "Beef, Dairy"
-      },
-      {
-        name: "Beef Mechado",
-        price: 135,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 25 }],
-        addons: [{ label: "Extra Carrots", price: 5 }],
-        allergens: "Beef"
-      },
-      {
-        name: "Chicken Adobo",
-        price: 115,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Double Chicken", price: 40 }],
-        addons: [{ label: "Hard-Boiled Egg", price: 10 }],
-        allergens: "Soy, Egg"
-      },
-      {
-        name: "Pork Binagoongan",
-        price: 140,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Extra Bagoong", price: 10 }],
-        allergens: "Fish"
-      },
-      {
-        name: "Chicken Curry",
-        price: 125,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Spicy", price: 10 }],
-        addons: [{ label: "Potato", price: 5 }],
-        allergens: "Dairy"
-      },
-      {
-        name: "Beef Caldereta",
-        price: 138,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Extra Meat", price: 30 }],
-        addons: [{ label: "Green Peas", price: 5 }],
-        allergens: "Beef"
-      },
-      {
-        name: "Pork Sisig",
-        price: 150,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Extra Chili", price: 5 }],
-        allergens: "Pork, Onion"
-      },
-      {
-        name: "Laing",
-        price: 110,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Extra Coconut Milk", price: 10 }],
-        allergens: "Coconut"
-      },
-      {
-        name: "Bicol Express",
-        price: 130,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Extra Chili", price: 5 }],
-        allergens: "Pork, Coconut"
-      }
-    ],
+// inside POSMain.jsx, replace your current placeholders with this:
 
-    "Appetizers": [
-      { name: "Spring Rolls",       price: 80,  sizes: [{label:"6 pcs", price:0}], addons: [{label:"Sweet Sauce", price:10}], allergens:"Gluten", },
-      { name: "Chicken Wings",      price: 120, sizes: [{label:"6 pcs", price:0}], addons: [{label:"Spicy Dip", price:10}], allergens:"Chicken", },
-      { name: "Mozzarella Sticks",  price: 100, sizes: [{label:"5 pcs", price:0}], addons: [{label:"Marinara", price:10}], allergens:"Dairy, Gluten", },
-      { name: "Calamari",           price: 150, sizes: [{label:"200g", price:0}], addons: [{label:"Lemon", price:5}], allergens:"Shellfish", },
-      { name: "Potato Wedges",      price: 90,  sizes: [{label:"Regular", price:0}],addons: [{label:"Ketchup", price:5}], allergens:"Potato", },
-      { name: "Bruschetta",          price: 110, sizes: [{label:"4 pcs", price:0}], addons: [{label:"Balsamic", price:10}], allergens:"Gluten", },
-      { name: "Garlic Bread",        price: 70,  sizes: [{label:"4 pcs", price:0}], addons: [{label:"Cheese", price:15}], allergens:"Dairy, Gluten", },
-      { name: "Nachos",             price: 130, sizes: [{label:"Single", price:0}], addons: [{label:"Cheese Dip", price:15}], allergens:"Dairy", },
-      { name: "Stuffed Mushrooms",   price: 140, sizes: [{label:"6 pcs", price:0}], addons: [{label:"Herb Butter", price:10}], allergens:"Mushroom", },
-      { name: "Onion Rings",         price: 95,  sizes: [{label:"Regular", price:0}], addons: [{label:"Ranch", price:10}], allergens:"Gluten", }
-    ],
-  
-    "Side Dish": [
-      {
-        name: "Garlic Rice",
-        price: 40,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 10 }],
-        addons: [{ label: "Cheese", price: 15 }],
-        allergens: "Garlic, Dairy"
-      },
-      {
-        name: "Plain Rice",
-        price: 30,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 10 }],
-        addons: [],
-        allergens: ""
-      },
-      {
-        name: "Fried Egg",
-        price: 20,
-        sizes: [{ label: "Single", price: 0 }, { label: "Double", price: 15 }],
-        addons: [],
-        allergens: "Egg"
-      },
-      {
-        name: "Steamed Vegetables",
-        price: 50,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Garlic Sauce", price: 10 }],
-        allergens: "Garlic"
-      },
-      {
-        name: "French Fries",
-        price: 55,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 15 }],
-        addons: [{ label: "Ketchup", price: 5 }],
-        allergens: ""
-      },
-      {
-        name: "Tofu Cubes",
-        price: 60,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Sweet Chili", price: 10 }],
-        allergens: "Soy"
-      },
-      {
-        name: "Grilled Corn",
-        price: 45,
-        sizes: [{ label: "Single", price: 0 }],
-        addons: [{ label: "Butter", price: 5 }],
-        allergens: "Dairy"
-      },
-      {
-        name: "Atchara",
-        price: 35,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [],
-        allergens: "Papaya"
-      },
-      {
-        name: "Chicharon",
-        price: 70,
-        sizes: [{ label: "Small", price: 0 }, { label: "Large", price: 20 }],
-        addons: [],
-        allergens: "Pork"
-      },
-      {
-        name: "Ukoy",
-        price: 65,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Vinegar Dip", price: 5 }],
-        allergens: "Shrimp, Gluten"
-      }
-    ],
-  
-    "Soup": [
-      {
-        name: "Sinigang",
-        price: 100,
-        sizes: [{ label: "Small", price: 0 }, { label: "Large", price: 25 }],
-        addons: [{ label: "Extra Tamarind", price: 5 }],
-        allergens: "Pork, Tamarind"
-      },
-      {
-        name: "Bulalo",
-        price: 150,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Bone Marrow", price: 20 }],
-        allergens: "Beef"
-      },
-      {
-        name: "Tinola",
-        price: 90,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Ginger", price: 5 }],
-        allergens: "Chicken, Ginger"
-      },
-      {
-        name: "Molo Soup",
-        price: 110,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Siomai", price: 15 }],
-        allergens: "Pork, Gluten"
-      },
-      {
-        name: "Beef Kare-Kare Soup",
-        price: 140,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Bagoong", price: 10 }],
-        allergens: "Peanut, Shrimp"
-      },
-      {
-        name: "Cream of Mushroom",
-        price: 95,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Croutons", price: 10 }],
-        allergens: "Dairy, Gluten"
-      },
-      {
-        name: "Corn Soup",
-        price: 85,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Extra Corn", price: 5 }],
-        allergens: ""
-      },
-      {
-        name: "Seafood Chowder",
-        price: 160,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Thickener", price: 10}],
-        allergens: "Shellfish, Dairy"
-      },
-      {
-        name: "Black Pepper Soup",
-        price: 105,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Extra Pepper", price: 5}],
-        allergens: ""
-      },
-      {
-        name: "Pumpkin Soup",
-        price: 100,
-        sizes: [{ label: "Bowl", price: 0 }],
-        addons: [{ label: "Cream", price: 10}],
-        allergens: "Dairy"
-      }
-    ],
-  
-    "Desserts": [
-      {
-        name: "Leche Flan",
-        price: 50,
-        sizes: [{ label: "Single", price: 0 }],
-        addons: [{ label: "Caramel Sauce", price: 5 }],
-        allergens: "Egg, Dairy"
-      },
-      {
-        name: "Halo-Halo",
-        price: 120,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Leche Flan", price: 15 }],
-        allergens: "Dairy"
-      },
-      {
-        name: "Bibingka",
-        price: 70,
-        sizes: [{ label: "Small", price: 0 }],
-        addons: [{ label: "Salted Egg", price: 10 }],
-        allergens: "Egg, Dairy"
-      },
-      {
-        name: "Puto",
-        price: 60,
-        sizes: [{ label: "3 pcs", price: 0 }, { label: "6 pcs", price: 15}],
-        addons: [{ label: "Cheese", price: 10 }],
-        allergens: "Dairy, Gluten"
-      },
-      {
-        name: "Turon",
-        price: 55,
-        sizes: [{ label: "2 pcs", price: 0 }, { label: "4 pcs", price: 15 }],
-        addons: [{ label: "Ice Cream", price: 20 }],
-        allergens: "Banana"
-      },
-      {
-        name: "Sapin-Sapin",
-        price: 65,
-        sizes: [{ label: "Slice", price: 0 }],
-        addons: [],
-        allergens: "Coconut"
-      },
-      {
-        name: "Ube Halaya",
-        price: 80,
-        sizes: [{ label: "Cup", price: 0 }],
-        addons: [{ label: "Coconut Strings", price: 5 }],
-        allergens: ""
-      },
-      {
-        name: "Buko Pandan",
-        price: 75,
-        sizes: [{ label: "Cup", price: 0 }],
-        addons: [{ label: "Nata de Coco", price: 5 }],
-        allergens: "Coconut"
-      },
-      {
-        name: "Mango Float",
-        price: 110,
-        sizes: [{ label: "Slice", price: 0 }],
-        addons: [{ label: "Whipped Cream", price: 10 }],
-        allergens: "Dairy"
-      },
-      {
-        name: "Taho",
-        price: 45,
-        sizes: [{ label: "Cup", price: 0 }],
-        addons: [{ label: "Sago", price: 5 }],
-        allergens: "Soy"
-      }
-    ],
-  
-    "Drinks": [
-      {
-        name: "Iced Tea",
-        price: 30,
-        sizes: [{ label: "Small", price: 0 }, { label: "Medium", price: 5 }, { label: "Large", price: 10 }],
-        addons: [{ label: "Lemon", price: 5 }],
-        allergens: "Caffeine"
-      },
-      {
-        name: "Salabat",
-        price: 40,
-        sizes: [{ label: "Cup", price: 0 }],
-        addons: [{ label: "Honey", price: 5 }],
-        allergens: ""
-      },
-      {
-        name: "Calamansi Juice",
-        price: 35,
-        sizes: [{ label: "Cup", price: 0 }, { label: "Pitcher", price: 50 }],
-        addons: [{ label: "Sugar", price: 5 }],
-        allergens: ""
-      },
-      {
-        name: "Buko Juice",
-        price: 50,
-        sizes: [{ label: " Cup", price: 0 }],
-        addons: [{ label: "Ice Cream", price: 15 }],
-        allergens: "Coconut"
-      },
-      {
-        name: "Coffee (Hot)",
-        price: 45,
-        sizes: [{ label: "Regular", price: 0 }, { label: "Large", price: 10 }],
-        addons: [{ label: "Cream", price: 5 }, { label: "Sugar", price: 2 }],
-        allergens: "Dairy"
-      },
-      {
-        name: "Milo Dinosaur",
-        price: 70,
-        sizes: [{ label: "Regular", price: 0 }],
-        addons: [{ label: "Sweetened Condensed Milk", price: 10 }],
-        allergens: "Dairy"
-      },
-      {
-        name: "Coke",
-        price: 40,
-        sizes: [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
-        addons: [],
-        allergens: ""
-      },
-      {
-        name: "Sprite",
-        price: 40,
-        sizes: [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
-        addons: [],
-        allergens: ""
-      },
-      {
-        name: "Royal",
-        price: 40,
-        sizes: [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
-        addons: [],
-        allergens: ""
-      },
-      {
-        name: "Water",
-        price: 20,
-        sizes: [{ label: "Bottle", price: 0 }],
-        addons: [],
-        allergens: ""
-      }
-    ]
-  };
+const placeholders = {
+  "Main Dish": [
+    {
+      name:        "Humba",
+      description: "Sweet braised pork with pineapple and soy.",
+      price:       120,
+      image:       "humba.jpeg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 20 }],
+      addons:      [{ label: "Extra Sauce", price: 10 }],
+      notes:       "",
+      allergens:   "Soy, Pork"
+    },
+    {
+      name:        "Kaldereta",
+      description: "Rich beef stew in tomato sauce and veggies.",
+      price:       130,
+      image:       "kaldereta.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 20 }],
+      addons:      [{ label: "Cheese", price: 15 }],
+      notes:       "",
+      allergens:   "Beef, Dairy"
+    },
+    {
+      name:        "Beef Mechado",
+      description: "Tender beef chunks simmered in tomato gravy.",
+      price:       135,
+      image:       "beef-mechado.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 25 }],
+      addons:      [{ label: "Extra Carrots", price: 5 }],
+      notes:       "",
+      allergens:   "Beef"
+    },
+    {
+      name:        "Chicken Adobo",
+      description: "Classic chicken marinated in soy and vinegar.",
+      price:       115,
+      image:       "chicken-adobo.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Double Chicken", price: 40 }],
+      addons:      [{ label: "Hard‑Boiled Egg", price: 10 }],
+      notes:       "",
+      allergens:   "Soy, Egg"
+    },
+    {
+      name:        "Pork Binagoongan",
+      description: "Savory pork in fermented shrimp paste sauce.",
+      price:       140,
+      image:       "pork-binagoongan.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Extra Bagoong", price: 10 }],
+      notes:       "",
+      allergens:   "Fish"
+    },
+    {
+      name:        "Chicken Curry",
+      description: "Creamy curry chicken with potatoes.",
+      price:       125,
+      image:       "chicken-curry.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Spicy", price: 10 }],
+      addons:      [{ label: "Potato", price: 5 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Beef Caldereta",
+      description: "Spicy beef stew with bell peppers and olives.",
+      price:       138,
+      image:       "beef-caldereta.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Extra Meat", price: 30 }],
+      addons:      [{ label: "Green Peas", price: 5 }],
+      notes:       "",
+      allergens:   "Beef"
+    },
+    {
+      name:        "Pork Sisig",
+      description: "Crispy chopped pork with chili and onions.",
+      price:       150,
+      image:       "pork-sisig.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Extra Chili", price: 5 }],
+      notes:       "",
+      allergens:   "Pork, Onion"
+    },
+    {
+      name:        "Laing",
+      description: "Taro leaves cooked in coconut milk and spices.",
+      price:       110,
+      image:       "laing.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Extra Coconut Milk", price: 10 }],
+      notes:       "",
+      allergens:   "Coconut"
+    },
+    {
+      name:        "Bicol Express",
+      description: "Spicy pork stew in creamy coconut sauce.",
+      price:       130,
+      image:       "bicol-express.png",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Extra Chili", price: 5 }],
+      notes:       "",
+      allergens:   "Pork, Coconut"
+    }
+  ],
 
-     // State
-  const [activeCategory,   setActiveCategory]   = useState("All Menu");
-  const [activeTab,        setActiveTab]        = useState("Menu");
-  const [searchTerm,       setSearchTerm]       = useState("");
-  const [dateFrom,         setDateFrom]         = useState("");
-  const [dateTo,           setDateTo]           = useState("");
-  const [products,         setProducts]         = useState([]);
-  const [cart,             setCart]             = useState([]);
-  const [orders,           setOrders]           = useState([]);
-  const [transactions,     setTransactions]     = useState([]);
-  const [itemAvailability, setItemAvailability] = useState({});
+  "Appetizers": [
+    {
+      name:        "Spring Rolls",
+      description: "Crispy veggie rolls with sweet dipping sauce.",
+      price:       80,
+      image:       "spring-rolls.jpg",
+      sizes:       [{ label: "6 pcs", price: 0 }],
+      addons:      [{ label: "Sweet Sauce", price: 10 }],
+      notes:       "",
+      allergens:   "Gluten"
+    },
+    {
+      name:        "Chicken Wings",
+      description: "Spicy fried wings served with dip.",
+      price:       120,
+      image:       "chicken-wings.jpg",
+      sizes:       [{ label: "6 pcs", price: 0 }],
+      addons:      [{ label: "Spicy Dip", price: 10 }],
+      notes:       "",
+      allergens:   "Chicken"
+    },
+    {
+      name:        "Mozzarella Sticks",
+      description: "Fried cheese sticks with marinara sauce.",
+      price:       100,
+      image:       "mozza-sticks.jpg",
+      sizes:       [{ label: "5 pcs", price: 0 }],
+      addons:      [{ label: "Marinara", price: 10 }],
+      notes:       "",
+      allergens:   "Dairy, Gluten"
+    },
+    {
+      name:        "Calamari",
+      description: "Crispy squid rings with lemon wedge.",
+      price:       150,
+      image:       "calamari.jpeg",
+      sizes:       [{ label: "200g", price: 0 }],
+      addons:      [{ label: "Lemon", price: 5 }],
+      notes:       "",
+      allergens:   "Shellfish"
+    },
+    {
+      name:        "Potato Wedges",
+      description: "Seasoned crispy potato wedges.",
+      price:       90,
+      image:       "potato-wedges.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Ketchup", price: 5 }],
+      notes:       "",
+      allergens:   "Potato"
+    },
+    {
+      name:        "Bruschetta",
+      description: "Toasted bread topped with tomato & basil.",
+      price:       110,
+      image:       "bruschetta.jpg",
+      sizes:       [{ label: "4 pcs", price: 0 }],
+      addons:      [{ label: "Balsamic", price: 10 }],
+      notes:       "",
+      allergens:   "Gluten"
+    },
+    {
+      name:        "Garlic Bread",
+      description: "Buttery garlic toast with melted cheese.",
+      price:       70,
+      image:       "garlic-bread.jpg",
+      sizes:       [{ label: "4 pcs", price: 0 }],
+      addons:      [{ label: "Cheese", price: 15 }],
+      notes:       "",
+      allergens:   "Dairy, Gluten"
+    },
+    {
+      name:        "Nachos",
+      description: "Corn chips loaded with melted cheese.",
+      price:       130,
+      image:       "nachos.jpg",
+      sizes:       [{ label: "Single", price: 0 }],
+      addons:      [{ label: "Cheese Dip", price: 15 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Stuffed Mushrooms",
+      description: "Baked mushrooms with herbed butter.",
+      price:       140,
+      image:       "stuffed-mushrooms.jpg",
+      sizes:       [{ label: "6 pcs", price: 0 }],
+      addons:      [{ label: "Herb Butter", price: 10 }],
+      notes:       "",
+      allergens:   "Mushroom"
+    },
+    {
+      name:        "Onion Rings",
+      description: "Golden fried onion rings with ranch.",
+      price:       95,
+      image:       "onion-rings.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Ranch", price: 10 }],
+      notes:       "",
+      allergens:   "Gluten"
+    }
+  ],
 
-  // Discount state
-  const [showDiscountModal,setShowDiscountModal]= useState(false);
-  const [discountType,     setDiscountType]     = useState(""); // "senior","pwd","student"
-  const [couponCode,       setCouponCode]       = useState("");
-  const [discountPct,      setDiscountPct]      = useState(0);
+  "Side Dish": [
+    {
+      name:        "Garlic Rice",
+      description: "Fragrant rice tossed in garlic oil.",
+      price:       40,
+      image:       "garlic-rice.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 10 }],
+      addons:      [{ label: "Cheese", price: 15 }],
+      notes:       "",
+      allergens:   "Garlic, Dairy"
+    },
+    {
+      name:        "Plain Rice",
+      description: "Steamed white rice, perfect with any dish.",
+      price:       30,
+      image:       "plain-rice.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 10 }],
+      addons:      [],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Fried Egg",
+      description: "Sunny side up or double yolk option.",
+      price:       20,
+      image:       "fried-egg.jpg",
+      sizes:       [{ label: "Single", price: 0 }, { label: "Double", price: 15 }],
+      addons:      [],
+      notes:       "",
+      allergens:   "Egg"
+    },
+    {
+      name:        "Steamed Vegetables",
+      description: "Mixed veggies lightly seasoned.",
+      price:       50,
+      image:       "steamed-vegetables.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Garlic Sauce", price: 10 }],
+      notes:       "",
+      allergens:   "Garlic"
+    },
+    {
+      name:        "French Fries",
+      description: "Crispy fries with golden crunch.",
+      price:       55,
+      image:       "french-fries.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 15 }],
+      addons:      [{ label: "Ketchup", price: 5 }],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Tofu Cubes",
+      description: "Fried tofu with sweet chili dip.",
+      price:       60,
+      image:       "tofu-cubes.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Sweet Chili", price: 10 }],
+      notes:       "",
+      allergens:   "Soy"
+    },
+    {
+      name:        "Grilled Corn",
+      description: "Charcoal‑grilled corn with butter.",
+      price:       45,
+      image:       "grilled-corn.jpg",
+      sizes:       [{ label: "Single", price: 0 }],
+      addons:      [{ label: "Butter", price: 5 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Atchara",
+      description: "Pickled green papaya side dish.",
+      price:       35,
+      image:       "atchara.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [],
+      notes:       "",
+      allergens:   "Papaya"
+    },
+    {
+      name:        "Chicharon",
+      description: "Crispy pork rind snack.",
+      price:       70,
+      image:       "chicharon.jpg",
+      sizes:       [{ label: "Small", price: 0 }, { label: "Large", price: 20 }],
+      addons:      [],
+      notes:       "",
+      allergens:   "Pork"
+    },
+    {
+      name:        "Ukoy",
+      description: "Shrimp fritters with vinegar dip.",
+      price:       65,
+      image:       "ukoy.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Vinegar Dip", price: 5 }],
+      notes:       "",
+      allergens:   "Shrimp, Gluten"
+    }
+  ],
 
-  // Success modal
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  "Soup": [
+    {
+      name:        "Sinigang",
+      description: "Tamarind soup with meat & veggies.",
+      price:       100,
+      image:       "sinigang.jpg",
+      sizes:       [{ label: "Small", price: 0 }, { label: "Large", price: 25 }],
+      addons:      [{ label: "Extra Tamarind", price: 5 }],
+      notes:       "",
+      allergens:   "Pork, Tamarind"
+    },
+    {
+      name:        "Bulalo",
+      description: "Hearty beef marrow soup.",
+      price:       150,
+      image:       "bulalo.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Bone Marrow", price: 20 }],
+      notes:       "",
+      allergens:   "Beef"
+    },
+    {
+      name:        "Tinola",
+      description: "Ginger chicken soup with papaya.",
+      price:       90,
+      image:       "tinola.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Ginger", price: 5 }],
+      notes:       "",
+      allergens:   "Chicken, Ginger"
+    },
+    {
+      name:        "Molo Soup",
+      description: "Pork dumpling soup in clear broth.",
+      price:       110,
+      image:       "molo-soup.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Siomai", price: 15 }],
+      notes:       "",
+      allergens:   "Pork, Gluten"
+    },
+    {
+      name:        "Beef Kare-Kare Soup",
+      description: "Peanut‑flavored oxtail soup.",
+      price:       140,
+      image:       "kare-kare.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Bagoong", price: 10 }],
+      notes:       "",
+      allergens:   "Peanut, Shrimp"
+    },
+    {
+      name:        "Cream of Mushroom",
+      description: "Creamy blended mushroom soup.",
+      price:       95,
+      image:       "cream-mushroom.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Croutons", price: 10 }],
+      notes:       "",
+      allergens:   "Dairy, Gluten"
+    },
+    {
+      name:        "Corn Soup",
+      description: "Sweet corn chowder in creamy base.",
+      price:       85,
+      image:       "corn-soup.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Extra Corn", price: 5 }],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Seafood Chowder",
+      description: "Hearty chowder with mixed seafood.",
+      price:       160,
+      image:       "seafood-chowder.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Thickener", price: 10 }],
+      notes:       "",
+      allergens:   "Shellfish, Dairy"
+    },
+    {
+      name:        "Black Pepper Soup",
+      description: "Peppery broth with a zing.",
+      price:       105,
+      image:       "pepper-soup.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Extra Pepper", price: 5 }],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Pumpkin Soup",
+      description: "Smooth pureed pumpkin soup.",
+      price:       100,
+      image:       "pumpkin-soup.jpg",
+      sizes:       [{ label: "Bowl", price: 0 }],
+      addons:      [{ label: "Cream", price: 10 }],
+      notes:       "",
+      allergens:   "Dairy"
+    }
+  ],
 
-  // Product modal & void
-  const [showModal,        setShowModal]        = useState(false);
-  const [modalProduct,     setModalProduct]     = useState(null);
-  const [showVoidPassword, setShowVoidPassword] = useState(false);
-  const [voidPasswordInput,setVoidPasswordInput]= useState("");
-  const [voidContext,      setVoidContext]      = useState({ type:null,index:null });
+  "Desserts": [
+    {
+      name:        "Leche Flan",
+      description: "Creamy caramel‑topped custard.",
+      price:       50,
+      image:       "leche-flan.jpg",
+      sizes:       [{ label: "Single", price: 0 }],
+      addons:      [{ label: "Caramel Sauce", price: 5 }],
+      notes:       "",
+      allergens:   "Egg, Dairy"
+    },
+    {
+      name:        "Halo-Halo",
+      description: "Mixed shaved ice dessert bowl.",
+      price:       120,
+      image:       "halohalo.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Leche Flan", price: 15 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Bibingka",
+      description: "Rice cake topped with salted egg.",
+      price:       70,
+      image:       "bibingka.jpg",
+      sizes:       [{ label: "Small", price: 0 }],
+      addons:      [{ label: "Salted Egg", price: 10 }],
+      notes:       "",
+      allergens:   "Egg, Dairy"
+    },
+    {
+      name:        "Puto",
+      description: "Steamed rice cupcakes (3 or 6 pcs).",
+      price:       60,
+      image:       "puto.jpg",
+      sizes:       [{ label: "3 pcs", price: 0 }, { label: "6 pcs", price: 15 }],
+      addons:      [{ label: "Cheese", price: 10 }],
+      notes:       "",
+      allergens:   "Dairy, Gluten"
+    },
+    {
+      name:        "Turon",
+      description: "Banana‑spring roll with brown sugar.",
+      price:       55,
+      image:       "turon.jpg",
+      sizes:       [{ label: "2 pcs", price: 0 }, { label: "4 pcs", price: 15 }],
+      addons:      [{ label: "Ice Cream", price: 20 }],
+      notes:       "",
+      allergens:   "Banana"
+    },
+    {
+      name:        "Sapin-Sapin",
+      description: "Layered sticky rice colored dessert.",
+      price:       65,
+      image:       "sapin-sapin.jpg",
+      sizes:       [{ label: "Slice", price: 0 }],
+      addons:      [],
+      notes:       "",
+      allergens:   "Coconut"
+    },
+    {
+      name:        "Ube Halaya",
+      description: "Purple yam jam served chilled.",
+      price:       80,
+      image:       "ube-halaya.jpg",
+      sizes:       [{ label: "Cup", price: 0 }],
+      addons:      [{ label: "Coconut Strings", price: 5 }],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Buko Pandan",
+      description: "Young coconut with pandan jelly.",
+      price:       75,
+      image:       "buko-pandan.jpg",
+      sizes:       [{ label: "Cup", price: 0 }],
+      addons:      [{ label: "Nata de Coco", price: 5 }],
+      notes:       "",
+      allergens:   "Coconut"
+    },
+    {
+      name:        "Mango Float",
+      description: "Layers of graham, mango & cream.",
+      price:       110,
+      image:       "mango-float.jpg",
+      sizes:       [{ label: "Slice", price: 0 }],
+      addons:      [{ label: "Whipped Cream", price: 10 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Taho",
+      description: "Warm silken tofu with arnibal syrup.",
+      price:       45,
+      image:       "taho.jpg",
+      sizes:       [{ label: "Cup", price: 0 }],
+      addons:      [{ label: "Sago", price: 5 }],
+      notes:       "",
+      allergens:   "Soy"
+    }
+  ],
 
-  // Payment
-  const [paymentMethod, setPaymentMethod] = useState("");
+  "Drinks": [
+    {
+      name:        "Iced Tea",
+      description: "Chilled black tea with lemon.",
+      price:       30,
+      image:       "iced-tea.png",
+      sizes:       [{ label: "Small", price: 0 }, { label: "Medium", price: 5 }, { label: "Large", price: 10 }],
+      addons:      [{ label: "Lemon", price: 5 }],
+      notes:       "",
+      allergens:   "Caffeine"
+    },
+    {
+      name:        "Salabat",
+      description: "Ginger tea for soothing warmth.",
+      price:       40,
+      image:       "salabat.jpg",
+      sizes:       [{ label: "Cup", price: 0 }],
+      addons:      [{ label: "Honey", price: 5 }],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Calamansi Juice",
+      description: "Fresh calamansi citrus drink.",
+      price:       35,
+      image:       "calamansi-juice.jpg",
+      sizes:       [{ label: "Cup", price: 0 }, { label: "Pitcher", price: 50 }],
+      addons:      [{ label: "Sugar", price: 5 }],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Buko Juice",
+      description: "Refreshing young coconut water.",
+      price:       50,
+      image:       "buko-juice.jpg",
+      sizes:       [{ label: "Bottle", price: 0 }],
+      addons:      [{ label: "Ice Cream", price: 15 }],
+      notes:       "",
+      allergens:   "Coconut"
+    },
+    {
+      name:        "Coffee (Hot)",
+      description: "Brewed coffee served steaming hot.",
+      price:       45,
+      image:       "coffee.jpg",
+      sizes:       [{ label: "Regular", price: 0 }, { label: "Large", price: 10 }],
+      addons:      [{ label: "Cream", price: 5 }, { label: "Sugar", price: 2 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Milo Dinosaur",
+      description: "Iced chocolate malt drink.",
+      price:       70,
+      image:       "milo-dino.jpg",
+      sizes:       [{ label: "Regular", price: 0 }],
+      addons:      [{ label: "Condensed Milk", price: 10 }],
+      notes:       "",
+      allergens:   "Dairy"
+    },
+    {
+      name:        "Coke",
+      description: "Chilled cola soda.",
+      price:       40,
+      image:       "coke.jpg",
+      sizes:       [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
+      addons:      [],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Sprite",
+      description: "Lemon‑lime soda, ice‑cold.",
+      price:       40,
+      image:       "sprite.jpg",
+      sizes:       [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
+      addons:      [],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Royal",
+      description: "Sweet grape‑flavored soda.",
+      price:       40,
+      image:       "royal.jpg",
+      sizes:       [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
+      addons:      [],
+      notes:       "",
+      allergens:   ""
+    },
+    {
+      name:        "Water",
+      description: "Pure filtered bottled water.",
+      price:       20,
+      image:       "water.png",
+      sizes:       [{ label: "Bottle", price: 0 }],
+      addons:      [],
+      notes:       "",
+      allergens:   ""
+    }
+  ]
+};
 
-  // Recompute products on category/availability change
+  // recompute product list
+  const filteredProducts = useMemo(() => {
+    const baseList =
+        activeCategory === "All Menu"
+            ? Object.values(placeholders).flat()
+            : placeholders[activeCategory] || [];
+    return baseList
+        .filter(i => itemAvailability[i.name])
+        .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+}, [activeCategory, itemAvailability, searchTerm])
+
+  // init availability
   useEffect(() => {
-    const list = (activeCategory === "All Menu"
-      ? Object.values(placeholders).flat()
-      : placeholders[activeCategory]) || [];
-      setProducts(list.filter(i => itemAvailability[i.name]));
-    }, [activeCategory, itemAvailability]);
+    if (Object.keys(itemAvailability).length === 0) {
+      const avail = {};
+      Object.values(placeholders)
+        .flat()
+        .forEach((i) => (avail[i.name] = true));
+      setItemAvailability(avail);
+    }
+  }, []);
 
-  // Totals
-  const subtotal    = cart.reduce((sum,i)=>sum + i.totalPrice, 0);
+  // totals
+  const subtotal = cart.reduce((sum, i) => sum + i.totalPrice, 0);
   const discountAmt = +(subtotal * discountPct / 100).toFixed(2);
-  const tax         = +(subtotal * 0.12).toFixed(2);
-  const total       = +(subtotal + tax - discountAmt).toFixed(2);
+  const tax = +(subtotal * 0.12).toFixed(2);
+  const total = +(subtotal + tax - discountAmt).toFixed(2);
 
-  // Handlers
-  const openProductModal = item => {
+  // open item modal
+  const openProductModal = (item) => {
     setModalProduct({ ...item, size: item.sizes[0], selectedAddons: [], quantity: 1, notes: "" });
     setShowModal(true);
   };
   const addToCart = () => {
-    const addonsCost = modalProduct.selectedAddons.reduce((s,a)=>s + a.price, 0);
-    const sizeCost   = modalProduct.size.price;
-    const price      = (modalProduct.price + addonsCost + sizeCost) * modalProduct.quantity;
-    setCart(prev => [...prev, { ...modalProduct, addons: modalProduct.selectedAddons, totalPrice: price }]);
+    const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
+    const sizeCost = modalProduct.size.price;
+    const price = (modalProduct.price + addonsCost + sizeCost) * modalProduct.quantity;
+    setCart((p) => [
+      ...p,
+      { ...modalProduct, addons: modalProduct.selectedAddons, totalPrice: price }
+    ]);
     setShowModal(false);
   };
 
   const processTransaction = () => {
     if (!paymentMethod) return alert("Select payment method");
     if (!cart.length) return alert("Cart empty");
-  
     const now = new Date();
     const id = now.getTime();
-  
     const order = {
       id: `ORD-${id}`,
       items: cart,
@@ -492,27 +728,19 @@ export default function POSMain() {
       discountCode: couponCode.trim() || null,
       tax
     };
-  
-    // ✅ Add to Orders log
-    setOrders(prev => [order, ...prev]);
-  
-    // ✅ Add to Transactions log
-    setTransactions(prev => [
+    setOrders((p) => [order, ...p]);
+    setTransactions((p) => [
       { ...order, type: "Payment", method: paymentMethod, total },
-      ...prev
+      ...p
     ]);
-  
-    // Reset states
+    // reset
     setCart([]);
     setPaymentMethod("");
     setDiscountPct(0);
     setDiscountType("");
     setCouponCode("");
-  
-    // Show success modal
     setShowSuccessModal(true);
   };
-  
 
   const triggerVoid = (type, idx = null) => {
     setVoidContext({ type, index: idx });
@@ -522,12 +750,10 @@ export default function POSMain() {
     if (voidPasswordInput !== basePassword) return alert("Wrong password");
     const now = new Date();
     const id = `VOID-${now.getTime()}`;
-  
     if (voidContext.type === "item") {
       const removed = cart[voidContext.index];
-      setCart(prev => prev.filter((_, i) => i !== voidContext.index));
-  
-      setTransactions(prev => [
+      setCart((p) => p.filter((_, i) => i !== voidContext.index));
+      setTransactions((p) => [
         {
           id,
           type: "Voided Item",
@@ -536,14 +762,14 @@ export default function POSMain() {
           subtotal: 0,
           discountAmt: 0,
           tax: 0,
-          total: 0,
+          total: 0
         },
-        ...prev,
+        ...p
       ]);
     } else {
       const allItems = [...cart];
       setCart([]);
-      setTransactions(prev => [
+      setTransactions((p) => [
         {
           id,
           type: "Voided Transaction",
@@ -552,32 +778,19 @@ export default function POSMain() {
           subtotal: 0,
           discountAmt: 0,
           tax: 0,
-          total: 0,
+          total: 0
         },
-        ...prev,
+        ...p
       ]);
     }
-  
     setShowVoidPassword(false);
     setVoidPasswordInput("");
   };
-  
 
-  // Open discount modal when Discount tab is clicked
   useEffect(() => {
     if (activeTab === "Discount") setShowDiscountModal(true);
   }, [activeTab]);
 
-  useEffect(() => {
-    if (Object.keys(itemAvailability).length === 0) {
-      const initialAvailability = {};
-      Object.values(placeholders).flat().forEach(item => {
-        initialAvailability[item.name] = true; // explicitly mark all as available initially
-      });
-      setItemAvailability(initialAvailability);
-    }
-  }, [placeholders]);
-  
   return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
       {/* LEFT COLUMN */}
@@ -585,7 +798,7 @@ export default function POSMain() {
         {/* HEADER */}
         <div className="flex items-center bg-[#800000] h-20 px-6 shadow border-b border-gray-200">
           <img
-            src={logoPos}
+            src={images["logo-pos2.png"]}
             alt="POS Logo"
             className="w-16 h-16 rounded object-contain -ml-2"
           />
@@ -593,43 +806,50 @@ export default function POSMain() {
             type="text"
             placeholder="Search..."
             value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 mx-6 h-12 px-4 border border-gray-200 rounded shadow"
           />
           <button
             onClick={() => setShowProfileModal(true)}
-            className="flex items-center space-x-1 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:bg-yellow-100"
+            className="flex items-center space-x-2 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:bg-yellow-100"
           >
             <img
-  src={avatar}
-  alt="Avatar"
-  className="w-8 h-8 rounded-full object-cover"
-/>
-
+              src={images["avatar-ph.png"]}
+              alt="Avatar"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <div className="text-left leading-tight">
-              <div className="font-bold">{userName}</div>
-              <div className="text-xs font-semibold">Cashier</div>
+              <div className="font-bold text-sm text-black">{userName}</div>
+              <div className="text-xs text-black">Cashier</div>
             </div>
           </button>
         </div>
 
-        {/* MAIN BODY */}
+         {/* MAIN BODY */}
         <div className="flex flex-1 overflow-hidden">
           {/* CATEGORY SIDEBAR */}
-          <div className="w-24 bg-[#F6F3EA] py-2 px-1 space-y-1.5 border-r border-transparent">
-            {categories.map(cat => (
+          <div className="w-24 bg-[#F6F3EA] py-0.5 px-1 space-y-1.5 border-r">
+          {[
+  { key: "All Menu", icon: "all-menu.png" },
+  { key: "Main Dish", icon: "main-dish.png" },
+  { key: "Appetizers", icon: "appetizers.png" },
+  { key: "Side Dish", icon: "side-dish.png" },
+  { key: "Soup", icon: "soup.png" },
+  { key: "Desserts", icon: "dessert.png" },
+  { key: "Drinks", icon: "drinks.png" }
+].map(cat => (
               <button
                 key={cat.key}
                 onClick={() => {
                   setActiveCategory(cat.key);
                   setSearchTerm("");
                 }}
-                className={`w-full aspect-square flex flex-col items-center justify-center rounded shadow bg-gray-200 hover:bg-white ${
-                  activeCategory === cat.key ? "bg-white font-bold" : ""
+                className={`w-full aspect-square flex flex-col items-center justify-center rou3nded shadow ${
+                  activeCategory === cat.key ? "bg-[#F6EBCE] font-semibold" : "bg-white hover:bg-[#F6EBCE]"
                 }`}
               >
-                <div className="text-lg mb-px">{cat.icon}</div>
-                <span className="uppercase text-center leading-tight text-[12px]">{cat.key}</span>
+                <img src={images[cat.icon]} alt={cat.key} className="w-8 h-8 mb-1" />
+    <span className="uppercase text-[10px]">{cat.key}</span>
               </button>
             ))}
           </div>
@@ -637,12 +857,15 @@ export default function POSMain() {
           {/* CONTENT */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* TABS */}
-            <div className="bg-[#F6F3EA] border-b border-transparent px-4 mt-2 pb-2">
-              <div
-                className="grid gap-x-6"
-                style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}
-              >
-                {tabs.map(tab => (
+            <div className="bg-[#F6F3EA] border-b px-4 mt-2 pb-2">
+              <div className="grid gap-x-6" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))" }}>
+              {[
+  { key: "Menu", icon: "menu.png" },
+  { key: "Orders", icon: "orders.png" },
+  { key: "Transactions", icon: "transactions.png" },
+  { key: "Items", icon: "items.png" },
+  { key: "Discount", icon: "discount.png" }
+].map(tab => (
                   <button
                     key={tab.key}
                     onClick={() => {
@@ -650,175 +873,203 @@ export default function POSMain() {
                       setSearchTerm("");
                     }}
                     className={`w-full h-[55px] flex items-center justify-center space-x-2 rounded uppercase shadow ${
-                      activeTab === tab.key
-                        ? "bg-white font-bold"
-                        : "bg-gray-200 hover:bg-white"
+                      activeTab === tab.key ? "bg-[#F6EBCE] font-bold" : "bg-white hover:bg-[#F6EBCE]"
                     }`}
                   >
-                    <span className="text-xl">{tab.icon}</span>
+    <img src={images[tab.icon]} alt={tab.key} className="w-8 h-8" />
                     <span>{tab.key}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-
             {/* TAB CONTENT */}
             <div className="flex-1 flex overflow-hidden">
               {/* MENU */}
-              {activeTab==="Menu" && (
-                <div className="flex-1 overflow-y-auto pt-2 px-6 pb-6 scrollbar-stable">
-                                    <div className="grid" style={{
-                    gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))",
-                    gap:"12px"
-                  }}>
-                    {products
-                      .filter(p=>p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                      .map((prod,i)=>(
-                        <div key={i}
-                          onClick={()=>openProductModal(prod)}
-                          className="bg-white p-4 rounded-lg shadow flex flex-col justify-between cursor-pointer">
-                          <div className="bg-gray-300 w-full rounded mb-2 h-[155px]"/>
-                          <div className="font-semibold text-lg truncate whitespace-nowrap overflow-hidden" title={prod.name}>{prod.name}</div>
-                          <div className="text-sm">₱{prod.price.toFixed(2)}</div>
+              {activeTab === "Menu" && (
+                <div className="flex-1 overflow-y-auto pt-2 px-6 pb-6 scrollbar">
+                  <div
+                    className="grid"
+                    style={{ gridTemplateColumns: "repeat(auto-fill,minmax(175px,1fr))", gap: "12px" }}
+                  >
+                    {filteredProducts.map((prod, i) => (
+                        <div
+                        key={i}
+                        onClick={() => openProductModal(prod)}
+                        className="bg-white p-4 rounded-lg shadow flex flex-col cursor-pointer hover:scale-105 transition-transform duration-150"
+                      >
+                          <img
+                            src={images[prod.image] || images["react.svg"]}
+                            alt={prod.name}
+                            className="w-full h-[155px] object-cover rounded mb-2"
+                          />
+                          <div className="font-semibold text-lg truncate">{prod.name}</div>
+                          <div className="text-m">₱{prod.price.toFixed(2)}</div>
                         </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
               )}
 
-              {/* Orders */}
-              {activeTab==="Orders" && (
+              {/* ORDERS */}
+              {activeTab === "Orders" && (
                 <div className="flex-1 p-6 flex flex-col">
                   <h2 className="text-2xl font-bold mb-4">Orders Log</h2>
                   <div className="flex space-x-4 mb-4">
-                    <div><label className="block text-sm">From</label>
-                      <input type="date" value={dateFrom}
-                             onChange={e=>setDateFrom(e.target.value)}
-                             className="border p-1 rounded"/>
+                    <div>
+                      <label className="block text-sm">From</label>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="border p-1 rounded"
+                      />
                     </div>
-                    <div><label className="block text-sm">To</label>
-                      <input type="date" value={dateTo}
-                             onChange={e=>setDateTo(e.target.value)}
-                             className="border p-1 rounded"/>
+                    <div>
+                      <label className="block text-sm">To</label>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="border p-1 rounded"
+                      />
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-4 overflow-y-auto flex-1 content-start auto-rows-min">
-                    {orders.filter(o=>{
-                      const termMatch = o.id.toLowerCase().includes(searchTerm.toLowerCase())
-                                      || o.date.toLowerCase().includes(searchTerm.toLowerCase());
-                      const iso = new Date(o.date).toISOString().slice(0,10);
-                      const okFrom = !dateFrom || iso>=dateFrom;
-                      const okTo   = !dateTo   || iso<=dateTo;
-                      return termMatch && okFrom && okTo;
-                    }).map(o=>(
-                      <div key={o.id} className="bg-white p-4 rounded-lg shadow">
-                        <div className="font-semibold mb-2">Order ID: {o.id}</div>
-                        <div className="mb-1"><strong>Txn:</strong> {o.transactionID}</div>
-                        <div className="mb-1"><strong>Date:</strong> {o.date}</div>
-                        <div className="text-sm">
-  <strong>Items:</strong>
-  <ul className="list-disc list-inside">
-    {o.items.map((i, idx) => (
-      <li key={idx} className="mb-1">
-        {i.name} x{i.quantity}
-        <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
-          {i.size       && <li>Size:     {i.size.label || i.size}</li>}
-          {i.addons     && <li>Add‑ons:  {i.addons.map(a => a.label || a).join(", ")}</li>}
-          {i.notes      && <li>Notes:    {i.notes}</li>}
-        </ul>
-      </li>
-    ))}
-  </ul>
-</div>
-
-
-                      </div>
-                    ))}
+                  <div className="grid grid-cols-4 gap-4 overflow-y-auto flex-1 auto-rows-min">
+                    {orders
+                      .filter((o) => {
+                        const termMatch =
+                          o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.date.toLowerCase().includes(searchTerm.toLowerCase());
+                        const iso = new Date(o.date).toISOString().slice(0, 10);
+                        const okFrom = !dateFrom || iso >= dateFrom;
+                        const okTo = !dateTo || iso <= dateTo;
+                        return termMatch && okFrom && okTo;
+                      })
+                      .map((o) => (
+                        <div key={o.id} className="bg-white p-4 rounded-lg shadow hover:scale-105 transition-transform duration-150 cursor-pointer">
+                          <div className="font-semibold mb-2">Order ID: {o.id}</div>
+                          <div className="mb-1">
+                            <strong>Txn:</strong> {o.transactionID}
+                          </div>
+                          <div className="mb-1">
+                            <strong>Date:</strong> {o.date}
+                          </div>
+                          <div className="text-sm">
+                            <strong>Items:</strong>
+                            <ul className="list-disc list-inside">
+                              {o.items.map((i, idx) => (
+                                <li key={idx} className="mb-1">
+                                  {i.name} x{i.quantity}
+                                  <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
+                                    {i.size && <li>Size: {i.size.label || i.size}</li>}
+                                    {i.addons && i.addons.length > 0 && (
+                                      <li>
+                                        Add‑ons: {i.addons.map((a) => a.label || a).join(", ")}
+                                      </li>
+                                    )}
+                                    {i.notes && <li>Notes: {i.notes}</li>}
+                                  </ul>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
 
-              {/* Transactions Log */}
-{activeTab === "Transactions" && (
-  <div className="flex-1 p-6 flex flex-col">
-    <h2 className="text-2xl font-bold mb-4">Transactions Log</h2>
-
-    {/* Date filters */}
-    <div className="flex space-x-4 mb-4">
-      <div>
-        <label className="block text-sm">From</label>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={e => setDateFrom(e.target.value)}
-          className="border p-1 rounded"
-        />
-      </div>
-      <div>
-        <label className="block text-sm">To</label>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={e => setDateTo(e.target.value)}
-          className="border p-1 rounded"
-        />
-      </div>
-    </div>
-
-    <div className="grid grid-cols-4 gap-4 overflow-y-auto flex-1 content-start auto-rows-min">
-      {transactions
-        .filter(tx => {
-          // Search by ID or date
-          const term = searchTerm.toLowerCase();
-          const matchesSearch =
-            tx.id.toLowerCase().includes(term) ||
-            tx.date.toLowerCase().includes(term);
-
-          // Date‐range filter
-          const isoDate = new Date(tx.date).toISOString().slice(0, 10);
-          const afterFrom = !dateFrom || isoDate >= dateFrom;
-          const beforeTo = !dateTo || isoDate <= dateTo;
-
-          return matchesSearch && afterFrom && beforeTo;
-        })
-        .map(tx => (
-          <div key={tx.id} className="bg-white p-4 rounded-lg shadow">
-            <div className="font-semibold mb-2">ID: {tx.id}</div>
-            <div className="mb-1"><strong>Type:</strong> {tx.type}</div>
-            {tx.method && <div className="mb-1"><strong>Method:</strong> {tx.method}</div>}
-            <div className="mb-1"><strong>Date:</strong> {tx.date}</div>
-
-            {/* Financial breakdown */}
-            <div className="mb-1"><strong>Subtotal:</strong> ₱{(tx.subtotal ?? 0).toFixed(2)}</div>
-            <div className="mb-1"><strong>Discount:</strong> ₱{tx.discountAmt.toFixed(2)}</div>
-            <div className="mb-1"><strong>Discount Type:</strong> {tx.discountType || "—"}</div>
-            {tx.discountCode && (
-              <div className="mb-1"><strong>Code:</strong> {tx.discountCode}</div>
-            )}
-            <div className="mb-1"><strong>Tax:</strong> ₱{tx.tax.toFixed(2)}</div>
-
-            <div className="text-sm mb-1">
-  <strong>Items:</strong>
-  <ul className="list-disc list-inside">
-    {tx.items.map((i, idx) => (
-      <li key={idx} className="mb-1">
-        {i.name} x{i.quantity}
-        <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
-          {i.size   && <li>Size:     {i.size.label || i.size}</li>}
-          {i.addons && <li>Add‑ons:  {i.addons.map(a => a.label || a).join(", ")}</li>}
-          {i.notes  && <li>Notes:    {i.notes}</li>}
-        </ul>
-      </li>
-    ))}
-  </ul>
-</div>
-            <div><strong>Total:</strong> ₱{tx.total.toFixed(2)}</div>
-          </div>
-        ))}
-    </div>
-  </div>
-)}
+              {/* TRANSACTIONS */}
+              {activeTab === "Transactions" && (
+                <div className="flex-1 p-6 flex flex-col">
+                  <h2 className="text-2xl font-bold mb-4">Transactions Log</h2>
+                  <div className="flex space-x-4 mb-4">
+                    <div>
+                      <label className="block text-sm">From</label>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="border p-1 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm">To</label>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="border p-1 rounded"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4 overflow-y-auto flex-1 auto-rows-min">
+                    {transactions
+                      .filter((tx) => {
+                        const term = searchTerm.toLowerCase();
+                        const match = tx.id.toLowerCase().includes(term) || tx.date.toLowerCase().includes(term);
+                        const iso = new Date(tx.date).toISOString().slice(0, 10);
+                        return match && (!dateFrom || iso >= dateFrom) && (!dateTo || iso <= dateTo);
+                      })
+                      .map((tx) => (
+                        <div key={tx.id} className="bg-white p-4 rounded-lg shadow hover:scale-105 transition-transform duration-150 cursor-pointer">
+                          <div className="font-semibold mb-2">ID: {tx.id}</div>
+                          <div className="mb-1">
+                            <strong>Type:</strong> {tx.type}
+                          </div>
+                          {tx.method && (
+                            <div className="mb-1">
+                              <strong>Method:</strong> {tx.method}
+                            </div>
+                          )}
+                          <div className="mb-1">
+                            <strong>Date:</strong> {tx.date}
+                          </div>
+                          <div className="mb-1">
+                            <strong>Subtotal:</strong> ₱{(tx.subtotal ?? 0).toFixed(2)}
+                          </div>
+                          <div className="mb-1">
+                            <strong>Discount:</strong> ₱{tx.discountAmt.toFixed(2)}
+                          </div>
+                          <div className="mb-1">
+                            <strong>Discount Type:</strong> {tx.discountType || "—"}
+                          </div>
+                          {tx.discountCode && (
+                            <div className="mb-1">
+                              <strong>Code:</strong> {tx.discountCode}
+                            </div>
+                          )}
+                          <div className="mb-1">
+                            <strong>Tax:</strong> ₱{tx.tax.toFixed(2)}
+                          </div>
+                          <div className="text-sm mb-1">
+                            <strong>Items:</strong>
+                            <ul className="list-disc list-inside">
+                              {tx.items.map((i, idx) => (
+                                <li key={idx} className="mb-1">
+                                  {i.name} x{i.quantity}
+                                  <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
+                                    {i.size && <li>Size: {i.size.label || i.size}</li>}
+                                    {i.addons && i.addons.length > 0 && (
+                                      <li>
+                                        Add‑ons: {i.addons.map((a) => a.label || a).join(", ")}
+                                      </li>
+                                    )}
+                                    {i.notes && <li>Notes: {i.notes}</li>}
+                                  </ul>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <strong>Total:</strong> ₱{tx.total.toFixed(2)}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
 
 {/* Items Availability */}
 {activeTab === "Items" && (
@@ -843,10 +1094,13 @@ export default function POSMain() {
           )
           .map((item, i) => (
             <div
-              key={i}
-              className="bg-white p-2 rounded-lg shadow flex flex-col justify-between"
-            >
-              <div className="bg-gray-300 w-full rounded mb-2 h-[155px]" />
+  key={i}
+  className="bg-white p-2 rounded-lg shadow flex flex-col justify-between hover:scale-105 transition-transform duration-150 cursor-pointer"
+>
+              <img
+              src={images[item.image] || images["react.svg"]}
+              alt={item.name}
+              className="w-full h-[155px] object-cover rounded mb-2"/>
               <div className="font-semibold text-base mb-2 text-center">
                 {item.name}
               </div>
@@ -889,74 +1143,69 @@ export default function POSMain() {
         </div>
       </div>
 
-{/* ORDER DETAILS (always visible) */}
+      {/* Order Details (always visible) fully cleaned, aligned, ready to paste*/}
 <div className="w-80 bg-[#F6F3EA] border-l border-gray-200 p-6 flex flex-col overflow-hidden shadow">
   <div className="flex-1 flex flex-col h-full">
-    {/* 1. Title */}
+    {/* Title + Void Transaction Button */}
     <div className="mb-4 flex justify-between items-center">
-      <h3 className="text-lg font-bold">Order Details</h3>
-      <button
-        onClick={() => triggerVoid("transaction")}
-        className="text-red-800 text-lg"
-      >
-        🚩
+      <h3 className="text-xl font-bold">Order Details</h3>
+      <button onClick={() => triggerVoid("transaction")}>
+        <img src={images["void-trans.png"]} alt="Void Transaction" className="w-6 h-6" />
       </button>
     </div>
 
-    {/* 2. Items (scrollable, reduced font size) */}
+    {/* Cart Items */}
     <div className="flex-1 overflow-y-auto mb-4 space-y-2">
       {cart.length === 0 ? (
-        <div className="text-black-300 text-sm">No items added.</div>
+        <div className="text-gray-400 text-sm">No items added.</div>
       ) : (
         cart.map((item, i) => (
-          <div key={i} className=" rounded p-1">
-            {/* Name + Total Price */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-1.5">
-                {/* Small cubic image placeholder */}
-                <div className="w-10 h-10 bg-gray-300 rounded-sm flex-shrink-0"></div>
-                <div className="text-xs font-medium truncate">
-                  {item.name} ({item.size.label})
+          <div key={i} className="bg-white rounded p-2">
+            {/* Item Row */}
+            <div className="flex justify-between items-start">
+              <div className="flex space-x-1.5">
+                <img
+                  src={images[item.image] || images["react.svg"]}
+                  alt={item.name}
+                  className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
+                />
+                <div className="flex flex-col">
+                  <div className="text-xs font-medium truncate">
+                    {item.name} ({item.size.label})
+                  </div>
+                  <div className="text-[10px] text-gray-700">
+                    {item.quantity} x ₱{(item.totalPrice / item.quantity).toFixed(2)}
+                  </div>
+                  {item.addons.length > 0 && (
+                    <div className="text-[10px] text-gray-700 truncate">
+                      Add‑ons: {item.addons.map(a => a.label).join(", ")}
+                    </div>
+                  )}
+                  {item.notes && (
+                    <div className="text-[10px] italic text-gray-600 truncate">
+                      "{item.notes}"
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="text-xs font-semibold whitespace-nowrap">
-                ₱{item.totalPrice.toFixed(2)}
+              <div className="flex flex-col items-end justify-between h-full">
+                <div className="text-xs font-semibold whitespace-nowrap">
+                  ₱{item.totalPrice.toFixed(2)}
+                </div>
+                <button
+                  onClick={() => triggerVoid("item", i)}
+                  className="mt-1"
+                >
+                  <img src={images["void-item.png"]} alt="Void Item" className="w-3 h-3" />
+                </button>
               </div>
             </div>
-
-            {/* Quantity x Unit Price + Void */}
-            <div className="flex justify-between items-center text-[10px] text-gray-700 mt-0.5">
-              <div>
-                {item.quantity} x ₱
-                {(item.totalPrice / item.quantity).toFixed(2)}
-              </div>
-              <button
-                onClick={() => triggerVoid("item", i)}
-                className="text-red-800 text-xs"
-              >
-                ⛔
-              </button>
-            </div>
-
-            {/* Add-ons */}
-            {item.addons.length > 0 && (
-              <div className="text-[10px] text-gray-700 mt-0.5 truncate">
-                Add‑ons: {item.addons.map(a => a.label).join(", ")}
-              </div>
-            )}
-
-            {/* Notes */}
-            {item.notes && (
-              <div className="text-[10px] italic text-gray-600 mt-0.5 truncate">
-                "{item.notes}"
-              </div>
-            )}
           </div>
         ))
       )}
     </div>
 
-    {/* 3. Subtotal + Discount info */}
+    {/* Totals */}
     <div className="bg-white p-3 rounded-lg mb-4 space-y-1 text-sm">
       <div className="flex justify-between">
         <span>Subtotal</span>
@@ -966,12 +1215,7 @@ export default function POSMain() {
         <div className="flex justify-between">
           <span>
             Discount (
-            {[
-              discountType === "senior" && "Senior",
-              discountType === "pwd" && "PWD",
-              discountType === "student" && "Student",
-              couponCode && couponCode.toUpperCase()
-            ]
+            {[discountType === "senior" && "Senior", discountType === "pwd" && "PWD", discountType === "student" && "Student", couponCode && couponCode.toUpperCase()]
               .filter(Boolean)
               .join(" + ")}
             ): {discountPct}%
@@ -990,23 +1234,27 @@ export default function POSMain() {
       </div>
     </div>
 
-    {/* 4. Payment */}
+    {/* Payment Method Buttons */}
     <div className="space-y-3">
       <div className="flex justify-around">
-        {["💵", "💳", "📱"].map(icon => (
+        {[
+          { key: "Cash", icon: "cash.png" },
+          { key: "Card", icon: "card.png" },
+          { key: "QRS", icon: "qrs.png" }
+        ].map(method => (
           <button
-            key={icon}
-            onClick={() => setPaymentMethod(icon)}
-            className={`h-12 w-12 rounded-lg flex items-center justify-center text-xl ${
-              paymentMethod === icon
-                ? "bg-yellow-100 scale-105"
-                : "bg-white"
+            key={method.key}
+            onClick={() => setPaymentMethod(prev => prev === method.key ? "" : method.key)}
+            className={`h-16 w-16 rounded-lg flex flex-col items-center justify-center space-y-1 ${
+              paymentMethod === method.key ? "bg-yellow-100 scale-105" : "bg-white"
             }`}
           >
-            {icon}
+            <img src={images[method.icon]} alt={method.key} className="w-6 h-6" />
+            <span className="text-[10px]">{method.key}</span>
           </button>
         ))}
       </div>
+
       <button
         onClick={processTransaction}
         className="w-full bg-red-800 text-white py-2 rounded-lg font-semibold text-sm"
@@ -1019,91 +1267,155 @@ export default function POSMain() {
 
 
       {/* ITEM MODAL */}
-      {showModal && modalProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-20">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-[576px] h-[525px] flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-2xl font-bold mb-1">{modalProduct.name}</h2>
-                <p className="text-sm mb-1">Allergens: {modalProduct.allergens}</p>
-                <p className="text-lg font-semibold text-red-800">₱{modalProduct.price}</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-3xl font-bold">×</button>
-            </div>
-            <div className="overflow-y-auto space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Quantity</span>
-                <div className="flex items-center space-x-2">
-                  <button className="w-8 h-8 bg-gray-200 rounded-full" onClick={() => setModalProduct(p => ({ ...p, quantity: Math.max(1, p.quantity - 1) }))}>−</button>
-                  <span className="font-medium">{modalProduct.quantity}</span>
-                  <button className="w-8 h-8 bg-gray-200 rounded-full" onClick={() => setModalProduct(p => ({ ...p, quantity: p.quantity + 1 }))}>+</button>
-                </div>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Size</h3>
-                <div className="flex space-x-2">
-                  {modalProduct.sizes.map(s => (
-                    <button
-                      key={s.label}
-                      onClick={() => setModalProduct(p => ({ ...p, size: s }))}  
-                      className={`px-3 py-1 rounded border ${
-                        modalProduct.size.label === s.label ? "bg-yellow-100 border-red-800 font-semibold" : "bg-white border-gray-200"
-                      }`}
-                    >
-                      {s.label} +₱{s.price}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {modalProduct.addons.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Add-ons</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {modalProduct.addons.map(a => (
-                      <button
-                        key={a.label}
-                        onClick={() => {
-                          setModalProduct(p => ({
-                            ...p,
-                            selectedAddons: p.selectedAddons.includes(a)
-                              ? p.selectedAddons.filter(x => x !== a)
-                              : [...p.selectedAddons, a]
-                          }));
-                        }}
-                        className={`px-3 py-1 rounded border ${
-                          modalProduct.selectedAddons.includes(a) ? "bg-yellow-100 border-red-800 font-semibold" : "bg-white border-gray-200"
-                        }`}
-                      >
-                        {a.label} +₱{a.price}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div>
-                <h3 className="font-semibold mb-2">Special Instructions</h3>
-                <textarea
-                  value={modalProduct.notes}
-                  onChange={e => setModalProduct(p => ({ ...p, notes: e.target.value }))}
-                  placeholder="e.g. No onions"
-                  className="w-full border-gray-200 border rounded p-2 resize-none"
-                  rows={3}
-                />
-              </div>
-            </div>
-            <div className="flex justify-between items-center mt-4">
-              <span className="text-xl font-bold">
-                Total ₱{(((modalProduct.price + modalProduct.size.price) * modalProduct.quantity) + modalProduct.selectedAddons.reduce((s,a)=>s+a.price,0)).toFixed(2)}
-              </span>
-            </div>
-            <div className="flex space-x-4 mt-4">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-2 bg-gray-200 rounded-lg font-semibold">Cancel</button>
-              <button onClick={addToCart} className="flex-1 py-2 bg-red-800 text-white rounded-lg font-semibold">Add to Order</button>
-            </div>
+{showModal && modalProduct && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-20">
+    <div className="bg-white rounded-2xl shadow-xl w-[576px]">
+      {/* — HEADER — */}
+      <div className="bg-gray-100 rounded-t-2xl p-6 flex">
+        {/* Product Image */}
+        <img
+          src={images[modalProduct.image]}
+          alt={modalProduct.name}
+          className="w-20 h-20 object-cover rounded-lg mr-4"
+        />
+        {/* Title / Description */}
+        <div className="flex-1">
+          <h2 className="text-xl font-semibold">{modalProduct.name}</h2>
+          <p className="text-sm text-gray-600 truncate">
+            {modalProduct.description}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+            Allergen: {modalProduct.allergens || "N/A"} </p>
+        </div>
+        {/* Price */}
+        <div className="text-right">
+          <span className="text-xl font-bold">₱{modalProduct.price.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* — BODY — */}
+      <div className="p-6 space-y-6">
+        {/* Quantity */}
+        <div className="flex items-center justify-between">
+          <span className="font-medium">Quantity</span>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() =>
+                setModalProduct((p) => ({
+                  ...p,
+                  quantity: Math.max(1, p.quantity - 1)
+                }))
+              }
+              className="w-8 h-8 bg-[#800000] rounded-full flex items-center justify-center text-xl text-white"
+            >
+              −
+            </button>
+            <span className="text-lg">{modalProduct.quantity}</span>
+            <button
+              onClick={() =>
+                setModalProduct((p) => ({ ...p, quantity: p.quantity + 1 }))
+              }
+              className="w-8 h-8 bg-[#800000] rounded-full flex items-center justify-center text-xl text-white"
+            >
+              +
+            </button>
           </div>
         </div>
-      )}
 
+        {/* Size */}
+        <div>
+          <span className="font-medium block mb-2">Size</span>
+          <div className="flex space-x-2">
+            {modalProduct.sizes.map((s) => (
+              <button
+                key={s.label}
+                onClick={() => setModalProduct((p) => ({ ...p, size: s }))}
+                className={`px-4 py-2 rounded-lg text-sm border ${
+                  modalProduct.size.label === s.label
+                    ? "bg-gray-200 border-gray-400 font-semibold"
+                    : "bg-white border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {s.label} {s.price > 0 && `+₱${s.price}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Add‑ons */}
+        {modalProduct.addons.length > 0 && (
+          <div>
+            <span className="font-medium block mb-2">Add‑ons</span>
+            <div className="flex flex-wrap gap-2">
+              {modalProduct.addons.map((a) => (
+                <button
+                  key={a.label}
+                  onClick={() =>
+                    setModalProduct((p) => ({
+                      ...p,
+                      selectedAddons: p.selectedAddons.includes(a)
+                        ? p.selectedAddons.filter((x) => x !== a)
+                        : [...p.selectedAddons, a]
+                    }))
+                  }
+                  className={`px-4 py-2 rounded-lg text-sm border ${
+                    modalProduct.selectedAddons.includes(a)
+                      ? "bg-gray-200 border-gray-400 font-semibold"
+                      : "bg-white border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  {a.label} {a.price > 0 && `+₱${a.price}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Special Instructions */}
+        <div>
+          <span className="font-medium block mb-2">Special instructions</span>
+          <textarea
+            value={modalProduct.notes}
+            onChange={(e) =>
+              setModalProduct((p) => ({ ...p, notes: e.target.value }))
+            }
+            placeholder="e.g No onions"
+            className="w-full border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring"
+            rows={3}
+          />
+        </div>
+      </div>
+
+      {/* — FOOTER — */}
+<div className="bg-gray-50 rounded-b-2xl p-4">
+  {/* First row: Total label and amount */}
+  <div className="flex justify-between">
+    <span className="text-lg font-semibold px-2">Total</span>
+    <span className="text-xl font-bold px-2">₱{(
+      (modalProduct.price + modalProduct.size.price) * modalProduct.quantity +
+      modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0) * modalProduct.quantity
+    ).toFixed(2)}</span>
+  </div>
+
+  {/* Second row: Buttons */}
+  <div className="flex space-x-4 mt-3">
+    <button
+      onClick={() => setShowModal(false)}
+      className="flex-1 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-gray-400"
+    >
+      Cancel
+    </button>
+    <button
+      onClick={addToCart}
+      className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:bg-gray-700"
+    >
+      Add to Order
+    </button>
+  </div>
+</div>
+        </div>
+  </div>
+)}
       {/* VOID PASSWORD MODAL */}
       {showVoidPassword && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-30">
@@ -1204,39 +1516,39 @@ export default function POSMain() {
         </div>
       )}
 
-{/* Profile Modal */}
-{showProfileModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-xl shadow-lg p-6 w-80 text-center">
-      <h2 className="text-xl font-bold mb-4">User Profile</h2>
-      <img
-  src={avatar}
-  alt="Avatar"
-  className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
-/>
-      <p className="mb-2"><strong>Name:</strong> {userName}</p>
-      <p className="mb-4"><strong>School ID:</strong> {schoolId}</p>
-      <div className="flex justify-center space-x-4">
-        <button
-          onClick={() => setShowProfileModal(false)}
-          className="bg-gray-200 px-4 py-2 rounded font-semibold"
-        >
-          Close
-        </button>
-        <button
-          onClick={() => {
-            localStorage.removeItem("userName");
-            localStorage.removeItem("schoolId");
-            navigate("/roles");
-          }}
-          className="bg-red-800 text-white px-4 py-2 rounded font-semibold"
-        >
-          Sign Out
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+     {/* Profile Modal */}
+     {showProfileModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-80 text-center">
+            <img
+              src={images["avatar-ph.png"]}
+              alt="Avatar"
+              className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
+            />
+            <h2 className="text-xl font-bold mb-2">User Profile</h2>
+            <p><strong>Name:</strong> {userName}</p>
+            <p className="mb-4"><strong>School ID:</strong> {schoolId}</p>
+            <div className="flex justify-center space-x-4">
+              <button
+                onClick={() => setShowProfileModal(false)}
+                className="bg-gray-200 px-4 py-2 rounded font-semibold"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem("userName");
+                  localStorage.removeItem("schoolId");
+                  navigate("/roles");
+                }}
+                className="bg-red-800 text-white px-4 py-2 rounded font-semibold"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
