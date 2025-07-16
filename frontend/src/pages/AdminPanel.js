@@ -207,6 +207,45 @@ const [currentSupplier, setCurrentSupplier] = useState({
   status: "Active",
 });
 
+const [voidLogs, setVoidLogs] = useState([
+  {
+    voidId: "V-001",
+    transactionId: "111-000191",
+    userName: "Cashier 1",
+    adminName: "Manager A",
+    reason: "Wrong item",
+    datetime: "May 23, 2025 11:20 am",
+    status: "Approved",
+  },
+  {
+    voidId: "V-002",
+    transactionId: "111-000194",
+    userName: "Cashier 2",
+    adminName: "Manager B",
+    reason: "Customer request",
+    datetime: "May 24, 2025 01:15 pm",
+    status: "Pending",
+  },
+  {
+    voidId: "V-003",
+    transactionId: "111-000199",
+    userName: "Cashier 3",
+    adminName: "Manager A",
+    reason: "Double entry",
+    datetime: "May 25, 2025 03:45 pm",
+    status: "Rejected",
+  },
+  ...Array(10).fill(0).map((_, i) => ({
+    voidId: `V-00${i + 4}`,
+    transactionId: `111-0002${i + 20}`,
+    userName: `Cashier ${i % 3 + 1}`,
+    adminName: `Manager ${String.fromCharCode(65 + (i % 3))}`,
+    reason: "Test void reason",
+    datetime: `May 26, 2025 0${i + 1}:00 am`,
+    status: i % 2 === 0 ? "Approved" : "Pending",
+  })),
+]);
+
   useEffect(() => {
     const storedName = localStorage.getItem("adminFullName");
     if (storedName) {
@@ -299,10 +338,11 @@ const [currentSupplier, setCurrentSupplier] = useState({
 </div>
 
       <input
-        type="text"
-        placeholder="Search"
-        className="w-full p-2 border border-gray-300 rounded"
-      />
+  type="text"
+  placeholder="Search"
+  className="w-1/4 p-2 border border-gray-300 rounded"
+/>
+
       <div className="overflow-x-auto max-h-[400px] overflow-y-scroll rounded border">
         <table className="min-w-full bg-white border">
           <thead>
@@ -362,9 +402,9 @@ const [currentSupplier, setCurrentSupplier] = useState({
       </div>
 
       <input
-        type="text"
-        placeholder="Search"
-        className="w-full p-2 border border-gray-300 rounded"
+       type="text"
+      placeholder="Search"
+      className="w-1/4 p-2 border border-gray-300 rounded"
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
       />
@@ -441,11 +481,11 @@ const renderSuppliers = () => {
       </div>
 
       {/* Search Bar */}
-      <input
-        type="text"
-        placeholder="Search"
-        className="w-full p-2 border border-gray-300 rounded"
-      />
+    <input
+  type="text"
+  placeholder="Search"
+  className="w-1/4 p-2 border border-gray-300 rounded"
+/>
 
       {/* Scrollable Table */}
       <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded border">
@@ -500,7 +540,7 @@ const renderSuppliers = () => {
     </div>
   );
 };
-
+ 
 
 const handleSave = () => {
   if (isEditMode) {
@@ -543,18 +583,69 @@ const handleSaveSupplier = () => {
     status: "Active",
   });
 };
+const renderVoidLogs = () => (
+  <div className="space-y-6">
+    <div className="flex justify-between items-center">
+      <h2 className="text-2xl font-bold">Void Logs</h2>
+    </div>
 
-  const renderContent = () => {
-  switch (activeSection) {
-    case "homepage": return renderHomepage();
-    case "inventory": return renderInventory();
-   case "pos": return renderPOSMonitoring();
-    case "suppliers": return renderSuppliers(); // ← change this line
-    case "voidlogs": return <h2 className="text-2xl font-bold">Void Logs</h2>;
-    default: return renderHomepage();
-    
-  }
-};
+    <input
+     type="text"
+  placeholder="Search"
+  className="w-1/4 p-2 border border-gray-300 rounded"
+    />
+
+    <div className="overflow-x-auto max-h-[400px] overflow-y-scroll rounded border">
+      <table className="min-w-full bg-white border">
+        <thead>
+          <tr className="bg-gray-100 text-left">
+            <th className="p-3 border">Void ID</th>
+            <th className="p-3 border">Transaction ID</th>
+            <th className="p-3 border">User Name (Cashier)</th>
+            <th className="p-3 border">Admin Name (Manager)</th>
+            <th className="p-3 border">Reason for Void</th>
+            <th className="p-3 border">Date and Time</th>
+            <th className="p-3 border">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {voidLogs.map((log, index) => (
+            <tr key={index} className="border-t">
+              <td className="p-3 border">{log.voidId}</td>
+              <td className="p-3 border">{log.transactionId}</td>
+              <td className="p-3 border">{log.userName}</td>
+              <td className="p-3 border">{log.adminName}</td>
+              <td className="p-3 border">{log.reason}</td>
+              <td className="p-3 border">{log.datetime}</td>
+              <td className="p-3 border">{log.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="text-right">
+      <button className="bg-yellow-500 text-black px-4 py-2 rounded hover:bg-yellow-600">
+        Export Logs
+      </button>
+    </div>
+  </div>
+);
+
+const renderContent = () => (
+  <div className="space-y-6 min-h-[600px]"> {/* Maintain height consistency */}
+    {(() => {
+      switch (activeSection) {
+        case "homepage": return renderHomepage();
+        case "inventory": return renderInventory();
+        case "pos": return renderPOSMonitoring();
+        case "suppliers": return renderSuppliers();
+        case "voidlogs": return renderVoidLogs();
+        default: return renderHomepage();
+      }
+    })()}
+  </div>
+);
 
 {renderContent()
   
