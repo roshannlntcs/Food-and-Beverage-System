@@ -1,51 +1,9 @@
 // src/POSMain.jsx
-import { useNavigate } from "react-router-dom"; 
 import React, { useState, useEffect, useMemo } from "react";
-
-// Grab every image file in ../../assets
-const importAll = (r) =>
-  r.keys().reduce((acc, key) => {
-    // key looks like "./beef-mechado.jpg" → trim the "./"
-    const fileName = key.replace("./", "");
-    acc[fileName] = r(key);
-    return acc;
-  }, {});
-
+import { useNavigate } from "react-router-dom";
+// import your icons...
+const importAll = (r) => r.keys().reduce((acc, k) => ({ ...acc, [k.replace('./','')]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
-
-export default function POSMain() {
-
-  const navigate = useNavigate();
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("All Menu");
-  const [activeTab, setActiveTab] = useState("Menu");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [itemAvailability, setItemAvailability] = useState({});
-  const [showDiscountModal, setShowDiscountModal] = useState(false);
-  const [discountType, setDiscountType] = useState("");
-  const [couponCode, setCouponCode] = useState("");
-  const [discountPct, setDiscountPct] = useState(0);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [modalProduct, setModalProduct] = useState(null);
-  const [showVoidPassword, setShowVoidPassword] = useState(false);
-  const [voidPasswordInput, setVoidPasswordInput] = useState("");
-  const [voidContext, setVoidContext] = useState({ type: null, index: null });
-  const [paymentMethod, setPaymentMethod] = useState("");
-
-  // get user info
-  const userName = localStorage.getItem("userName") || "Cashier";
-  const schoolId = localStorage.getItem("schoolId") || "";
-
-  const basePassword = "123456";
-
-// inside POSMain.jsx, replace your current placeholders with this:
 
 const placeholders = {
   "Main Dish": [
@@ -667,6 +625,51 @@ const placeholders = {
   ]
 };
 
+export default function POSMain() {
+
+  const navigate = useNavigate();
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("All Menu");
+  const [activeTab, setActiveTab] = useState("Menu");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [products, setProducts] = useState([]);
+
+  const [cart, setCart] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+
+
+  const [itemAvailability, setItemAvailability] = useState({});
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountType, setDiscountType] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [discountPct, setDiscountPct] = useState(0);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalProduct, setModalProduct] = useState(null);
+
+  const [showVoidPassword, setShowVoidPassword] = useState(false);
+  const [voidPasswordInput, setVoidPasswordInput] = useState("");
+
+  const [voidContext, setVoidContext] = useState({ type: null, index: null });
+  const [paymentMethod, setPaymentMethod] = useState("");
+
+  const [voidLogs, setVoidLogs] = useState([]);  
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyContext, setHistoryContext] = useState(null);
+
+  // get user info
+  const userName = localStorage.getItem("userName") || "Cashier";
+  const schoolId = localStorage.getItem("schoolId") || "";
+
+  const basePassword = "123456";
+
+// inside POSMain.jsx, replace your current placeholders with this:
+
+
+
   // recompute product list
   const filteredProducts = useMemo(() => {
     const baseList =
@@ -746,46 +749,76 @@ const placeholders = {
     setVoidContext({ type, index: idx });
     setShowVoidPassword(true);
   };
-  const confirmVoid = () => {
-    if (voidPasswordInput !== basePassword) return alert("Wrong password");
-    const now = new Date();
-    const id = `VOID-${now.getTime()}`;
-    if (voidContext.type === "item") {
-      const removed = cart[voidContext.index];
-      setCart((p) => p.filter((_, i) => i !== voidContext.index));
-      setTransactions((p) => [
-        {
-          id,
-          type: "Voided Item",
-          date: now.toLocaleDateString(),
-          items: [removed],
-          subtotal: 0,
-          discountAmt: 0,
-          tax: 0,
-          total: 0
-        },
-        ...p
-      ]);
+  // Replace your old confirmVoid entirely with this:
+
+const confirmVoid = () => {
+  if (voidPasswordInput !== basePassword) {
+    alert("Wrong password");
+    return;
+  }
+  const { type, tx, index } = voidContext;
+
+  setTransactions(prev =>
+    prev.map(t => {
+      if (t.id !== tx.id) return t;
+
+      // Mark void flags
+      let items = t.items.map((it, idx) =>
+        (type === "transaction" || idx === index)
+          ? { ...it, voided: true }
+          : it
+      );
+
+      // Recompute subtotal, discount, tax, total
+      const subtotal = items
+        .filter(it => !it.voided)
+        .reduce((sum, it) => {
+          const base = it.price;
+          const sizeUp = it.size.price;
+          const addons = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+          return sum + (base + sizeUp + addons) * it.quantity;
+        }, 0);
+      const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
+      const tax = +(subtotal * 0.12).toFixed(2);
+      const total = +(subtotal + tax - discountAmt).toFixed(2);
+
+      return {
+        ...t,
+        items,
+        voided: type === "transaction" ? true : t.voided,
+        subtotal,
+        discountAmt,
+        tax,
+        total
+      };
+    })
+  );
+
+  // Update voidLogs as before...
+  setVoidLogs(prev => {
+    const existing = prev.find(v => v.txId === tx.id);
+    const newVoidedItems = type === "transaction"
+      ? tx.items.map(i => i.name)
+      : [...(existing?.voidedItems||[]), tx.items[index].name];
+    const newLog = {
+      voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
+      txId: tx.id,
+      voidedItems: Array.from(new Set(newVoidedItems)),
+      fullyVoided: type === "transaction"
+    };
+    if (existing) {
+      return prev.map(v => v.txId === tx.id ? newLog : v);
     } else {
-      const allItems = [...cart];
-      setCart([]);
-      setTransactions((p) => [
-        {
-          id,
-          type: "Voided Transaction",
-          date: now.toLocaleDateString(),
-          items: allItems,
-          subtotal: 0,
-          discountAmt: 0,
-          tax: 0,
-          total: 0
-        },
-        ...p
-      ]);
+      return [...prev, newLog];
     }
-    setShowVoidPassword(false);
-    setVoidPasswordInput("");
-  };
+  });
+
+  // Close modals
+  setShowVoidPassword(false);
+  setShowHistoryModal(false);
+  setVoidContext(null);
+  setVoidPasswordInput('');
+};
 
   useEffect(() => {
     if (activeTab === "Discount") setShowDiscountModal(true);
@@ -844,7 +877,7 @@ const placeholders = {
                   setActiveCategory(cat.key);
                   setSearchTerm("");
                 }}
-                className={`w-full aspect-square flex flex-col items-center justify-center rou3nded shadow ${
+                className={`w-full aspect-square flex flex-col items-center justify-center rounded shadow ${
                   activeCategory === cat.key ? "bg-[#F6EBCE] font-semibold" : "bg-white hover:bg-[#F6EBCE]"
                 }`}
               >
@@ -980,96 +1013,150 @@ const placeholders = {
                 </div>
               )}
 
-              {/* TRANSACTIONS */}
-              {activeTab === "Transactions" && (
-                <div className="flex-1 p-6 flex flex-col">
-                  <h2 className="text-2xl font-bold mb-4">Transactions Log</h2>
-                  <div className="flex space-x-4 mb-4">
-                    <div>
-                      <label className="block text-sm">From</label>
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="border p-1 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm">To</label>
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="border p-1 rounded"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4 overflow-y-auto flex-1 auto-rows-min">
-                    {transactions
-                      .filter((tx) => {
-                        const term = searchTerm.toLowerCase();
-                        const match = tx.id.toLowerCase().includes(term) || tx.date.toLowerCase().includes(term);
-                        const iso = new Date(tx.date).toISOString().slice(0, 10);
-                        return match && (!dateFrom || iso >= dateFrom) && (!dateTo || iso <= dateTo);
-                      })
-                      .map((tx) => (
-                        <div key={tx.id} className="bg-white p-4 rounded-lg shadow hover:scale-105 transition-transform duration-150 cursor-pointer">
-                          <div className="font-semibold mb-2">ID: {tx.id}</div>
-                          <div className="mb-1">
-                            <strong>Type:</strong> {tx.type}
-                          </div>
-                          {tx.method && (
-                            <div className="mb-1">
-                              <strong>Method:</strong> {tx.method}
-                            </div>
-                          )}
-                          <div className="mb-1">
-                            <strong>Date:</strong> {tx.date}
-                          </div>
-                          <div className="mb-1">
-                            <strong>Subtotal:</strong> ₱{(tx.subtotal ?? 0).toFixed(2)}
-                          </div>
-                          <div className="mb-1">
-                            <strong>Discount:</strong> ₱{tx.discountAmt.toFixed(2)}
-                          </div>
-                          <div className="mb-1">
-                            <strong>Discount Type:</strong> {tx.discountType || "—"}
-                          </div>
-                          {tx.discountCode && (
-                            <div className="mb-1">
-                              <strong>Code:</strong> {tx.discountCode}
-                            </div>
-                          )}
-                          <div className="mb-1">
-                            <strong>Tax:</strong> ₱{tx.tax.toFixed(2)}
-                          </div>
-                          <div className="text-sm mb-1">
-                            <strong>Items:</strong>
-                            <ul className="list-disc list-inside">
-                              {tx.items.map((i, idx) => (
-                                <li key={idx} className="mb-1">
-                                  {i.name} x{i.quantity}
-                                  <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
-                                    {i.size && <li>Size: {i.size.label || i.size}</li>}
-                                    {i.addons && i.addons.length > 0 && (
-                                      <li>
-                                        Add‑ons: {i.addons.map((a) => a.label || a).join(", ")}
-                                      </li>
-                                    )}
-                                    {i.notes && <li>Notes: {i.notes}</li>}
-                                  </ul>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div>
-                            <strong>Total:</strong> ₱{tx.total.toFixed(2)}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+{activeTab === "Transactions" && (
+  <div className="flex-1 p-2 flex flex-col h-full min-h-0">
+    <h2 className="text-2xl font-bold mb-3">Transactions & Void Logs</h2>
+    <div className="flex space-x-2 flex-1 h-full min-h-0">
+      {/* ─── Transaction Logs ─── */}
+      <div className="w-1/2 bg-white rounded-lg shadow p-2 flex flex-col h-full min-h-0">
+        <h3 className="font-semibold mb-1">Transaction Logs</h3>
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-2">
+          {transactions.map(tx => (
+            <button
+              key={tx.transactionID}
+              onClick={() => setHistoryContext({ type: 'detail', tx })}
+              className={`w-full text-left p-2 rounded-lg border transition duration-150 hover:bg-[#F6EBCE] ${
+                tx.voided ? 'bg-gray-100 opacity-60' : ''
+              }`}
+            >
+              <div className="flex justify-between">
+                <span className="font-medium">
+                  {tx.transactionID} {tx.voided && '(Voided)'}
+                </span>
+                <span>₱{tx.total.toFixed(2)}</span>
+              </div>
+              <div className="text-xs text-gray-600">
+                Order: {tx.id}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Void Logs ─── */}
+      <div className="w-1/2 bg-white rounded-lg shadow p-2 flex flex-col h-full min-h-0">
+        <h3 className="font-semibold mb-1">Void Logs</h3>
+        <div className="flex-1 overflow-y-auto min-h-0 space-y-2">
+          {voidLogs.map(vl => (
+            <div
+              key={vl.voidId}
+              className={`p-2 rounded-lg border transition duration-150 hover:bg-[#F6EBCE] ${
+                vl.fullyVoided ? 'bg-red-50' : ''
+              }`}
+            >
+              <div className="flex justify-between">
+                <span className="font-medium">{vl.voidId}</span>
+                {vl.fullyVoided && <span className="text-xs text-gray-600">(Voided)</span>}
+              </div>
+              <div className="text-xs text-gray-600">Tx: {vl.txId}</div>
+              <div className="text-sm">{vl.voidedItems.join(', ')}</div>
+            </div>
+          ))}
+          {voidLogs.length === 0 && (
+            <div className="text-gray-400">No voids yet.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* ─── Detail Popup ─── */}
+{historyContext?.type === 'detail' && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white w-1/4 max-h-[80vh] rounded-lg flex flex-col">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-10 bg-white border-b px-4 py-2 flex justify-between items-center">
+        <h2 className="text-lg font-bold">{historyContext.tx.transactionID} Details</h2>
+        <button
+          onClick={() => setHistoryContext(null)}
+          className="text-gray-500 hover:text-gray-800"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="p-4 overflow-y-auto flex-1 space-y-4">
+        {historyContext.tx.items.map((it, idx) => {
+          if (it.voided) return null; // skip voided lines
+          const base = it.price;
+          const sizeUp = it.size.price;
+          const addonsTotal = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+          const lineTotal = (base + sizeUp + addonsTotal) * it.quantity;
+          return (
+            <div key={idx} className="p-3 border rounded-lg">
+              <div className="font-medium">{it.name}</div>
+              <div className="text-sm flex justify-between">
+                <span>Base:</span><span>₱{base.toFixed(2)}</span>
+              </div>
+              <div className="text-sm flex justify-between">
+                <span>Size ({it.size.label}):</span><span>₱{sizeUp.toFixed(2)}</span>
+              </div>
+              {addonsTotal > 0 && (
+                <div className="text-sm flex justify-between">
+                  <span>Add‑ons:</span><span>₱{addonsTotal.toFixed(2)}</span>
                 </div>
               )}
+              {it.notes && <div className="text-sm italic">Notes: {it.notes}</div>}
+              <div className="mt-2 text-sm font-semibold flex justify-between">
+                <span>Line Total:</span><span>₱{lineTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Discount info */}
+        {historyContext.tx.discountPct > 0 && (
+          <div className="p-4 bg-gray-50 rounded-lg text-sm">
+            <div className="flex justify-between">
+              <span>Discount ({historyContext.tx.discountType.toUpperCase()}):</span>
+              <span>-₱{historyContext.tx.discountAmt.toFixed(2)}</span>
+            </div>
+            {historyContext.tx.discountCode && (
+              <div className="mt-1 flex justify-between">
+                <span>Coupon:</span><span>{historyContext.tx.discountCode}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Totals */}
+        <div className="p-4 bg-gray-50 rounded-lg space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>Subtotal:</span><span>₱{historyContext.tx.subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Tax (12%):</span><span>₱{historyContext.tx.tax.toFixed(2)}</span>
+          </div>
+          {historyContext.tx.discountPct > 0 && (
+            <div className="flex justify-between">
+              <span>Discount:</span><span>-₱{historyContext.tx.discountAmt.toFixed(2)}</span>
+            </div>
+          )}
+          <hr className="my-2" />
+          <div className="flex justify-between font-bold">
+            <span>Total:</span><span>₱{historyContext.tx.total.toFixed(2)}</span>
+          </div>
+          <div className="mt-2 text-sm text-gray-600">
+            <strong>Payment:</strong> {historyContext.tx.method}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
 {/* Items Availability */}
 {activeTab === "Items" && (
@@ -1143,14 +1230,18 @@ const placeholders = {
         </div>
       </div>
 
-      {/* Order Details (always visible) fully cleaned, aligned, ready to paste*/}
+{/* ─── Order Details Pane ─── */}
 <div className="w-80 bg-[#F6F3EA] border-l border-gray-200 p-6 flex flex-col overflow-hidden shadow">
   <div className="flex-1 flex flex-col h-full">
-    {/* Title + Void Transaction Button */}
+    {/* Title + History & Void Launcher */}
     <div className="mb-4 flex justify-between items-center">
       <h3 className="text-xl font-bold">Order Details</h3>
-      <button onClick={() => triggerVoid("transaction")}>
-        <img src={images["void-trans.png"]} alt="Void Transaction" className="w-6 h-6" />
+      <button
+        onClick={() => transactions.length && setShowHistoryModal(true)}
+        disabled={!transactions.length}
+        className={`p-1 rounded ${transactions.length ? 'hover:bg-gray-200' : 'opacity-50 cursor-not-allowed'}`}
+      >
+        <img src={images["void-trans.png"]} alt="History & Void" className="w-5 h-5" />
       </button>
     </div>
 
@@ -1161,18 +1252,17 @@ const placeholders = {
       ) : (
         cart.map((item, i) => (
           <div key={i} className="bg-white rounded p-2">
-            {/* Item Row */}
             <div className="flex justify-between items-start">
-              <div className="flex space-x-1.5">
+              {/* Left: image + details */}
+              <div className="flex space-x-1.5 flex-1 min-w-0">
                 <img
                   src={images[item.image] || images["react.svg"]}
                   alt={item.name}
                   className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
                 />
-                <div className="flex flex-col">
-                  <div className="text-xs font-medium truncate">
-                    {item.name} ({item.size.label})
-                  </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <div className="text-xs font-medium truncate">{item.name}</div>
+                  <div className="text-[10px] text-gray-700 truncate">Size: {item.size.label}</div>
                   <div className="text-[10px] text-gray-700">
                     {item.quantity} x ₱{(item.totalPrice / item.quantity).toFixed(2)}
                   </div>
@@ -1188,16 +1278,11 @@ const placeholders = {
                   )}
                 </div>
               </div>
-              <div className="flex flex-col items-end justify-between h-full">
+              {/* Right: total */}
+              <div className="flex flex-col items-end justify-between h-full ml-2">
                 <div className="text-xs font-semibold whitespace-nowrap">
                   ₱{item.totalPrice.toFixed(2)}
                 </div>
-                <button
-                  onClick={() => triggerVoid("item", i)}
-                  className="mt-1"
-                >
-                  <img src={images["void-item.png"]} alt="Void Item" className="w-3 h-3" />
-                </button>
               </div>
             </div>
           </div>
@@ -1215,7 +1300,10 @@ const placeholders = {
         <div className="flex justify-between">
           <span>
             Discount (
-            {[discountType === "senior" && "Senior", discountType === "pwd" && "PWD", discountType === "student" && "Student", couponCode && couponCode.toUpperCase()]
+            {[discountType === "senior" && "Senior",
+              discountType === "pwd" && "PWD",
+              discountType === "student" && "Student",
+              couponCode && couponCode.toUpperCase()]
               .filter(Boolean)
               .join(" + ")}
             ): {discountPct}%
@@ -1254,7 +1342,6 @@ const placeholders = {
           </button>
         ))}
       </div>
-
       <button
         onClick={processTransaction}
         className="w-full bg-red-800 text-white py-2 rounded-lg font-semibold text-sm"
@@ -1265,6 +1352,123 @@ const placeholders = {
   </div>
 </div>
 
+{/* ─── History & Void Modal (z‑50) ─── */}
+{showHistoryModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-2xl shadow-xl w-[32rem] max-h-[80vh] flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b flex justify-between items-center">
+        <h2 className="text-xl font-bold">Transaction History</h2>
+        <button
+          onClick={() => setShowHistoryModal(false)}
+          className="text-gray-600 hover:text-gray-800"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        {transactions.map(tx => (
+          !tx.isVoidLog && (
+            <div
+              key={tx.id}
+              className={`p-4 rounded-lg border ${
+                tx.voided
+                  ? 'bg-gray-100 opacity-60'
+                  : 'hover:shadow-md transition-shadow duration-150'
+              }`}
+            >
+              {/* Transaction header */}
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <div className="font-semibold">
+                    {tx.voided ? `${tx.id} (Voided)` : tx.id}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {tx.date} • {tx.method}
+                  </div>
+                </div>
+                {!tx.voided && (
+                  <button
+                    onClick={() => {
+                      setVoidContext({ type: 'transaction', tx });
+                      setShowVoidPassword(true);
+                    }}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <img src={images["void-trans.png"]} alt="Void Tx" className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Line items */}
+              <div className="space-y-1">
+                {tx.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <div className={item.voided ? 'line-through text-gray-500' : ''}>
+                      {item.name} x{item.quantity} @ ₱{(item.totalPrice/item.quantity).toFixed(2)}
+                    </div>
+                    {!item.voided && !tx.voided && (
+                      <button
+                        onClick={() => {
+                          setVoidContext({ type: 'item', tx, index: idx });
+                          setShowVoidPassword(true);
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <img src={images["void-item.png"]} alt="Void Item" className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Total */}
+              <div className="mt-4 text-right text-sm font-medium">
+                Total: ₱{tx.total.toFixed(2)}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+
+      {/* Sticky footer */}
+      <div className="px-6 py-3 border-t bg-white flex justify-end">
+        <button
+          onClick={() => setShowHistoryModal(false)}
+          className="px-4 py-2 rounded-lg border hover:bg-gray-100"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* ─── Void Password Modal (as before) ─── */}
+      {showVoidPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[1000]">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-96 text-center">
+            <h2 className="text-xl font-bold mb-4 text-red-800">Manager Password</h2>
+            <input
+              type="password"
+              value={voidPasswordInput}
+              onChange={e => setVoidPasswordInput(e.target.value)}
+              placeholder="Enter password"
+              className="w-full border rounded p-2 mb-4"
+            />
+            <div className="flex justify-around">
+              <button onClick={confirmVoid} className="bg-red-800 text-white px-6 py-2 rounded-lg">
+                Confirm
+              </button>
+              <button onClick={() => setShowVoidPassword(false)} className="bg-gray-200 px-6 py-2 rounded-lg">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ITEM MODAL */}
 {showModal && modalProduct && (
@@ -1401,13 +1605,13 @@ const placeholders = {
   <div className="flex space-x-4 mt-3">
     <button
       onClick={() => setShowModal(false)}
-      className="flex-1 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-gray-400"
+      className="flex-1 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-[#F6EBCE]"
     >
       Cancel
     </button>
     <button
       onClick={addToCart}
-      className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:bg-gray-700"
+      className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:font-bold"
     >
       Add to Order
     </button>
@@ -1416,25 +1620,6 @@ const placeholders = {
         </div>
   </div>
 )}
-      {/* VOID PASSWORD MODAL */}
-      {showVoidPassword && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-30">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-96 text-center">
-            <h2 className="text-xl font-bold mb-4 text-red-800">Manager Password</h2>
-            <input
-              type="password"
-              value={voidPasswordInput}
-              onChange={e => setVoidPasswordInput(e.target.value)}
-              placeholder="Enter password"
-              className="w-full border-gray-200 border rounded p-2 mb-4"
-            />
-            <div className="flex justify-around">
-              <button onClick={confirmVoid} className="bg-red-800 text-white px-6 py-2 rounded-lg font-semibold">Confirm</button>
-              <button onClick={() => setShowVoidPassword(false)} className="bg-gray-200 text-black px-6 py-2 rounded-lg font-semibold">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
 
      {/* DISCOUNT MODAL */}
      {showDiscountModal && (
