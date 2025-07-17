@@ -65,44 +65,53 @@ export default function AdminLoginPage() {
             </div>
           )}
 
-          <div className="mb-4">
-            <label className="block text-gray-700 mb-2">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-blue-400"
-              placeholder="Enter username"
-            />
-          </div>
+          {/* Form with Enter key submission */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault(); // Prevent page refresh
+              handleLogin(); // Trigger login
+            }}
+          >
+            <div className="mb-4">
+              <label className="block text-gray-700 mb-2">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-blue-400"
+                placeholder="Enter username"
+              />
+            </div>
 
-          <div className="mb-6">
-            <label className="block text-gray-700 mb-2">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-blue-400"
-              placeholder="Enter password"
-            />
-          </div>
+            <div className="mb-6">
+              <label className="block text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-blue-400"
+                placeholder="Enter password"
+              />
+            </div>
 
-          {/* Buttons Centered */}
-         <div className="flex flex-col items-center space-y-4 mt-10">
-            <button
-              onClick={handleLogin}
-              className="h-[40px] w-[200px] bg-yellow-400 text-black py-2 px-4 rounded-[20px] hover:bg-yellow-500 transition"
-            >
-              Enter
-            </button>
+            {/* Buttons Centered */}
+            <div className="flex flex-col items-center space-y-4 mt-10">
+              <button
+                type="submit"
+                className="h-[40px] w-[200px] bg-yellow-400 text-black py-2 px-4 rounded-[20px] hover:bg-yellow-500 transition"
+              >
+                Enter
+              </button>
 
-            <button
-              onClick={() => navigate("/roles")}
-              className="h-[40px] w-[200px] bg-gray-200 text-gray-700 py-2 px-4 rounded-[20px] hover:bg-gray-300 transition"
-            >
-              Cancel
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => navigate("/roles")}
+                className="h-[40px] w-[200px] bg-gray-200 text-gray-700 py-2 px-4 rounded-[20px] hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -119,6 +128,9 @@ export default function AdminLoginPage() {
               onChange={(e) => setFullName(e.target.value)}
               className="w-full p-2 mb-4 border rounded focus:outline-none focus:ring focus:border-blue-400"
               placeholder="Full Name"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleModalSubmit();
+              }}
             />
             <button
               onClick={handleModalSubmit}

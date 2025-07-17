@@ -299,12 +299,11 @@ const [voidLogs, setVoidLogs] = useState([
 
 
   const renderHomepage = () => (
-  <div className="space-y-2">
-            <div className="absolute top-10 left-10 text-3xl font-bold text-gray-800">
-          Welcome, {adminName || "Admin"}!
-    </div>
-    {/* Stats on top */}
-    <div className="grid grid-cols-3 gap-4">
+  <div className="space-y-6">
+   
+
+    {/* Stats Section */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <div className="bg-white p-4 rounded shadow">
         <p className="text-sm text-gray-500">Revenue</p>
         <h2 className="text-xl font-bold">₱25,000</h2>
@@ -319,8 +318,8 @@ const [voidLogs, setVoidLogs] = useState([
       </div>
     </div>
 
-    {/* Charts below */}
-    <div className="grid grid-cols-2 gap-6">
+    {/* Charts Section */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="bg-white shadow p-6 rounded">
         <h3 className="text-lg font-semibold">Stocks Overview</h3>
         <div className="mt-4 h-40 bg-gray-200 flex items-center justify-center text-gray-500">
@@ -333,7 +332,7 @@ const [voidLogs, setVoidLogs] = useState([
           Pie Chart Placeholder
         </div>
       </div>
-      <div className="bg-white shadow p-6 rounded col-span-2">
+      <div className="bg-white shadow p-6 rounded col-span-full">
         <h3 className="text-lg font-semibold mb-4">Today's Top Selling</h3>
         <div className="h-32 bg-gray-200 flex items-center justify-center text-gray-500">
           Bar Chart Placeholder
@@ -740,50 +739,64 @@ return (
         </nav>
       </div>
 
-      {/* Top Right: Notifications + Profile */}
-      <div className="absolute top-6 right-8 z-20 flex items-center gap-4" ref={profileMenuRef}>
-        {/* Notification Bell */}
-        <div className="relative" ref={notificationRef}>
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
-          >
-            <Bell size={20} className="text-black" />
-          </button>
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border rounded shadow-lg z-10">
-              <div className="p-4 border-b font-semibold">Notifications</div>
-              <ul className="max-h-60 overflow-y-auto">
-                {notifications.map((notif) => (
-                  <li key={notif.id} className="p-3 text-sm hover:bg-gray-100 border-b">
-                    {notif.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+      {/* Top Bar: Welcome + Notifications + Profile */}
+<div className="absolute top-6 left-64 right-6 z-20 flex justify-between items-center px-4">
+  {/* Left side: Welcome only if on homepage */}
+  {activeSection === "homepage" ? (
+    <h1 className="text-2xl font-bold text-gray-800">
+      Welcome, {adminName || "Admin"}!
+    </h1>
+  ) : (
+    <div /> // placeholder to keep layout aligned
+  )}
 
-        {/* Profile Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
-            className="bg-gray-200 text-black px-4 py-2 rounded hover:bg-gray-300"
-          >
-            {adminName}
-          </button>
-          {showProfileMenu && (
-            <div className="absolute right-0 mt-2 bg-white border rounded shadow z-10 w-40">
-              <button
-                onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
-              >
-                Logout
-              </button>
-            </div>
-          )}
+  {/* Right side: Notifications + Profile */}
+  <div className="flex items-center gap-4" ref={profileMenuRef}>
+    {/* Notification Bell */}
+    <div className="relative" ref={notificationRef}>
+      <button
+        onClick={() => setShowNotifications(!showNotifications)}
+        className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
+      >
+        <Bell size={20} className="text-black" />
+      </button>
+      {showNotifications && (
+        <div className="absolute right-0 mt-2 w-64 bg-white border rounded shadow-lg z-10">
+          <div className="p-4 border-b font-semibold">Notifications</div>
+          <ul className="max-h-60 overflow-y-auto">
+            {notifications.map((notif) => (
+              <li key={notif.id} className="p-3 text-sm hover:bg-gray-100 border-b">
+                {notif.message}
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
+      )}
+    </div>
+
+    {/* Profile Dropdown */}
+    <div className="relative">
+      <button
+        onClick={() => setShowProfileMenu(!showProfileMenu)}
+        className="bg-gray-200 text-black px-4 py-2 rounded hover:bg-gray-300"
+      >
+        {adminName}
+      </button>
+     {showProfileMenu && (
+  <div className="absolute right-0 mt-2 bg-white border rounded shadow z-10 w-40">
+    <button
+      onClick={handleLogout}
+      className="w-full bg-[#800000] text-white px-4 py-2 rounded hover:bg-[#660000] transition"
+    >
+      Logout
+    </button>
+  </div>
+)}
+
+    </div>
+  </div>
+</div>
+
 
       {/* Main Scrollable Content */}
      <div className="ml-64 mt-24 px-6 pb-8 overflow-y-auto w-full">
