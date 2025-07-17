@@ -129,6 +129,7 @@ const [transactionData, setTransactionData] = useState([
   
 ]);
 
+//Inventory State
 const [showPopup, setShowPopup] = useState(false);
 const [isEditMode, setIsEditMode] = useState(false);
 const [currentItem, setCurrentItem] = useState({
@@ -138,6 +139,8 @@ const [currentItem, setCurrentItem] = useState({
   qty: "",
   status: "Available",
 });
+const [originalItemName, setOriginalItemName] = useState(""); 
+
 
 // SUPPLIER STATE
 const [supplierData, setSupplierData] = useState([
@@ -226,6 +229,8 @@ const [currentSupplier, setCurrentSupplier] = useState({
   products: "",
   status: "Active",
 });
+const [originalSupplierName, setOriginalSupplierName] = useState(""); 
+
 
 const [voidLogs, setVoidLogs] = useState([
   {
@@ -401,6 +406,7 @@ const [voidLogs, setVoidLogs] = useState([
           onClick={() => {
             setIsEditMode(true);
             setCurrentItem(item);
+            setOriginalItemName(item.name);
             setShowPopup(true);
           }}
           className="bg-[#800000] text-white px-3 py-1 rounded hover:bg-[#660000]"
@@ -555,10 +561,11 @@ const renderSuppliers = () => {
             </tr>
           </thead>
           <tbody>
-            {supplierData
+           {supplierData
   .filter(supplier =>
     supplier.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
-    supplier.products.toLowerCase().includes(supplierSearchTerm.toLowerCase())
+    supplier.products.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
+    supplier.contact.toLowerCase().includes(supplierSearchTerm.toLowerCase()) 
   )
   .map((supplier, index) => (
               <tr key={index} className="border-t">
@@ -573,11 +580,13 @@ const renderSuppliers = () => {
                   <button
                     className="bg-[#800000] text-white px-3 py-1 rounded hover:bg-[#660000]"
 
-                    onClick={() => {
+                   onClick={() => {
                       setIsEditSupplierMode(true);
                       setCurrentSupplier(supplier);
+                      setOriginalSupplierName(supplier.name); 
                       setShowSupplierPopup(true);
                     }}
+
                   >
                     Edit
                   </button>
@@ -600,36 +609,74 @@ const renderSuppliers = () => {
 
 
 const handleSave = () => {
+  // If any field is empty or invalid, just close the popup silently
+  if (
+    !currentItem.name.trim() ||
+    currentItem.price === "" ||
+    isNaN(currentItem.price) ||
+    !currentItem.category.trim() ||
+    currentItem.qty === "" ||
+    isNaN(currentItem.qty)
+  ) {
+    // Just close the popup
+    setShowPopup(false);
+    setIsEditMode(false);
+    setOriginalItemName(""); // Clear original tracker
+    return;
+  }
+
+  // Proceed with save
   if (isEditMode) {
-    // Update item in inventory
     setInventoryData((prevData) =>
       prevData.map((item) =>
-        item.name === currentItem.name ? currentItem : item
+        item.name === originalItemName ? currentItem : item
       )
     );
   } else {
-    // Add new item
     setInventoryData((prevData) => [...prevData, currentItem]);
   }
 
-  // Reset
+  // Reset state
   setCurrentItem({ name: "", price: "", category: "", qty: "", status: "Available" });
   setShowPopup(false);
   setIsEditMode(false);
+  setOriginalItemName("");
 };
+
+
+
 const handleSaveSupplier = () => {
+  // If any required field is empty or invalid, close the popup silently
+  if (
+    !currentSupplier.name.trim() ||
+    !currentSupplier.contact.trim() ||
+    !currentSupplier.phone.trim() ||
+    !currentSupplier.email.trim() ||
+    !currentSupplier.address.trim() ||
+    !currentSupplier.products.trim()
+  ) {
+    // Close the popup without saving
+    setShowSupplierPopup(false);
+    setIsEditSupplierMode(false);
+    setOriginalSupplierName("");
+    return;
+  }
+
+  // Proceed with update or add
   if (isEditSupplierMode) {
     setSupplierData((prev) =>
       prev.map((sup) =>
-        sup.name === currentSupplier.name ? currentSupplier : sup
+        sup.name === originalSupplierName ? currentSupplier : sup
       )
     );
   } else {
     setSupplierData((prev) => [...prev, currentSupplier]);
   }
 
+  // Reset state
   setShowSupplierPopup(false);
   setIsEditSupplierMode(false);
+  setOriginalSupplierName("");
   setCurrentSupplier({
     name: "",
     contact: "",
@@ -640,6 +687,9 @@ const handleSaveSupplier = () => {
     status: "Active",
   });
 };
+
+
+
 const renderVoidLogs = () => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
@@ -804,131 +854,213 @@ return (
 
         {/* Popup: Add/Edit Inventory */}
         {showPopup && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded p-6 w-[90%] max-w-md">
-              <h2 className="text-xl font-bold mb-4">
-                {isEditMode ? "Edit Item" : "Add Item"}
-              </h2>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Name"
-                  value={currentItem.name}
-                  onChange={(e) =>
-                    setCurrentItem({ ...currentItem, name: e.target.value })
-                  }
-                  className="w-full border p-2 rounded"
-                />
-                <input
-                  type="number"
-                  placeholder="Price"
-                  value={currentItem.price}
-                  onChange={(e) =>
-                    setCurrentItem({
-                      ...currentItem,
-                      price: parseFloat(e.target.value),
-                    })
-                  }
-                  className="w-full border p-2 rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Category"
-                  value={currentItem.category}
-                  onChange={(e) =>
-                    setCurrentItem({ ...currentItem, category: e.target.value })
-                  }
-                  className="w-full border p-2 rounded"
-                />
-                <input
-                  type="number"
-                  placeholder="Quantity"
-                  value={currentItem.qty}
-                  onChange={(e) =>
-                    setCurrentItem({
-                      ...currentItem,
-                      qty: parseInt(e.target.value),
-                    })
-                  }
-                  className="w-full border p-2 rounded"
-                />
-                <select
-                  value={currentItem.status}
-                  onChange={(e) =>
-                    setCurrentItem({ ...currentItem, status: e.target.value })
-                  }
-                  className="w-full border p-2 rounded"
-                >
-                  <option value="Available">Available</option>
-                  <option value="Unavailable">Unavailable</option>
-                </select>
-              </div>
-              <div className="flex justify-end mt-4 gap-2">
-                <button
-                  onClick={() => setShowPopup(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white rounded shadow-lg p-6 w-[90%] max-w-xl">
+  <h2 className="text-2xl font-bold mb-6">
+    {isEditMode ? "Edit Item" : "New Item"}
+  </h2>
+      <div className="bg-[#F9F6EE] p-6 rounded space-y-4">
+        {/* Form Row: Name and ID (optional) */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Name</div>
+          <input
+            type="text"
+            value={currentItem.name}
+            onChange={(e) => setCurrentItem({ ...currentItem, name: e.target.value })}
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+          <div className="w-16 bg-gray-100 text-center py-2 rounded text-sm text-gray-500">
+            ID
           </div>
-        )}
+        </div>
+
+        {/* Form Row: Category */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Category</div>
+          <input
+            type="text"
+            value={currentItem.category}
+            onChange={(e) => setCurrentItem({ ...currentItem, category: e.target.value })}
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Form Row: Price */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Price</div>
+          <input
+            type="number"
+            value={currentItem.price}
+            onChange={(e) => setCurrentItem({ ...currentItem, price: parseFloat(e.target.value) })}
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Form Row: Quantity */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Quantity</div>
+          <input
+            type="number"
+            value={currentItem.qty}
+            onChange={(e) => setCurrentItem({ ...currentItem, qty: parseInt(e.target.value) })}
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Form Row: Status */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Status</div>
+          <select
+            value={currentItem.status}
+            onChange={(e) => setCurrentItem({ ...currentItem, status: e.target.value })}
+            className="flex-grow p-2 rounded bg-gray-100"
+          >
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-4 mt-6">
+        <button
+          onClick={() => setShowPopup(false)}
+          className="bg-black text-white px-6 py-2 rounded hover:bg-gray-800"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          className="bg-yellow-400 text-black px-6 py-2 rounded hover:bg-yellow-500"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Popup: Add/Edit Supplier */}
         {showSupplierPopup && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-            <div className="bg-white rounded p-6 w-[90%] max-w-md">
-              <h2 className="text-xl font-bold mb-4">
-                {isEditSupplierMode ? "Edit Supplier" : "Add Supplier"}
-              </h2>
-              <div className="space-y-3">
-                {["name", "contact", "phone", "email", "address", "products"].map((field) => (
-                  <input
-                    key={field}
-                    type="text"
-                    placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-                    value={currentSupplier[field]}
-                    onChange={(e) =>
-                      setCurrentSupplier({ ...currentSupplier, [field]: e.target.value })
-                    }
-                    className="w-full border p-2 rounded"
-                  />
-                ))}
-                <select
-                  value={currentSupplier.status}
-                  onChange={(e) =>
-                    setCurrentSupplier({ ...currentSupplier, status: e.target.value })
-                  }
-                  className="w-full border p-2 rounded"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-              <div className="flex justify-end mt-4 gap-2">
-                <button
-                  onClick={() => setShowSupplierPopup(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveSupplier}
-                  className="px-4 py-2 bg-[#800000] text-white rounded hover:bg-[#660000]"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white rounded shadow-lg p-6 w-[90%] max-w-2xl">
+      <h2 className="text-2xl font-bold mb-6">
+        {isEditSupplierMode ? "Edit Supplier" : "New Supplier"}
+      </h2>
+      <div className="bg-[#F9F6EE] p-6 rounded space-y-4">
+        {/* Name */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Supplier Name</div>
+          <input
+            type="text"
+            value={currentSupplier.name}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, name: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Contact Person */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Contact Person</div>
+          <input
+            type="text"
+            value={currentSupplier.contact}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, contact: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Phone Number */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Phone Number</div>
+          <input
+            type="text"
+            value={currentSupplier.phone}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, phone: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Email */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Email</div>
+          <input
+            type="email"
+            value={currentSupplier.email}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, email: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Address */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Address</div>
+          <input
+            type="text"
+            value={currentSupplier.address}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, address: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Products */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Products</div>
+          <input
+            type="text"
+            value={currentSupplier.products}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, products: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          />
+        </div>
+
+        {/* Status */}
+        <div className="flex items-center gap-2">
+          <div className="w-1/3 text-gray-700 font-medium">Status</div>
+          <select
+            value={currentSupplier.status}
+            onChange={(e) =>
+              setCurrentSupplier({ ...currentSupplier, status: e.target.value })
+            }
+            className="flex-grow p-2 rounded bg-gray-100"
+          >
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex justify-end gap-4 mt-6">
+        <button
+          onClick={() => setShowSupplierPopup(false)}
+          className="bg-black text-white px-6 py-2 rounded hover:bg-gray-800"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSaveSupplier}
+          className="bg-yellow-400 text-black px-6 py-2 rounded hover:bg-yellow-500"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
         {/* Popup: Transaction Details */}
         {selectedTransaction && (

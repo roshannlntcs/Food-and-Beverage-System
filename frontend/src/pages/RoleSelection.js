@@ -30,18 +30,19 @@ export default function RoleSelection() {
         <div className="flex justify-center gap-6 mb-8">
           {/* Admin Role */}
           <div
-            onClick={() => setSelectedRole("admin")}
-            className={`cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
-              selectedRole === "admin"
-                ? "bg-yellow-300 border-yellow-500 shadow-md"
-                : "bg-gray-100 border-gray-300 hover:bg-yellow-200 hover:border-yellow-400 hover:shadow-lg hover:scale-105"
-            }`}
-          >
-            <i
-              className={`fas fa-wrench text-2xl mb-2 transition-colors ${
-                selectedRole === "admin" ? "text-yellow-400" : "text-gray-500"
+           onClick={() => setSelectedRole("admin")}
+              className={`cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
+                selectedRole === "admin"
+                  ? "bg-[#F6EBCE] border-yellow-500 shadow-md"
+                  : "bg-gray-100 border-gray-300 hover:bg-[#F6EBCE]  hover:border-yellow-400 hover:shadow-lg hover:scale-105"
               }`}
-            />
+              >
+           <i
+                className={`fas fa-wrench text-2xl mb-2 transition-colors ${
+                  selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-500"
+                }`}
+              />
+
             ADMIN
           </div>
 
@@ -50,13 +51,13 @@ export default function RoleSelection() {
             onClick={() => setSelectedRole("user")}
             className={`cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
               selectedRole === "user"
-                ? "bg-yellow-300 border-yellow-500 shadow-md"
-                : "bg-gray-100 border-gray-300 hover:bg-yellow-200 hover:border-yellow-400 hover:shadow-lg hover:scale-105"
+                ? "bg-[#F6EBCE] border-yellow-500 shadow-md"
+                : "bg-gray-100 border-gray-300 hover:bg-[#F6EBCE]  hover:border-yellow-400 hover:shadow-lg hover:scale-105"
             }`}
           >
-            <i
+           <i
               className={`fas fa-user text-2xl mb-2 transition-colors ${
-                selectedRole === "user" ? "text-yellow-400" : "text-gray-500"
+                selectedRole === "user" ? "text-[#FFC72C]" : "text-gray-500"
               }`}
             />
             USER
@@ -71,7 +72,7 @@ export default function RoleSelection() {
             disabled={!selectedRole}
             className={`px-10 py-2 rounded-full text-black font-medium transition ${
               selectedRole
-                ? "bg-yellow-500 hover:bg-yellow-600"
+                ? "bg-[#FFC72C] hover:bg-yellow-600"
                 : "bg-gray-300 cursor-not-allowed"
             }`}
           >

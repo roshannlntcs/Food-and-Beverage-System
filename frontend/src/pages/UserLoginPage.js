@@ -13,13 +13,13 @@ export default function UserLoginPage() {
       setError("Please enter both School ID and Name.");
       return;
     }
-  
+
     // Store user details in localStorage so POSMain can retrieve them
     localStorage.setItem("schoolId", schoolId.trim());
     localStorage.setItem("userName", name.trim());
-  
+
     navigate("/user");
-  };  
+  };
 
   return (
     <div className="h-screen flex overflow-hidden bg-[#F6F3EA]">
@@ -34,7 +34,13 @@ export default function UserLoginPage() {
 
       {/* Right Side - Login Form */}
       <div className="w-3/5 flex items-center justify-center bg-[#F6F3EA] p-8">
-        <div className="w-full max-w-md">
+        <form
+          className="w-full max-w-md"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleLogin();
+          }}
+        >
           {/* Centered POS Logo */}
           <div className="flex justify-center mb-6">
             <img
@@ -79,20 +85,21 @@ export default function UserLoginPage() {
           {/* Buttons Centered Like Admin Login */}
           <div className="flex flex-col items-center space-y-4 mt-10">
             <button
-              onClick={handleLogin}
+              type="submit"
               className="h-[40px] w-[200px] bg-yellow-400 text-black py-2 px-4 rounded-[20px] hover:bg-yellow-500 transition"
             >
               Enter
             </button>
 
             <button
+              type="button"
               onClick={() => navigate("/roles")}
               className="h-[40px] w-[200px] bg-gray-200 text-gray-700 py-2 px-4 rounded-[20px] hover:bg-gray-300 transition"
             >
               Cancel
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
