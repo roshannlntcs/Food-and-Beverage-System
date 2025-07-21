@@ -1,4 +1,3 @@
-// src/pages/UserLoginPage.js
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -14,7 +13,6 @@ export default function UserLoginPage() {
       return;
     }
 
-    // Store user details in localStorage so POSMain can retrieve them
     localStorage.setItem("schoolId", schoolId.trim());
     localStorage.setItem("userName", name.trim());
 
@@ -22,32 +20,19 @@ export default function UserLoginPage() {
   };
 
   return (
-    <div className="h-screen flex overflow-hidden bg-[#F6F3EA]">
-      {/* Left Side - Image */}
-      <div className="w-2/5 h-full">
-        <img
-          src="/loginnpic.jpg"
-          alt="User Illustration"
-          className="w-full h-full object-cover"
-        />
-      </div>
-
-      {/* Right Side - Login Form */}
-      <div className="w-3/5 flex items-center justify-center bg-[#F6F3EA] p-8">
+    <div
+      className="h-screen w-screen bg-cover bg-center flex items-center justify-start"
+      style={{ backgroundImage: "url('/userlogin_bg.png')" }}
+    >
+      <div className="ml-36 bg-white bg-opacity-90 p-10 rounded-lg shadow-lg w-full max-w-md">
         <form
-          className="w-full max-w-md"
           onSubmit={(e) => {
             e.preventDefault();
             handleLogin();
           }}
         >
-          {/* Centered POS Logo */}
           <div className="flex justify-center mb-6">
-            <img
-              src="/poslogo.png"
-              alt="POS Logo"
-              className="h-20 w-auto"
-            />
+            <img src="/poslogo.png" alt="POS Logo" className="h-20 w-auto" />
           </div>
 
           <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">
@@ -66,7 +51,7 @@ export default function UserLoginPage() {
               type="text"
               value={schoolId}
               onChange={(e) => setSchoolId(e.target.value)}
-              className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-yellow-400"
+              className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-blue-400"
               placeholder="Enter School ID"
             />
           </div>
@@ -77,12 +62,11 @@ export default function UserLoginPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-yellow-400"
+              className="w-full p-2 border rounded focus:outline-none focus:ring focus:border-blue-400"
               placeholder="Enter Name"
             />
           </div>
 
-          {/* Buttons Centered Like Admin Login */}
           <div className="flex flex-col items-center space-y-4 mt-10">
             <button
               type="submit"

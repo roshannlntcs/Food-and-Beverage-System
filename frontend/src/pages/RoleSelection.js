@@ -17,50 +17,61 @@ export default function RoleSelection() {
     <div
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
       style={{
-        backgroundImage: "url('/blur.png')", // Replace with your actual image filename
+        backgroundImage: "url('/b.jpg')", // Replace with your actual image filename
       }}
     >
       {/* Optional dark overlay */}
       <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-sm"></div>
 
       {/* Modal */}
-      <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[600px] text-center">
+      <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[500px] text-center">
         <h1 className="text-2xl font-semibold mb-8">Please select your role</h1>
 
         <div className="flex justify-center gap-6 mb-8">
           {/* Admin Role */}
           <div
-           onClick={() => setSelectedRole("admin")}
-              className={`cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
-                selectedRole === "admin"
-                  ? "bg-[#F6EBCE] border-yellow-500 shadow-md"
-                  : "bg-gray-100 border-gray-300 hover:bg-[#F6EBCE]  hover:border-yellow-400 hover:shadow-lg hover:scale-105"
+            onClick={() => setSelectedRole("admin")}
+            className={`group cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
+              selectedRole === "admin"
+                ? "bg-[#f9f5ec] border-yellow-500 shadow-md text-[#FFC72C]"
+                : "bg-[#f9f5ec] border-gray-300 text-gray-700 hover:border-yellow-400 hover:shadow-lg hover:scale-105 hover:text-[#FFC72C]"
+            }`}
+          >
+            <i
+              className={`fas fa-wrench text-2xl mb-2 transition-colors ${
+                selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
               }`}
-              >
-           <i
-                className={`fas fa-wrench text-2xl mb-2 transition-colors ${
-                  selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-500"
-                }`}
-              />
-
-            ADMIN
+            />
+            <span
+              className={`transition-colors ${
+                selectedRole === "admin" ? "text-[#FFC72C]" : "group-hover:text-[#FFC72C]"
+              }`}
+            >
+              ADMIN
+            </span>
           </div>
 
           {/* User Role */}
           <div
             onClick={() => setSelectedRole("user")}
-            className={`cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
+            className={`group cursor-pointer w-28 h-28 rounded-xl flex flex-col items-center justify-center border-2 text-sm font-medium transform transition-all duration-300 ${
               selectedRole === "user"
-                ? "bg-[#F6EBCE] border-yellow-500 shadow-md"
-                : "bg-gray-100 border-gray-300 hover:bg-[#F6EBCE]  hover:border-yellow-400 hover:shadow-lg hover:scale-105"
+                ? "bg-[#f9f5ec] border-yellow-500 shadow-md text-[#FFC72C]"
+                : "bg-[#f9f5ec] border-gray-300 text-gray-700 hover:border-yellow-400 hover:shadow-lg hover:scale-105 hover:text-[#FFC72C]"
             }`}
           >
-           <i
+            <i
               className={`fas fa-user text-2xl mb-2 transition-colors ${
-                selectedRole === "user" ? "text-[#FFC72C]" : "text-gray-500"
+                selectedRole === "user" ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
               }`}
             />
-            USER
+            <span
+              className={`transition-colors ${
+                selectedRole === "user" ? "text-[#FFC72C]" : "group-hover:text-[#FFC72C]"
+              }`}
+            >
+              USER
+            </span>
           </div>
         </div>
 
