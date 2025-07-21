@@ -229,7 +229,19 @@ const [currentSupplier, setCurrentSupplier] = useState({
   products: "",
   status: "Active",
 });
+
 const [originalSupplierName, setOriginalSupplierName] = useState(""); 
+const [supplierLogs, setSupplierLogs] = useState([]);          // ✅ NEW: stores logs
+const [showSupplierLogs, setShowSupplierLogs] = useState(false); // ✅ NEW: toggle popup
+
+
+  const [loggedInAdmin, setLoggedInAdmin] = useState("");
+
+  useEffect(() => {
+    const storedAdmin = localStorage.getItem("loggedInAdmin");
+    if (storedAdmin) setLoggedInAdmin(storedAdmin);
+  }, []);
+
 
 
 const [voidLogs, setVoidLogs] = useState([
@@ -516,7 +528,6 @@ const renderSuppliers = () => {
         <h2 className="text-2xl font-bold">Supplier Records</h2>
         <button
           className="bg-[#800000] text-white px-4 py-2 rounded hover:bg-[#660000] w-fit self-end md:self-auto"
-
           onClick={() => {
             setIsEditSupplierMode(false);
             setCurrentSupplier({
@@ -536,14 +547,13 @@ const renderSuppliers = () => {
       </div>
 
       {/* Search Bar */}
-    <input
-  type="text"
-  placeholder="Search"
-  className="w-1/4 p-2 border border-gray-300 rounded"
-  value={supplierSearchTerm}
-  onChange={(e) => setSupplierSearchTerm(e.target.value)}
-/>
-
+      <input
+        type="text"
+        placeholder="Search"
+        className="w-1/4 p-2 border border-gray-300 rounded"
+        value={supplierSearchTerm}
+        onChange={(e) => setSupplierSearchTerm(e.target.value)}
+      />
 
       {/* Scrollable Table */}
       <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded border">
@@ -561,52 +571,91 @@ const renderSuppliers = () => {
             </tr>
           </thead>
           <tbody>
-           {supplierData
-  .filter(supplier =>
-    supplier.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
-    supplier.products.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
-    supplier.contact.toLowerCase().includes(supplierSearchTerm.toLowerCase()) 
-  )
-  .map((supplier, index) => (
-              <tr key={index} className="border-t">
-                <td className="p-3 border">{supplier.name}</td>
-                <td className="p-3 border">{supplier.contact}</td>
-                <td className="p-3 border">{supplier.phone}</td>
-                <td className="p-3 border">{supplier.email}</td>
-                <td className="p-3 border">{supplier.address}</td>
-                <td className="p-3 border">{supplier.products}</td>
-                <td className="p-3 border">{supplier.status}</td>
-                <td className="p-3 border">
-                  <button
-                    className="bg-[#800000] text-white px-3 py-1 rounded hover:bg-[#660000]"
-
-                   onClick={() => {
-                      setIsEditSupplierMode(true);
-                      setCurrentSupplier(supplier);
-                      setOriginalSupplierName(supplier.name); 
-                      setShowSupplierPopup(true);
-                    }}
-
-                  >
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {supplierData
+              .filter((supplier) =>
+                supplier.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
+                supplier.products.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
+                supplier.contact.toLowerCase().includes(supplierSearchTerm.toLowerCase())
+              )
+              .map((supplier, index) => (
+                <tr key={index} className="border-t">
+                  <td className="p-3 border">{supplier.name}</td>
+                  <td className="p-3 border">{supplier.contact}</td>
+                  <td className="p-3 border">{supplier.phone}</td>
+                  <td className="p-3 border">{supplier.email}</td>
+                  <td className="p-3 border">{supplier.address}</td>
+                  <td className="p-3 border">{supplier.products}</td>
+                  <td className="p-3 border">{supplier.status}</td>
+                  <td className="p-3 border">
+                    <button
+                      className="bg-[#800000] text-white px-3 py-1 rounded hover:bg-[#660000]"
+                      onClick={() => {
+                        setIsEditSupplierMode(true);
+                        setCurrentSupplier(supplier);
+                        setOriginalSupplierName(supplier.name);
+                        setShowSupplierPopup(true);
+                      }}
+                    >
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
 
-      {/* Logs Button */}
+      {/* View Logs Button */}
       <div className="text-right">
-        <button className="bg-yellow-500 text-black px-4 py-2 rounded hover:bg-yellow-600">
+        <button
+          className="bg-yellow-500 text-black px-4 py-2 rounded hover:bg-yellow-600"
+          onClick={() => setShowSupplierLogs(true)}
+        >
           View Logs
         </button>
       </div>
+
+      {/* ✅ Supplier Logs Popup */}
+    {showSupplierLogs && (
+  <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-lg w-[90%] max-w-3xl">
+      <h2 className="text-2xl font-bold mb-4">Supplier Logs</h2>
+            <div className="overflow-y-auto max-h-[400px] bg-[#fefaf1] p-4 rounded">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-300 text-gray-600">
+                    <th className="p-2">Action</th>
+                    <th className="p-2">Admin</th>
+                    <th className="p-2">Date & Time</th>
+                    <th className="p-2">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplierLogs.map((log, index) => (
+                    <tr key={index} className="border-t border-gray-200">
+                      <td className="p-2">{log.action}</td>
+                      <td className="p-2">{log.admin}</td>
+                      <td className="p-2">{log.datetime}</td>
+                      <td className="p-2">{log.detail}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-right mt-4">
+              <button
+                onClick={() => setShowSupplierLogs(false)}
+                className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
 
 const handleSave = () => {
   // If any field is empty or invalid, just close the popup silently
@@ -646,7 +695,10 @@ const handleSave = () => {
 
 
 const handleSaveSupplier = () => {
-  // If any required field is empty or invalid, close the popup silently
+  const currentTime = new Date().toLocaleString();
+  const adminName = loggedInAdmin || "Unknown Admin";
+
+  // Validate fields
   if (
     !currentSupplier.name.trim() ||
     !currentSupplier.contact.trim() ||
@@ -655,25 +707,65 @@ const handleSaveSupplier = () => {
     !currentSupplier.address.trim() ||
     !currentSupplier.products.trim()
   ) {
-    // Close the popup without saving
     setShowSupplierPopup(false);
     setIsEditSupplierMode(false);
     setOriginalSupplierName("");
     return;
   }
 
-  // Proceed with update or add
   if (isEditSupplierMode) {
+    // ✅ Update supplierData here (this was missing!)
     setSupplierData((prev) =>
-      prev.map((sup) =>
-        sup.name === originalSupplierName ? currentSupplier : sup
+      prev.map((supplier) =>
+        supplier.name === originalSupplierName ? currentSupplier : supplier
       )
     );
+
+    // Compare changes for logs
+    const oldSupplier = supplierData.find(s => s.name === originalSupplierName);
+    const changes = [];
+
+    if (oldSupplier) {
+      for (const key in currentSupplier) {
+        if (
+          currentSupplier[key] !== oldSupplier[key] &&
+          key !== "name"
+        ) {
+          changes.push(`${key} changed from '${oldSupplier[key]}' to '${currentSupplier[key]}'`);
+        }
+      }
+    }
+
+    // ✅ Log edits
+    setSupplierLogs((prevLogs) => [
+      ...prevLogs,
+      {
+        action: "Edited",
+        admin: adminName,
+        datetime: currentTime,
+        detail:
+          changes.length > 0
+            ? `Edited Supplier '${currentSupplier.name}': ${changes.join(", ")}`
+            : `Edited Supplier '${currentSupplier.name}'`,
+      },
+    ]);
   } else {
+    // ✅ Add supplier
     setSupplierData((prev) => [...prev, currentSupplier]);
+
+    // ✅ Log add
+    setSupplierLogs((prevLogs) => [
+      ...prevLogs,
+      {
+        action: "Added",
+        admin: adminName,
+        datetime: currentTime,
+        detail: `Added Supplier '${currentSupplier.name}'`,
+      },
+    ]);
   }
 
-  // Reset state
+  // ✅ Reset form
   setShowSupplierPopup(false);
   setIsEditSupplierMode(false);
   setOriginalSupplierName("");
@@ -687,6 +779,7 @@ const handleSaveSupplier = () => {
     status: "Active",
   });
 };
+
 
 
 
@@ -747,6 +840,8 @@ const renderVoidLogs = () => (
     </div>
   </div>
 );
+
+
 
 const renderContent = () => (
   <div className="space-y-6 min-h-[600px]"> {/* Maintain height consistency */}

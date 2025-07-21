@@ -28,6 +28,7 @@ export default function AdminLoginPage() {
       return;
     }
     localStorage.setItem("adminFullName", fullName);
+    localStorage.setItem("loggedInAdmin", fullName); 
     setShowModal(false);
     navigate("/admin");
   };
