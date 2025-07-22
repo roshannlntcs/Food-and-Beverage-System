@@ -635,11 +635,13 @@ export default function POSMain() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [products, setProducts] = useState([]);
+  const lockTabs = ["Orders", "Transactions", "Discount"];
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
 
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
-
 
   const [itemAvailability, setItemAvailability] = useState({});
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -666,9 +668,20 @@ export default function POSMain() {
 
   const basePassword = "123456";
 
+ // ID Generators ensuring uniqueness
+ const generateOrderID = () => `ORD-${Date.now()}`;
+ const generateTransactionID = () => `TR-${Date.now() + Math.floor(Math.random() * 1000)}`;
+ const generateVoidID = () => `VOID-${Date.now() + Math.floor(Math.random() * 2000)}`;
+
+ // Placeholder shop details for receipt
+ const shopDetails = {
+   name: "SPLICE ENTERPRISES, INC.",
+   address: "123 Placeholder Street, City, PH",
+   contact: "0912-345-6789",
+ };
+
+
 // inside POSMain.jsx, replace your current placeholders with this:
-
-
 
   // recompute product list
   const filteredProducts = useMemo(() => {
@@ -714,111 +727,169 @@ export default function POSMain() {
     setShowModal(false);
   };
 
-  const processTransaction = () => {
-    if (!paymentMethod) return alert("Select payment method");
-    if (!cart.length) return alert("Cart empty");
-    const now = new Date();
-    const id = now.getTime();
-    const order = {
-      id: `ORD-${id}`,
-      items: cart,
-      transactionID: `TX-${id}`,
-      date: now.toLocaleDateString(),
-      subtotal,
-      discountAmt,
-      discountPct,
-      discountType,
-      discountCode: couponCode.trim() || null,
-      tax
-    };
-    setOrders((p) => [order, ...p]);
-    setTransactions((p) => [
-      { ...order, type: "Payment", method: paymentMethod, total },
-      ...p
-    ]);
-    // reset
-    setCart([]);
-    setPaymentMethod("");
-    setDiscountPct(0);
-    setDiscountType("");
-    setCouponCode("");
-    setShowSuccessModal(true);
-  };
+    // Handle processing a transaction
+    const processTransaction = () => {
+      if (cart.length === 0) {
+        alert("Cart is empty.");
+        return;
+      }
+      if (!paymentMethod) {
+        alert("Please select a payment method before processing the transaction.");
+        return;
+      }
+    
+      const orderID = generateOrderID();
+      const transactionID = generateTransactionID();
+    
+      const subtotal = cart.reduce((sum, item) => {
+        const base = item.price;
+        const sizeUp = item.size.price;
+        const addons = (item.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+        return sum + (base + sizeUp + addons) * item.quantity;
+      }, 0);
+    
+      const computedDiscountAmt = +(subtotal * (discountPct / 100)).toFixed(2);
+      const tax = +(subtotal * 0.12).toFixed(2);
+      const total = +(subtotal + tax - computedDiscountAmt).toFixed(2);
+    
+      const newTransaction = {
+        id: transactionID,
+        transactionID,
+        orderID,
+        items: cart.map(item => ({ ...item, voided: false })),
+        subtotal,
+        discountPct,
+        discountAmt: computedDiscountAmt,
+        tax,
+        total,
+        method: paymentMethod || "N/A",
+        cashier: userName || "N/A",
+        date: new Date().toLocaleString(),
+        voided: false,
+      };
+    
+      const newOrder = {
+        id: orderID,
+        orderID,
+        transactionID,
+        items: cart,
+        status: "pending",
+        date: new Date().toLocaleString(),
+      };
+    
+      setTransactions(prev => [newTransaction, ...prev]);
+      setOrders(prev => [newOrder, ...prev]);
+      setCart([]);
+      setPaymentMethod("");
+      setShowOrderSuccess(true);
 
+      // Reset discounts for the next transaction
+      setDiscountType("");
+      setDiscountPct(0);
+      setCouponCode("");
+    };
+    
   const triggerVoid = (type, idx = null) => {
     setVoidContext({ type, index: idx });
     setShowVoidPassword(true);
   };
-  // Replace your old confirmVoid entirely with this:
 
-const confirmVoid = () => {
-  if (voidPasswordInput !== basePassword) {
-    alert("Wrong password");
-    return;
-  }
-  const { type, tx, index } = voidContext;
-
-  setTransactions(prev =>
-    prev.map(t => {
-      if (t.id !== tx.id) return t;
-
-      // Mark void flags
-      let items = t.items.map((it, idx) =>
-        (type === "transaction" || idx === index)
-          ? { ...it, voided: true }
-          : it
-      );
-
-      // Recompute subtotal, discount, tax, total
-      const subtotal = items
-        .filter(it => !it.voided)
-        .reduce((sum, it) => {
-          const base = it.price;
-          const sizeUp = it.size.price;
-          const addons = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
-          return sum + (base + sizeUp + addons) * it.quantity;
-        }, 0);
-      const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
-      const tax = +(subtotal * 0.12).toFixed(2);
-      const total = +(subtotal + tax - discountAmt).toFixed(2);
-
-      return {
-        ...t,
-        items,
-        voided: type === "transaction" ? true : t.voided,
-        subtotal,
-        discountAmt,
-        tax,
-        total
-      };
-    })
-  );
-
-  // Update voidLogs as before...
-  setVoidLogs(prev => {
-    const existing = prev.find(v => v.txId === tx.id);
-    const newVoidedItems = type === "transaction"
-      ? tx.items.map(i => i.name)
-      : [...(existing?.voidedItems||[]), tx.items[index].name];
-    const newLog = {
-      voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
-      txId: tx.id,
-      voidedItems: Array.from(new Set(newVoidedItems)),
-      fullyVoided: type === "transaction"
-    };
-    if (existing) {
-      return prev.map(v => v.txId === tx.id ? newLog : v);
-    } else {
-      return [...prev, newLog];
+  const confirmVoid = () => {
+    if (voidPasswordInput !== basePassword) {
+      alert("Wrong password");
+      return;
     }
-  });
-
-  // Close modals
-  setShowVoidPassword(false);
-  setShowHistoryModal(false);
-  setVoidContext(null);
-  setVoidPasswordInput('');
-};
+  
+    const { type, tx, index } = voidContext;
+  
+    // Update Transactions
+    setTransactions(prev =>
+      prev.map(t => {
+        if (t.id !== tx.id) return t;
+  
+        const updatedItems = t.items.map((it, idx) =>
+          (type === "transaction" || idx === index)
+            ? { ...it, voided: true }
+            : it
+        );
+  
+        const subtotal = updatedItems
+          .filter(it => !it.voided)
+          .reduce((sum, it) => {
+            const base = it.price;
+            const sizeUp = it.size.price;
+            const addons = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+            return sum + (base + sizeUp + addons) * it.quantity;
+          }, 0);
+  
+        const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
+        const tax = +(subtotal * 0.12).toFixed(2);
+        const total = +(subtotal + tax - discountAmt).toFixed(2);
+  
+        return {
+          ...t,
+          items: updatedItems,
+          voided: type === "transaction" ? true : t.voided,
+          subtotal,
+          discountAmt,
+          tax,
+          total,
+        };
+      })
+    );
+  
+    // Update Orders to reflect voids
+    setOrders(prev =>
+      prev.map(order => {
+        if (order.transactionID !== tx.transactionID) return order;
+  
+        if (type === "transaction") {
+          // Entire transaction voided: mark all items and the order
+          return {
+            ...order,
+            voided: true,
+            items: order.items.map(it => ({ ...it, voided: true })),
+          };
+        } else {
+          // Void single item by matching the item in the order by name, size, and price
+          const updatedItems = order.items.map((it, idx) => {
+            const txItem = tx.items[index];
+            const isMatch =
+              it.name === txItem.name &&
+              it.size.label === txItem.size.label &&
+              it.price === txItem.price &&
+              !it.voided; // ensure not already voided
+            return isMatch ? { ...it, voided: true } : it;
+          });
+          return { ...order, items: updatedItems };
+        }
+      })
+    );
+  
+    // Update Void Logs
+    setVoidLogs(prev => {
+      const existing = prev.find(v => v.txId === tx.id);
+      const newVoidedItems = type === "transaction"
+        ? tx.items.map(i => i.name)
+        : [...(existing?.voidedItems || []), tx.items[index].name];
+      const newLog = {
+        voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
+        txId: tx.id,
+        voidedItems: Array.from(new Set(newVoidedItems)),
+        fullyVoided: type === "transaction",
+      };
+      if (existing) {
+        return prev.map(v => v.txId === tx.id ? newLog : v);
+      } else {
+        return [...prev, newLog];
+      }
+    });
+  
+    setShowVoidPassword(false);
+    setShowHistoryModal(false);
+    setVoidContext(null);
+    setVoidPasswordInput('');
+  };  
 
   useEffect(() => {
     if (activeTab === "Discount") setShowDiscountModal(true);
@@ -844,7 +915,7 @@ const confirmVoid = () => {
           />
           <button
             onClick={() => setShowProfileModal(true)}
-            className="flex items-center space-x-2 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:bg-yellow-100"
+            className="flex items-center space-x-2 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:scale-105 shadow-md transition-shadow duration-150"
           >
             <img
               src={images["avatar-ph.png"]}
@@ -878,7 +949,7 @@ const confirmVoid = () => {
                   setSearchTerm("");
                 }}
                 className={`w-full aspect-square flex flex-col items-center justify-center rounded shadow ${
-                  activeCategory === cat.key ? "bg-[#F6EBCE] font-semibold" : "bg-white hover:bg-[#F6EBCE]"
+                  activeCategory === cat.key ? "bg-[#F6EBCE] font-semibold" : "bg-white hover:scale-105 shadow-md transition-shadow duration-150"
                 }`}
               >
                 <img src={images[cat.icon]} alt={cat.key} className="w-8 h-8 mb-1" />
@@ -899,22 +970,22 @@ const confirmVoid = () => {
   { key: "Items", icon: "items.png" },
   { key: "Discount", icon: "discount.png" }
 ].map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => {
-                      setActiveTab(tab.key);
-                      setSearchTerm("");
-                    }}
-                    className={`w-full h-[55px] flex items-center justify-center space-x-2 rounded uppercase shadow ${
-                      activeTab === tab.key ? "bg-[#F6EBCE] font-bold" : "bg-white hover:bg-[#F6EBCE]"
-                    }`}
-                  >
-    <img src={images[tab.icon]} alt={tab.key} className="w-8 h-8" />
-                    <span>{tab.key}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+  <button
+    key={tab.key}
+    onClick={() => {
+      setActiveTab(tab.key);
+      setSearchTerm("");
+    }}
+    className={`w-full h-[55px] flex items-center justify-center space-x-2 rounded uppercase shadow ${
+      activeTab === tab.key ? "bg-[#F6EBCE] font-bold" : "bg-white hover:scale-105 shadow-md transition-shadow duration-150"
+    }`}
+  >
+<img src={images[tab.icon]} alt={tab.key} className="w-8 h-8" />
+    <span>{tab.key}</span>
+  </button>
+))}
+</div>
+</div>
 
             {/* TAB CONTENT */}
             <div className="flex-1 flex overflow-hidden">
@@ -945,73 +1016,90 @@ const confirmVoid = () => {
               )}
 
               {/* ORDERS */}
+              {/* ─── Orders Tab ─── */}
               {activeTab === "Orders" && (
-                <div className="flex-1 p-6 flex flex-col">
-                  <h2 className="text-2xl font-bold mb-4">Orders Log</h2>
-                  <div className="flex space-x-4 mb-4">
-                    <div>
-                      <label className="block text-sm">From</label>
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="border p-1 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm">To</label>
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="border p-1 rounded"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4 overflow-y-auto flex-1 auto-rows-min">
-                    {orders
-                      .filter((o) => {
-                        const termMatch =
-                          o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          o.date.toLowerCase().includes(searchTerm.toLowerCase());
-                        const iso = new Date(o.date).toISOString().slice(0, 10);
-                        const okFrom = !dateFrom || iso >= dateFrom;
-                        const okTo = !dateTo || iso <= dateTo;
-                        return termMatch && okFrom && okTo;
-                      })
-                      .map((o) => (
-                        <div key={o.id} className="bg-white p-4 rounded-lg shadow hover:scale-105 transition-transform duration-150 cursor-pointer">
-                          <div className="font-semibold mb-2">Order ID: {o.id}</div>
-                          <div className="mb-1">
-                            <strong>Txn:</strong> {o.transactionID}
-                          </div>
-                          <div className="mb-1">
-                            <strong>Date:</strong> {o.date}
-                          </div>
-                          <div className="text-sm">
-                            <strong>Items:</strong>
-                            <ul className="list-disc list-inside">
-                              {o.items.map((i, idx) => (
-                                <li key={idx} className="mb-1">
-                                  {i.name} x{i.quantity}
-                                  <ul className="list-disc list-inside ml-4 text-xs text-gray-700">
-                                    {i.size && <li>Size: {i.size.label || i.size}</li>}
-                                    {i.addons && i.addons.length > 0 && (
-                                      <li>
-                                        Add‑ons: {i.addons.map((a) => a.label || a).join(", ")}
-                                      </li>
-                                    )}
-                                    {i.notes && <li>Notes: {i.notes}</li>}
-                                  </ul>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+  <div className="flex-1 p-4 flex flex-col h-full">
+    <h2 className="text-2xl font-bold mb-3">Order Logs</h2>
+    <div className="flex-1 overflow-y-auto">
+      <div
+        className="grid content-start auto-rows-min"
+        style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(175px, 1fr))",
+          gap: "12px",
+        }}
+      >
+        {orders.length === 0 && (
+          <div className="text-gray-400 text-sm col-span-full">
+            No orders yet.
+          </div>
+        )}
+        {orders.map((order) => (
+  <button
+    key={order.orderID}
+    onClick={() => setHistoryContext({ type: "orderDetail", order })}
+    className={`bg-white p-3 rounded-lg shadow flex flex-col justify-between hover:scale-105 transition-transform duration-150 cursor-pointer text-left ${
+      order.voided ? "bg-gray-100 opacity-60" : ""
+    }`}
+  >
+    <div className="font-semibold text-base mb-1 truncate">
+      {order.orderID}
+    </div>
+    <div className="text-xs text-gray-600 truncate">
+      Tx: {order.transactionID} {order.voided && "(Voided)"}
+    </div>
+    <div className="text-xs text-gray-500 mt-1">
+      {order.date}
+    </div>
+  </button>
+))}
+      </div>
+    </div>
+  </div>
+)}
+
+
+{/* ─── Order Details Modal ─── */}
+{historyContext?.type === "orderDetail" && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white w-1/4 max-h-[85vh] rounded-xl flex flex-col">
+      {/* Header */}
+      <div className="sticky top-0 bg-[#800000] rounded-t border-b px-4 py-2 flex justify-between items-center">
+        <h2 className="text-lg text-white font-bold">{historyContext.order.orderID}  </h2>
+        <button
+          onClick={() => setHistoryContext(null)}
+          className="text-gray-300 hover:text-white"
+          aria-label="Close"
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 overflow-y-auto flex-1 space-y-3">
+        <div className="text-sm text-gray-600">
+          Connected Transaction: {historyContext.order.transactionID}</div>
+        <div className="text-xs text-gray-500">{historyContext.order.date}</div>
+
+        {historyContext.order.items.map((item, idx) => (
+          <div key={idx} className="p-3 border rounded-lg">
+          <div className={`font-semibold ${item.voided ? 'line-through text-gray-500' : ''}`}>
+  {item.name} ({item.size.label}) x{item.quantity} {item.voided && "(Voided)"}
+</div>
+{item.selectedAddons?.length > 0 && (
+  <div className="text-sm">
+    Add-ons: {item.selectedAddons.map(a => a.label).join(", ")}
+  </div>
+)}
+{item.notes && (
+  <div className="text-sm italic">Notes: {item.notes}</div>
+)}
+
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
 {activeTab === "Transactions" && (
   <div className="flex-1 p-2 flex flex-col h-full min-h-0">
@@ -1025,7 +1113,7 @@ const confirmVoid = () => {
             <button
               key={tx.transactionID}
               onClick={() => setHistoryContext({ type: 'detail', tx })}
-              className={`w-full text-left p-2 rounded-lg border transition duration-150 hover:bg-[#F6EBCE] ${
+              className={`w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md transition-shadow duration-150${
                 tx.voided ? 'bg-gray-100 opacity-60' : ''
               }`}
             >
@@ -1036,7 +1124,7 @@ const confirmVoid = () => {
                 <span>₱{tx.total.toFixed(2)}</span>
               </div>
               <div className="text-xs text-gray-600">
-                Order: {tx.id}
+              Order: {tx.orderID}
               </div>
             </button>
           ))}
@@ -1050,7 +1138,7 @@ const confirmVoid = () => {
           {voidLogs.map(vl => (
             <div
               key={vl.voidId}
-              className={`p-2 rounded-lg border transition duration-150 hover:bg-[#F6EBCE] ${
+              className={`p-2 rounded-lg border transition duration-150 hover:shadow-md transition-shadow duration-150${
                 vl.fullyVoided ? 'bg-red-50' : ''
               }`}
             >
@@ -1074,63 +1162,71 @@ const confirmVoid = () => {
 {/* ─── Detail Popup ─── */}
 {historyContext?.type === 'detail' && (
   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white w-1/4 max-h-[80vh] rounded-lg flex flex-col">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-10 bg-white border-b px-4 py-2 flex justify-between items-center">
-        <h2 className="text-lg font-bold">{historyContext.tx.transactionID} Details</h2>
+    <div className="bg-white w-1/3 max-h-[85vh] rounded-xl flex flex-col">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-[#800000] rounded-t border-b px-4 py-2 flex justify-between items-center">
+        <h2 className="text-lg text-white font-bold">{historyContext.tx.transactionID} Details</h2>
         <button
           onClick={() => setHistoryContext(null)}
-          className="text-gray-500 hover:text-gray-800"
+          className="text-gray-300 hover:text-white"
           aria-label="Close"
         >
           ✕
         </button>
       </div>
 
-      {/* Scrollable body */}
+      {/* Scrollable Content */}
       <div className="p-4 overflow-y-auto flex-1 space-y-4">
         {historyContext.tx.items.map((it, idx) => {
-          if (it.voided) return null; // skip voided lines
           const base = it.price;
           const sizeUp = it.size.price;
-          const addonsTotal = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+          const selectedAddons = it.selectedAddons || [];
+          const addonsTotal = selectedAddons.reduce((a, x) => a + x.price, 0);
+          const addonNames = selectedAddons.map(a => a.label).join(", ") || "None";
           const lineTotal = (base + sizeUp + addonsTotal) * it.quantity;
+
           return (
-            <div key={idx} className="p-3 border rounded-lg">
-              <div className="font-medium">{it.name}</div>
-              <div className="text-sm flex justify-between">
-                <span>Base:</span><span>₱{base.toFixed(2)}</span>
-              </div>
-              <div className="text-sm flex justify-between">
-                <span>Size ({it.size.label}):</span><span>₱{sizeUp.toFixed(2)}</span>
-              </div>
-              {addonsTotal > 0 && (
-                <div className="text-sm flex justify-between">
-                  <span>Add‑ons:</span><span>₱{addonsTotal.toFixed(2)}</span>
-                </div>
-              )}
-              {it.notes && <div className="text-sm italic">Notes: {it.notes}</div>}
-              <div className="mt-2 text-sm font-semibold flex justify-between">
-                <span>Line Total:</span><span>₱{lineTotal.toFixed(2)}</span>
-              </div>
-            </div>
+<div key={idx} className={`p-3 border rounded-lg ${it.voided ? 'bg-gray-100' : ''}`}>
+  {/* Item Name + Price */}
+  <div className={`flex justify-between ${it.voided ? 'line-through text-gray-500' : ''}`}>
+    <span className="font-semibold">{it.name} {it.voided && "(Voided)"}</span>
+    <span className="text-sm">₱{base.toFixed(2)}</span>
+  </div>
+
+  {/* Size */}
+  <div className="text-sm flex justify-between">
+    <span>Size: {it.size.label}</span>
+    <span>₱{sizeUp.toFixed(2)}</span>
+  </div>
+
+  {/* Add-ons */}
+  {addonsTotal > 0 && (
+    <div className="text-sm flex justify-between">
+      <span>Add‑ons: {addonNames}</span>
+      <span>₱{addonsTotal.toFixed(2)}</span>
+    </div>
+  )}
+
+  {/* Quantity */}
+  <div className="text-sm flex justify-between">
+    <span>Quantity</span>
+    <span>{it.quantity}</span>
+  </div>
+
+  {/* Notes */}
+  {it.notes && (
+    <div className="text-sm italic">Notes: {it.notes}</div>
+  )}
+
+  {/* Line Total */}
+  <div className="mt-1 text-sm font-semibold flex justify-between">
+    <span>Line Total:</span>
+    <span>₱{lineTotal.toFixed(2)}</span>
+  </div>
+</div>
+
           );
         })}
-
-        {/* Discount info */}
-        {historyContext.tx.discountPct > 0 && (
-          <div className="p-4 bg-gray-50 rounded-lg text-sm">
-            <div className="flex justify-between">
-              <span>Discount ({historyContext.tx.discountType.toUpperCase()}):</span>
-              <span>-₱{historyContext.tx.discountAmt.toFixed(2)}</span>
-            </div>
-            {historyContext.tx.discountCode && (
-              <div className="mt-1 flex justify-between">
-                <span>Coupon:</span><span>{historyContext.tx.discountCode}</span>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Totals */}
         <div className="p-4 bg-gray-50 rounded-lg space-y-1 text-sm">
@@ -1141,22 +1237,32 @@ const confirmVoid = () => {
             <span>Tax (12%):</span><span>₱{historyContext.tx.tax.toFixed(2)}</span>
           </div>
           {historyContext.tx.discountPct > 0 && (
-            <div className="flex justify-between">
-              <span>Discount:</span><span>-₱{historyContext.tx.discountAmt.toFixed(2)}</span>
-            </div>
-          )}
+  <div className="flex justify-between">
+    <span>
+      Discount (
+      {historyContext.tx.discountPct}% 
+      {historyContext.tx.discountType ? ` ${historyContext.tx.discountType.toUpperCase()}` : ""} 
+      {historyContext.tx.couponCode ? ` + ${historyContext.tx.couponCode.toUpperCase()}` : ""}
+      ):
+    </span>
+    <span>-₱{historyContext.tx.discountAmt.toFixed(2)}</span>
+  </div>
+)}
           <hr className="my-2" />
           <div className="flex justify-between font-bold">
             <span>Total:</span><span>₱{historyContext.tx.total.toFixed(2)}</span>
           </div>
-          <div className="mt-2 text-sm text-gray-600">
-            <strong>Payment:</strong> {historyContext.tx.method}
+          <div className="mt-1 text-sm text-gray-600">
+            <strong>Payment Method:</strong> {historyContext.tx.method || 'N/A'}
           </div>
+          <div className="text-xs text-gray-500">
+          <strong>Date of Transaction: </strong>{historyContext.tx.date}</div>
         </div>
       </div>
     </div>
   </div>
 )}
+
 
 {/* Items Availability */}
 {activeTab === "Items" && (
@@ -1299,16 +1405,8 @@ const confirmVoid = () => {
       {discountPct > 0 && (
         <div className="flex justify-between">
           <span>
-            Discount (
-            {[discountType === "senior" && "Senior",
-              discountType === "pwd" && "PWD",
-              discountType === "student" && "Student",
-              couponCode && couponCode.toUpperCase()]
-              .filter(Boolean)
-              .join(" + ")}
-            ): {discountPct}%
-          </span>
-          <span>₱{discountAmt.toFixed(2)}</span>
+            Discount ({discountPct}%)</span>
+          <span>₱{discountAmt.toFixed(2)}</span>     
         </div>
       )}
       <div className="flex justify-between">
@@ -1333,8 +1431,8 @@ const confirmVoid = () => {
           <button
             key={method.key}
             onClick={() => setPaymentMethod(prev => prev === method.key ? "" : method.key)}
-            className={`h-16 w-16 rounded-lg flex flex-col items-center justify-center space-y-1 ${
-              paymentMethod === method.key ? "bg-yellow-100 scale-105" : "bg-white"
+            className={`bg-white h-16 w-16 rounded-lg flex flex-col items-center justify-center space-y-1 ${
+              paymentMethod === method.key ? "bg-yellow-100 scale-105" : "hover:scale-105 shadow-md transition-shadow"
             }`}
           >
             <img src={images[method.icon]} alt={method.key} className="w-6 h-6" />
@@ -1357,11 +1455,11 @@ const confirmVoid = () => {
   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
     <div className="bg-white rounded-2xl shadow-xl w-[32rem] max-h-[80vh] flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b flex justify-between items-center">
-        <h2 className="text-xl font-bold">Transaction History</h2>
+      <div className="bg-[#800000] px-6 py-4 border-b flex justify-between items-center">
+        <h2 className="text-xl text-white font-bold">Transaction History</h2>
         <button
           onClick={() => setShowHistoryModal(false)}
-          className="text-gray-600 hover:text-gray-800"
+          className="text-gray hover:text-white"
         >
           ✕
         </button>
@@ -1440,6 +1538,74 @@ const confirmVoid = () => {
           className="px-4 py-2 rounded-lg border hover:bg-gray-100"
         >
           Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* ─── Receipt Modal ─── */}
+{showReceiptModal && transactions.length > 0 && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 print:bg-white print:relative print:inset-auto print:flex print:items-start print:justify-start">
+    <div className="bg-white w-80 max-h-[90vh] rounded-xl flex flex-col p-4 shadow print:shadow-none print:w-full print:max-h-full">
+      {/* Header */}
+      <div className="text-center mb-2">
+        <h2 className="text-lg font-bold">SPLICE ENTERPRISES, INC.</h2>
+        <p className="text-xs">123 Placeholder Street, City, PH</p>
+        <p className="text-xs">0912-345-6789</p>
+      </div>
+
+      {/* Transaction Info */}
+      <div className="text-xs mb-2">
+        <div>Transaction ID: {transactions[0].transactionID}</div>
+        <div>Date: {transactions[0].date}</div>
+        <div>Cashier: {transactions[0].cashier}</div>
+        <div>Payment Method: {transactions[0].method}</div>
+      </div>
+
+      {/* Items List */}
+      <div className="border-t border-b py-2 mb-2 space-y-1">
+        {transactions[0].items.map((item, idx) => (
+          <div key={idx} className="text-xs">
+            <div className="font-medium">{item.name} x {item.quantity}</div>
+            <div>Size: {item.size.label}</div>
+            {item.selectedAddons?.length > 0 && (
+              <div>Add-ons: {item.selectedAddons.map(a => a.label).join(", ")}</div>
+            )}
+            {item.notes && (
+              <div className="italic">Notes: {item.notes}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Discounts */}
+      {transactions[0].discountPct > 0 && (
+        <div className="text-xs mb-1">
+          <div>Discount: {transactions[0].discountPct}%</div>
+          <div>Amount Deducted: ₱{transactions[0].discountAmt.toFixed(2)}</div>
+        </div>
+      )}
+
+      {/* Total */}
+      <div className="text-sm font-semibold flex justify-between border-t pt-2 mt-2">
+        <span>Total:</span>
+        <span>₱{transactions[0].total.toFixed(2)}</span>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex justify-around mt-4 print:hidden">
+        <button
+          onClick={() => window.print()}
+          className="bg-green-600 text-white px-4 py-1 rounded-lg text-sm hover:bg-green-700"
+        >
+          Print
+        </button>
+        <button
+          onClick={() => setShowReceiptModal(false)}
+          className="bg-gray-300 text-black px-4 py-1 rounded-lg text-sm hover:bg-gray-400"
+        >
+          Done
         </button>
       </div>
     </div>
@@ -1621,85 +1787,130 @@ const confirmVoid = () => {
   </div>
 )}
 
-     {/* DISCOUNT MODAL */}
-     {showDiscountModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-40">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-96">
-            <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
-            <div className="space-y-2 mb-4">
-              <label className="flex items-center">
-                <input type="radio" name="disc" value="senior"
-                       checked={discountType==="senior"}
-                       onChange={()=>setDiscountType("senior")}
-                       className="mr-2"/>
-                Senior Citizen (20%)
-              </label>
-              <label className="flex items-center">
-                <input type="radio" name="disc" value="pwd"
-                       checked={discountType==="pwd"}
-                       onChange={()=>setDiscountType("pwd")}
-                       className="mr-2"/>
-                PWD (20%)
-              </label>
-              <label className="flex items-center">
-                <input type="radio" name="disc" value="student"
-                       checked={discountType==="student"}
-                       onChange={()=>setDiscountType("student")}
-                       className="mr-2"/>
-                Student (5%)
-              </label>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm mb-1">Coupon Code</label>
-              <input type="text" value={couponCode}
-                     onChange={e=>setCouponCode(e.target.value)}
-                     placeholder="SAVE10 / HALFOFF / FIVEOFF"
-                     className="w-full border p-2 rounded"/>
-            </div>
-            <div className="flex justify-end space-x-4">
-              <button onClick={()=>setShowDiscountModal(false)}
-                      className="px-4 py-2 rounded border">Cancel</button>
-              <button onClick={()=>{
-                let pct=0;
-                if(discountType==="senior"||discountType==="pwd") pct=20;
-                else if(discountType==="student") pct=5;
-                const code=couponCode.trim().toUpperCase();
-                if(code==="SAVE10") pct+=10;
-                if(code==="HALFOFF") pct+=50;
-                if(code==="FIVEOFF") pct+=5;
-                setDiscountPct(pct);
-                setShowDiscountModal(false);
-              }}
-                className="px-4 py-2 rounded bg-red-800 text-white">
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+   {/* DISCOUNT MODAL */}
+{showDiscountModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-40">
+    <div className="bg-white p-6 rounded-2xl shadow-xl w-96">
+      <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
+      <div className="space-y-2 mb-4">
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            name="disc"
+            checked={discountType === "senior"}
+            onChange={() =>
+              setDiscountType(prev => prev === "senior" ? "" : "senior")
+            }
+            className="mr-2"
+          />
+          Senior Citizen (20%)
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            name="disc"
+            checked={discountType === "pwd"}
+            onChange={() =>
+              setDiscountType(prev => prev === "pwd" ? "" : "pwd")
+            }
+            className="mr-2"
+          />
+          PWD (20%)
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            name="disc"
+            checked={discountType === "student"}
+            onChange={() =>
+              setDiscountType(prev => prev === "student" ? "" : "student")
+            }
+            className="mr-2"
+          />
+          Student (5%)
+        </label>
+      </div>
+      <div className="mb-4">
+        <label className="block text-sm mb-1">Coupon Code</label>
+        <input
+          type="text"
+          value={couponCode}
+          onChange={e => setCouponCode(e.target.value)}
+          placeholder="SAVE10 / HALFOFF / FIVEOFF"
+          className="w-full border p-2 rounded"
+        />
+      </div>
+      <div className="flex justify-end space-x-4">
+        <button
+          onClick={() => {
+            setDiscountType("");
+            setCouponCode("");
+            setDiscountPct(0);
+            setShowDiscountModal(false);
+          }}
+          className="px-4 py-2 rounded border"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            let pct = 0;
+          
+            // Apply discount type percentage
+            if (discountType === "senior" || discountType === "pwd") {
+              pct += 20;
+            } else if (discountType === "student") {
+              pct += 5;
+            }
+          
+            // Apply coupon code stacking
+            const code = couponCode.trim().toUpperCase();
+            if (code === "SAVE10") pct += 10;
+            if (code === "HALFOFF") pct += 50;
+            if (code === "FIVEOFF") pct += 5;
+          
+            setDiscountPct(pct);
+            setShowDiscountModal(false);
+          }}
+          className="px-4 py-2 rounded bg-red-800 text-white"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 {/* SUCCESS MODAL */}
-{showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-2xl shadow-lg w-80 text-center animate-fadeIn">
-            <h2 className="text-2xl font-bold mb-4">🎉 Order Successful!</h2>
-            <p className="mb-6">Your transaction has been recorded.</p>
-            <div className="flex justify-center space-x-4 mb-4">
-             <button
-               onClick={()=>setShowSuccessModal(false)}
-               className="px-6 py-2 bg-yellow-100 rounded-lg font-semibold"
-             >
-               Close
-             </button>
-             <button
-               className="px-6 py-2 bg-gray-200 rounded-lg font-semibold"
-             >
-               Print Receipt
-             </button>
-           </div>
-          </div>
-        </div>
-      )}
+{/* ─── Order Success Modal ─── */}
+{showOrderSuccess && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white w-80 rounded-xl p-6 flex flex-col items-center space-y-4 shadow-xl">
+      <h2 className="text-lg font-bold text-green-700">Order Successful!</h2>
+      <p className="text-sm text-center">Your order has been successfully processed.</p>
+      <div className="flex space-x-3">
+        <button
+          onClick={() => {
+            setShowOrderSuccess(false);
+          }}
+          className="bg-gray-300 text-black px-4 py-2 rounded-lg font-semibold hover:bg-gray-400"
+        >
+          Done
+        </button>
+        <button
+          onClick={() => {
+            setShowReceiptModal(true);
+            setShowOrderSuccess(false);
+          }}
+          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700"
+        >
+          Print Receipt
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
      {/* Profile Modal */}
      {showProfileModal && (
