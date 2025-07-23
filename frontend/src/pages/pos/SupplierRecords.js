@@ -1,0 +1,253 @@
+// src/pages/pos/SupplierRecords.js
+import React, { useState } from 'react';
+import Sidebar from '../../components/Sidebar';
+import { FaSearch, FaPen } from 'react-icons/fa';
+
+const dummySuppliers = [
+  {
+    name: 'Davao Fresh Supplies',
+    contactPerson: 'Maria Santos',
+    phone: '09171234567',
+    email: 'davaofresh@example.com',
+    address: 'Davao City',
+    products: 'Eggs, Chicken',
+    status: 'Active',
+  },
+  {
+    name: 'Panabo Meats',
+    contactPerson: 'Jose Dela Cruz',
+    phone: '09281234567',
+    email: 'panabomeats@example.com',
+    address: 'Panabo City',
+    products: 'Beef, Pork',
+    status: 'Inactive',
+  },
+  {
+    name: 'Tagum Agro Supplies',
+    contactPerson: 'Liza Moreno',
+    phone: '09391234567',
+    email: 'tagumagro@example.com',
+    address: 'Tagum City',
+    products: 'Vegetables, Spices',
+    status: 'Active',
+  },
+  {
+    name: 'Mintal Livestock',
+    contactPerson: 'Carlos Mendoza',
+    phone: '09551234567',
+    email: 'mintallive@example.com',
+    address: 'Mintal, Davao City',
+    products: 'Chicken, Duck',
+    status: 'Active',
+  },
+  {
+    name: 'Toril Groceries',
+    contactPerson: 'Jenny Abad',
+    phone: '09661234567',
+    email: 'torilgrocery@example.com',
+    address: 'Toril, Davao City',
+    products: 'Fruits, Canned Goods',
+    status: 'Inactive',
+  },
+  {
+    name: 'Calinan Egg Supply',
+    contactPerson: 'Ronnie Cruz',
+    phone: '09184561234',
+    email: 'calinanegg@example.com',
+    address: 'Calinan, Davao City',
+    products: 'Eggs',
+    status: 'Active',
+  },
+  {
+    name: 'Agdao Market Bulk',
+    contactPerson: 'Elaine Yu',
+    phone: '09999992345',
+    email: 'agdao_bulk@example.com',
+    address: 'Agdao, Davao City',
+    products: 'Meat, Vegetables',
+    status: 'Inactive',
+  },
+  {
+    name: 'Ecoland Dairy',
+    contactPerson: 'Francis Dy',
+    phone: '09213456789',
+    email: 'ecolanddairy@example.com',
+    address: 'Ecoland, Davao City',
+    products: 'Milk, Yogurt',
+    status: 'Active',
+  },
+  {
+    name: 'Bajada Farms',
+    contactPerson: 'Althea Tan',
+    phone: '09112223344',
+    email: 'bajadafarms@example.com',
+    address: 'Bajada, Davao City',
+    products: 'Organic Chicken',
+    status: 'Active',
+  },
+  {
+    name: 'SM Wholesale',
+    contactPerson: 'Janice Ong',
+    phone: '09199887766',
+    email: 'smwholesale@example.com',
+    address: 'Lanang, Davao City',
+    products: 'Various Goods',
+    status: 'Inactive',
+  },
+  {
+    name: 'Matina Traders',
+    contactPerson: 'Arthur G.',
+    phone: '09988776655',
+    email: 'matinatraders@example.com',
+    address: 'Matina, Davao City',
+    products: 'Spices, Oil',
+    status: 'Active',
+  },
+  {
+    name: 'Tagum Veggies Depot',
+    contactPerson: 'Rowena L.',
+    phone: '09173334455',
+    email: 'tagumveggies@example.com',
+    address: 'Tagum City',
+    products: 'Lettuce, Tomatoes',
+    status: 'Active',
+  },
+  {
+    name: 'Panabo Cold Storage',
+    contactPerson: 'Dexter Lim',
+    phone: '09334455667',
+    email: 'panabocold@example.com',
+    address: 'Panabo City',
+    products: 'Frozen Goods',
+    status: 'Inactive',
+  },
+  {
+    name: 'Gaisano Bulk Center',
+    contactPerson: 'Clarence Uy',
+    phone: '09215557788',
+    email: 'gaisanobulk@example.com',
+    address: 'Davao City',
+    products: 'Dry Goods, Beverages',
+    status: 'Active',
+  },
+  {
+    name: 'Sasa Fisheries',
+    contactPerson: 'Irene Mendoza',
+    phone: '09097773344',
+    email: 'sasafish@example.com',
+    address: 'Sasa, Davao City',
+    products: 'Fish, Shrimp',
+    status: 'Active',
+  },
+];
+
+
+const SupplierRecords = () => {
+  const [search, setSearch] = useState('');
+
+  const filteredSuppliers = dummySuppliers.filter((supplier) =>
+    supplier.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="flex min-h-screen bg-[#f9f6ee]">
+      <Sidebar />
+      <div className="ml-20 p-6 w-full">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Supplier Records</h1>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center bg-gray-200 px-4 py-2 rounded-full shadow">
+              <i className="fas fa-user-circle text-xl mr-2" />
+              <div>
+                <div className="text-sm font-semibold">Neziel Aniga</div>
+                <div className="text-xs text-gray-500">Admin</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search & Add */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
+            <input
+              type="text"
+              placeholder="Search"
+              className="outline-none w-full"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <FaSearch className="text-gray-500" />
+          </div>
+          <button className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded shadow text-lg font-semibold border border-yellow-500">
+            + Add Supplier
+          </button>
+        </div>
+
+        {/* Scrollable Table */}
+        <div className="border rounded-md overflow-hidden">
+          <div className="max-h-[500px] overflow-y-auto">
+            <table className="w-full table-auto border-collapse">
+              <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
+                <tr className="text-left">
+                  <th className="p-3">No.</th>
+                  <th className="p-3">Supplier Name</th>
+                  <th className="p-3">Contact Person</th>
+                  <th className="p-3">Phone Number</th>
+                  <th className="p-3">Email Address</th>
+                  <th className="p-3">Address</th>
+                  <th className="p-3">Assigned Products</th>
+                  <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSuppliers.map((supplier, index) => (
+                  <tr key={index} className="bg-white border-b hover:bg-[#f1f1f1]">
+                    <td className="p-3">{index + 1}</td>
+                    <td className="p-3">{supplier.name}</td>
+                    <td className="p-3">{supplier.contactPerson}</td>
+                    <td className="p-3">{supplier.phone}</td>
+                    <td className="p-3">{supplier.email}</td>
+                    <td className="p-3">{supplier.address}</td>
+                    <td className="p-3">{supplier.products}</td>
+                    <td className="p-3 text-center">
+                      <span
+                        className={`px-3 py-1 text-sm font-medium rounded-full ${
+                          supplier.status === 'Active'
+                            ? 'bg-green-500 text-white'
+                            : 'bg-red-500 text-white'
+                        }`}
+                      >
+                        {supplier.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <FaPen className="text-red-600 cursor-pointer mx-auto" />
+                    </td>
+                  </tr>
+                ))}
+                {filteredSuppliers.length === 0 && (
+                  <tr>
+                    <td colSpan="9" className="text-center p-4 text-gray-500">
+                      No suppliers found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* View Logs Button */}
+        <div className="mt-4 flex justify-end">
+          <button className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500">
+            View Logs
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SupplierRecords;

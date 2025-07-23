@@ -30,7 +30,8 @@ export default function AdminLoginPage() {
     localStorage.setItem("adminFullName", fullName);
     localStorage.setItem("loggedInAdmin", fullName); 
     setShowModal(false);
-    navigate("/admin");
+    navigate("/admin/home");
+
   };
 
   return (
@@ -102,31 +103,34 @@ export default function AdminLoginPage() {
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-80 shadow-lg">
-            <h3 className="text-xl font-semibold mb-4 text-center">
-              Enter Full Name
-            </h3>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full p-2 mb-4 border rounded focus:outline-none focus:ring focus:border-blue-400"
-              placeholder="Full Name"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleModalSubmit();
-              }}
-            />
-            <button
-              onClick={handleModalSubmit}
-              className="w-full bg-yellow-400 text-black py-2 rounded hover:bg-yellow-500 transition"
-            >
-              Submit
-            </button>
-          </div>
-        </div>
-      )}
+    {showModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 w-80 shadow-lg">
+      <h3 className="text-xl font-semibold mb-4 text-center">
+        Enter Full Name
+      </h3>
+      <input
+        type="text"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        className="w-full p-2 mb-4 border rounded focus:outline-none focus:ring focus:border-blue-400"
+        placeholder="Full Name"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleModalSubmit(); // This will now navigate to /admin/home
+          }
+        }}
+      />
+      <button
+        onClick={handleModalSubmit}
+        className="w-full bg-yellow-400 text-black py-2 rounded hover:bg-yellow-500 transition"
+      >
+        Submit
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
