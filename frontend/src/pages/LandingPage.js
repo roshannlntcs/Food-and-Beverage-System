@@ -9,48 +9,51 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#F6F3EA] text-gray-900 flex flex-col font-sans overflow-hidden">
-      {/* Full Background Image */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="/landing_bg.png"
-          alt="Background"
-          className="w-full h-full object-cover"
-        />
-      </div>
+    <div className="relative min-h-screen bg-[#F6F3EA] text-gray-900 flex flex-col font-sans">
+      {/* Fixed CBA Logo at Top-Right */}
+      <img
+        src="/cbalogo.png"
+        alt="CBA Logo"
+        className="absolute top-6 right-6 h-16 w-auto z-50"
+      />
 
-      {/* Fixed Logos at Top-Right */}
-      <div className="absolute top-6 right-12 flex items-center space-x-4 z-50">
-        <img
-          src="/poslogo.png"
-          alt="Splice Logo"
-          className="h-14 w-auto"
-        />
-        <img
-          src="/cbalogo.png"
-          alt="CBA Logo"
-          className="h-16 w-auto"
-        />
-      </div>
+      {/* Hero Section */}
+      <div className="flex flex-col md:flex-row h-full flex-grow">
+        {/* Left Half with Red Image */}
+        <div className="relative w-full md:w-[42.3%] h-80 md:h-auto overflow-hidden flex items-center justify-center">
+          <img
+            src="/red.png"
+            alt="Red Background"
+            className="w-full h-full object-cover"
+            style={{
+              clipPath: 'ellipse(120% 100% at 0% 50%)',
+            }}
+          />
+        </div>
 
-      {/* Content Section */}
-      <div className="relative z-10 flex flex-col justify-center items-center flex-grow px-6 md:px-28 py-12 text-center">
-      <div className="max-w-[700px] ml-12 -mt-8"> 
-          <h1 className="text-3xl md:text-6xl font-extrabold leading-tight mb-10">
-            Streamline Your <br /> Sales & Inventory <br /> With Ease
-          </h1>
+        {/* Right Half with Content */}
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-10 md:px-28 py-20">
+          {/* Wrapper for text block */}
+          <div className="text-left w-full max-w-[600px]">
+            {/* Heading */}
+            <h1 className="text-3xl md:text-xl font-extrabold leading-tight mb-10">
+              Streamline Your <br /> Sales & Inventory <br /> With Ease
+            </h1>
 
-          <p className="text-gray-700 text-base md:text-lg mb-8">
-            Powerful POS and Inventory, Built for Speed.
-          </p>
+            {/* Paragraph */}
+            <p className="text-gray-600 text-base md:text-lg mb-8">
+              Powerful POS and Inventory, Built for Speed.
+            </p>
 
-          <div className="flex justify-center">
-            <button
-              onClick={handleGetStarted}
-              className="bg-[#F6EBCE] text-black font-semibold py-3 px-8 rounded-full border border-[#e4e4e7] shadow-[inset_0_1px_3px_rgba(255,255,255,0.6),0_6px_12px_rgba(0,0,0,0.08),0_2px_0px_#FFC72C] hover:shadow-[inset_0_1px_3px_rgba(255,255,255,0.7),0_10px_20px_rgba(0,0,0,0.12),0_3px_0px_#FFC72C] hover:scale-105 hover:-translate-y-1 transition-all duration-300 ease-in-out"
-            >
-              Get Started
-            </button>
+            {/* Button */}
+            <div className="flex justify-end w-full">
+              <button
+                onClick={handleGetStarted}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-3 px-6 rounded-full shadow transition-all transform hover:scale-105"
+              >
+                Get Started
+              </button>
+            </div>
           </div>
         </div>
       </div>
