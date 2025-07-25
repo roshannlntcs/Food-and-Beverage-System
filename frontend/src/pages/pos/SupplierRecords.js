@@ -387,3 +387,5 @@ const SupplierRecords = () => {
     </div>
   );
 }
+
+export default SupplierRecords;
