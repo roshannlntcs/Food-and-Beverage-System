@@ -637,11 +637,13 @@ export default function POSMain() {
   const [products, setProducts] = useState([]);
   const lockTabs = ["Orders", "Transactions", "Discount"];
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false)
 
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [editingCartIndex, setEditingCartIndex] = useState(null);
+  const [modalEdited, setModalEdited] = useState(false);
 
   const [itemAvailability, setItemAvailability] = useState({});
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -681,8 +683,6 @@ export default function POSMain() {
  };
 
 
-// inside POSMain.jsx, replace your current placeholders with this:
-
   // recompute product list
   const filteredProducts = useMemo(() => {
     const baseList =
@@ -693,6 +693,50 @@ export default function POSMain() {
         .filter(i => itemAvailability[i.name])
         .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
 }, [activeCategory, itemAvailability, searchTerm])
+
+const openEditModal = (item, index) => {
+  setModalProduct({
+    ...item,
+    selectedAddons: item.selectedAddons || [],
+    quantity: item.quantity || 1,
+    notes: item.notes || "",
+  });
+  setEditingCartIndex(index);
+  setShowModal(true);
+  setModalEdited(false);
+};
+
+const removeCartItem = (index) => {
+  setCart(prev => prev.filter((_, i) => i !== index));
+};
+
+// open item modal
+const openProductModal = (item) => {
+  setModalProduct({ ...item, size: item.sizes[0], selectedAddons: [], quantity: 1, notes: "" });
+  setShowModal(true);
+  setEditingCartIndex(null);
+  setModalEdited(false);
+};
+
+const applyCartItemChanges = () => {
+  const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
+  const sizeCost = modalProduct.size.price;
+  const price = (modalProduct.price + addonsCost + sizeCost) * modalProduct.quantity;
+
+  setCart(prev => prev.map((item, idx) => {
+    if (idx === editingCartIndex) {
+      return {
+        ...modalProduct,
+        addons: modalProduct.selectedAddons,
+        totalPrice: price,
+      };
+    }
+    return item;
+  }));
+  setShowModal(false);
+  setEditingCartIndex(null);
+  setModalEdited(false);
+};
 
   // init availability
   useEffect(() => {
@@ -711,11 +755,8 @@ export default function POSMain() {
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - discountAmt).toFixed(2);
 
-  // open item modal
-  const openProductModal = (item) => {
-    setModalProduct({ ...item, size: item.sizes[0], selectedAddons: [], quantity: 1, notes: "" });
-    setShowModal(true);
-  };
+  
+
   const addToCart = () => {
     const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
     const sizeCost = modalProduct.size.price;
@@ -1037,19 +1078,20 @@ export default function POSMain() {
   <button
     key={order.orderID}
     onClick={() => setHistoryContext({ type: "orderDetail", order })}
-    className={`bg-white p-3 rounded-lg shadow flex flex-col justify-between hover:scale-105 transition-transform duration-150 cursor-pointer text-left ${
+    className={`bg-white p-3 rounded-lg shadow flex flex-col justify-between hover:shadow-md transition-shadow duration-150 ${
       order.voided ? "bg-gray-100 opacity-60" : ""
     }`}
   >
-    <div className="font-semibold text-base mb-1 truncate">
-      {order.orderID}
-    </div>
-    <div className="text-xs text-gray-600 truncate">
+     <div className="flex items-center space-x-2">
+      {/* ICON GOES HERE */}
+      <img src={images["order_log.png"]} alt="Order Log" className="w-12 h-12 rounded-sm object-cover flex-shrink-0" />
+      <div className="font-semibold text-base truncate">{order.orderID}
+      <div className="text-xs text-gray-600">
       Tx: {order.transactionID} {order.voided && "(Voided)"}
     </div>
-    <div className="text-xs text-gray-500 mt-1">
-      {order.date}
+    <div className="text-xs text-gray-500">{order.date}</div></div>
     </div>
+    
   </button>
 ))}
       </div>
@@ -1117,16 +1159,16 @@ export default function POSMain() {
                 tx.voided ? 'bg-gray-100 opacity-60' : ''
               }`}
             >
-              <div className="flex justify-between">
-                <span className="font-medium">
-                  {tx.transactionID} {tx.voided && '(Voided)'}
-                </span>
-                <span>₱{tx.total.toFixed(2)}</span>
-              </div>
-              <div className="text-xs text-gray-600">
-              Order: {tx.orderID}
-              </div>
-            </button>
+                  <div className="flex justify-between items-center">
+      <div className="flex items-center space-x-2">
+        <img src={images["trans_log.png"]} alt="Transaction Log" className="w-8 h-8 rounded-sm object-cover flex-shrink-0" />
+        <span className="font-medium">{tx.transactionID}{tx.voided && ' (Voided)'}
+        <div className="text-xs text-gray-600">Order ID: {tx.orderID}</div>
+</span>
+      </div>
+      <span>₱{tx.total.toFixed(2)}</span>
+    </div>
+  </button>
           ))}
         </div>
       </div>
@@ -1142,13 +1184,19 @@ export default function POSMain() {
                 vl.fullyVoided ? 'bg-red-50' : ''
               }`}
             >
-              <div className="flex justify-between">
-                <span className="font-medium">{vl.voidId}</span>
-                {vl.fullyVoided && <span className="text-xs text-gray-600">(Voided)</span>}
-              </div>
-              <div className="text-xs text-gray-600">Tx: {vl.txId}</div>
-              <div className="text-sm">{vl.voidedItems.join(', ')}</div>
-            </div>
+             <div className="flex justify-between items-center">
+      <div className="flex items-center space-x-2">
+        <img src={images["void_log.png"]} alt="Void Log" className="w-9 h-9 rounded-sm object-cover flex-shrink-0" />
+        <span className="font-medium">{vl.voidId}
+        <div className="text-xs text-gray-600">TRN ID: {vl.txId}</div>  
+    <div className="text-xs">Items: {vl.voidedItems.join(', ')}
+    </div>
+    </span>
+      </div>
+      {vl.fullyVoided && <span className="text-xs text-gray-600">(Voided)</span>}
+    </div>
+    
+  </div>
           ))}
           {voidLogs.length === 0 && (
             <div className="text-gray-400">No voids yet.</div>
@@ -1352,49 +1400,80 @@ export default function POSMain() {
     </div>
 
     {/* Cart Items */}
-    <div className="flex-1 overflow-y-auto mb-4 space-y-2">
-      {cart.length === 0 ? (
-        <div className="text-gray-400 text-sm">No items added.</div>
-      ) : (
-        cart.map((item, i) => (
-          <div key={i} className="bg-white rounded p-2">
-            <div className="flex justify-between items-start">
-              {/* Left: image + details */}
-              <div className="flex space-x-1.5 flex-1 min-w-0">
-                <img
-                  src={images[item.image] || images["react.svg"]}
-                  alt={item.name}
-                  className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
-                />
-                <div className="flex flex-col flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate">{item.name}</div>
-                  <div className="text-[10px] text-gray-700 truncate">Size: {item.size.label}</div>
-                  <div className="text-[10px] text-gray-700">
-                    {item.quantity} x ₱{(item.totalPrice / item.quantity).toFixed(2)}
+<div className="flex-1 overflow-y-auto mb-4 space-y-2">
+  {cart.length === 0 ? (
+    <div className="text-gray-400 text-sm">No items added.</div>
+  ) : (
+    cart.map((item, i) => (
+      <div
+        key={i}
+        className="relative group"                    // ← make it a hover group
+      >
+        {/* ── The sliding content ── */}
+        <div
+          className="
+            bg-white rounded p-2
+            transform transition-transform duration-200
+            group-hover:-translate-x-8             // ← slide left 2rem on hover
+          "
+          onClick={() => openEditModal(item, i)}
+        >
+          <div className="flex justify-between items-start">
+            {/* Left: image + details */}
+            <div className="flex space-x-1.5 flex-1 min-w-0">
+              <img
+                src={images[item.image] || images["react.svg"]}
+                alt={item.name}
+                className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
+              />
+              <div className="flex flex-col flex-1 min-w-0">
+                <div className="text-xs font-medium truncate">
+                  {item.name}
+                </div>
+                <div className="text-[10px] text-gray-700 truncate">
+                  Size: {item.size.label}
+                </div>
+                <div className="text-[10px] text-gray-700">
+                  {item.quantity} x ₱{(item.totalPrice / item.quantity).toFixed(2)}
+                </div>
+                {item.addons.length > 0 && (
+                  <div className="text-[10px] text-gray-700 truncate">
+                    Add‑ons: {item.addons.map(a => a.label).join(", ")}
                   </div>
-                  {item.addons.length > 0 && (
-                    <div className="text-[10px] text-gray-700 truncate">
-                      Add‑ons: {item.addons.map(a => a.label).join(", ")}
-                    </div>
-                  )}
-                  {item.notes && (
-                    <div className="text-[10px] italic text-gray-600 truncate">
-                      "{item.notes}"
-                    </div>
-                  )}
-                </div>
+                )}
+                {item.notes && (
+                  <div className="text-[10px] italic text-gray-600 truncate">
+                    "{item.notes}"
+                  </div>
+                )}
               </div>
-              {/* Right: total */}
-              <div className="flex flex-col items-end justify-between h-full ml-2">
-                <div className="text-xs font-semibold whitespace-nowrap">
-                  ₱{item.totalPrice.toFixed(2)}
-                </div>
+            </div>
+            {/* Right: line total */}
+            <div className="flex flex-col items-end justify-between h-full ml-2">
+              <div className="text-xs font-semibold whitespace-nowrap">
+                ₱{item.totalPrice.toFixed(2)}
               </div>
             </div>
           </div>
-        ))
-      )}
-    </div>
+        </div>
+
+        {/* ── Reveal‑on‑hover Trash button ── */}
+        <button
+          onClick={() => removeCartItem(i)}
+          className="
+            absolute inset-y-0 right-0 flex items-center justify-center
+            w-8 bg-red-100 rounded-r
+            opacity-0 group-hover:opacity-100
+            transition-opacity duration-200
+          "
+          title="Remove item"
+        >
+          <img src={images["remove_item.png"]} alt="Remove" className="w-5 h-5 rounded-sm object-cover flex-shrink-0"/>
+        </button>
+      </div>
+    ))
+  )}
+</div>
 
     {/* Totals */}
     <div className="bg-white p-3 rounded-lg mb-4 space-y-1 text-sm">
@@ -1545,14 +1624,17 @@ export default function POSMain() {
 )}
 
 {/* ─── Receipt Modal ─── */}
+{/* ─── Receipt Modal (Clean Layout Matching Request) ─── */}
 {showReceiptModal && transactions.length > 0 && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 print:bg-white print:relative print:inset-auto print:flex print:items-start print:justify-start">
-    <div className="bg-white w-80 max-h-[90vh] rounded-xl flex flex-col p-4 shadow print:shadow-none print:w-full print:max-h-full">
+  <div
+    className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 print:bg-transparent"
+  >
+    <div className="printable-receipt bg-white w-80 max-h-[90vh] rounded-xl flex flex-col p-4 shadow print:shadow-none print:w-full print:max-h-full">
       {/* Header */}
       <div className="text-center mb-2">
-        <h2 className="text-lg font-bold">SPLICE ENTERPRISES, INC.</h2>
-        <p className="text-xs">123 Placeholder Street, City, PH</p>
-        <p className="text-xs">0912-345-6789</p>
+        <h2 className="text-lg font-bold">{shopDetails.name}</h2>
+        <p className="text-xs">{shopDetails.address}</p>
+        <p className="text-xs">{shopDetails.contact}</p>
       </div>
 
       {/* Transaction Info */}
@@ -1564,46 +1646,76 @@ export default function POSMain() {
       </div>
 
       {/* Items List */}
-      <div className="border-t border-b py-2 mb-2 space-y-1">
-        {transactions[0].items.map((item, idx) => (
-          <div key={idx} className="text-xs">
-            <div className="font-medium">{item.name} x {item.quantity}</div>
-            <div>Size: {item.size.label}</div>
-            {item.selectedAddons?.length > 0 && (
-              <div>Add-ons: {item.selectedAddons.map(a => a.label).join(", ")}</div>
-            )}
-            {item.notes && (
-              <div className="italic">Notes: {item.notes}</div>
-            )}
-          </div>
-        ))}
+      <div className="border-t border-b py-2 mb-2 space-y-2 text-xs">
+        {transactions[0].items.map((item, idx) => {
+          const base = item.price;
+          const sizeUp = item.size.price;
+          const selectedAddons = item.selectedAddons || [];
+          const addonsTotal = selectedAddons.reduce((a, x) => a + x.price, 0);
+          const addonNames = selectedAddons.map(a => a.label).join(", ") || "";
+          const lineTotal = (base + sizeUp) * item.quantity;
+
+          return (
+            <div key={idx} className="space-y-0.5">
+              {/* Main line */}
+              <div className="flex justify-between">
+                <span>
+                  {item.name} ({item.size.label}) x{item.quantity}
+                </span>
+                <span>₱{lineTotal.toFixed(2)}</span>
+              </div>
+              {/* Add-ons line */}
+              {selectedAddons.length > 0 && (
+                <div className="flex justify-between pl-2">
+                  <span>Add-ons: {addonNames}</span>
+                  <span>₱{addonsTotal.toFixed(2)}</span>
+                </div>
+              )}
+              {/* Notes line */}
+              {item.notes && (
+                <div className="pl-2 italic">Notes: {item.notes}</div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Discounts */}
-      {transactions[0].discountPct > 0 && (
-        <div className="text-xs mb-1">
-          <div>Discount: {transactions[0].discountPct}%</div>
-          <div>Amount Deducted: ₱{transactions[0].discountAmt.toFixed(2)}</div>
+      {/* Totals */}
+      <div className="text-xs space-y-0.5">
+        <div className="flex justify-between">
+          <span>Subtotal:</span>
+          <span>₱{transactions[0].subtotal.toFixed(2)}</span>
         </div>
-      )}
-
-      {/* Total */}
-      <div className="text-sm font-semibold flex justify-between border-t pt-2 mt-2">
-        <span>Total:</span>
-        <span>₱{transactions[0].total.toFixed(2)}</span>
+        <div className="flex justify-between">
+          <span>Tax (12%):</span>
+          <span>₱{transactions[0].tax.toFixed(2)}</span>
+        </div>
+        {transactions[0].discountPct > 0 && (
+          <div className="flex justify-between">
+            <span>
+              Discount ({transactions[0].discountPct}% {transactions[0].discountType ? transactions[0].discountType : ""})
+            </span>
+            <span>-₱{transactions[0].discountAmt.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="border-t my-1"></div>
+        <div className="flex justify-between font-bold text-sm">
+          <span>Total:</span>
+          <span>₱{transactions[0].total.toFixed(2)}</span>
+        </div>
       </div>
 
       {/* Buttons */}
       <div className="flex justify-around mt-4 print:hidden">
         <button
           onClick={() => window.print()}
-          className="bg-green-600 text-white px-4 py-1 rounded-lg text-sm hover:bg-green-700"
+          className="bg-green-600 text-white px-12 py-1 rounded-lg text-sm hover:bg-green-700"
         >
           Print
         </button>
         <button
           onClick={() => setShowReceiptModal(false)}
-          className="bg-gray-300 text-black px-4 py-1 rounded-lg text-sm hover:bg-gray-400"
+          className="bg-gray-300 text-black px-12 py-1 rounded-lg text-sm hover:bg-gray-400"
         >
           Done
         </button>
@@ -1611,6 +1723,7 @@ export default function POSMain() {
     </div>
   </div>
 )}
+
 
       {/* ─── Void Password Modal (as before) ─── */}
       {showVoidPassword && (
@@ -1637,6 +1750,7 @@ export default function POSMain() {
       )}
 
       {/* ITEM MODAL */}
+{/* ITEM MODAL */}
 {showModal && modalProduct && (
   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-20">
     <div className="bg-white rounded-2xl shadow-xl w-[576px]">
@@ -1651,11 +1765,8 @@ export default function POSMain() {
         {/* Title / Description */}
         <div className="flex-1">
           <h2 className="text-xl font-semibold">{modalProduct.name}</h2>
-          <p className="text-sm text-gray-600 truncate">
-            {modalProduct.description}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-            Allergen: {modalProduct.allergens || "N/A"} </p>
+          <p className="text-sm text-gray-600 truncate">{modalProduct.description}</p>
+          <p className="text-xs text-gray-500 mt-1">Allergen: {modalProduct.allergens || "N/A"}</p>
         </div>
         {/* Price */}
         <div className="text-right">
@@ -1670,21 +1781,20 @@ export default function POSMain() {
           <span className="font-medium">Quantity</span>
           <div className="flex items-center space-x-2">
             <button
-              onClick={() =>
-                setModalProduct((p) => ({
-                  ...p,
-                  quantity: Math.max(1, p.quantity - 1)
-                }))
-              }
+              onClick={() => {
+                setModalProduct((p) => ({ ...p, quantity: Math.max(1, p.quantity - 1) }));
+                setModalEdited(true);
+              }}
               className="w-8 h-8 bg-[#800000] rounded-full flex items-center justify-center text-xl text-white"
             >
               −
             </button>
             <span className="text-lg">{modalProduct.quantity}</span>
             <button
-              onClick={() =>
-                setModalProduct((p) => ({ ...p, quantity: p.quantity + 1 }))
-              }
+              onClick={() => {
+                setModalProduct((p) => ({ ...p, quantity: p.quantity + 1 }));
+                setModalEdited(true);
+              }}
               className="w-8 h-8 bg-[#800000] rounded-full flex items-center justify-center text-xl text-white"
             >
               +
@@ -1699,7 +1809,10 @@ export default function POSMain() {
             {modalProduct.sizes.map((s) => (
               <button
                 key={s.label}
-                onClick={() => setModalProduct((p) => ({ ...p, size: s }))}
+                onClick={() => {
+                  setModalProduct((p) => ({ ...p, size: s }));
+                  setModalEdited(true);
+                }}
                 className={`px-4 py-2 rounded-lg text-sm border ${
                   modalProduct.size.label === s.label
                     ? "bg-gray-200 border-gray-400 font-semibold"
@@ -1712,7 +1825,7 @@ export default function POSMain() {
           </div>
         </div>
 
-        {/* Add‑ons */}
+        {/* Add-ons */}
         {modalProduct.addons.length > 0 && (
           <div>
             <span className="font-medium block mb-2">Add‑ons</span>
@@ -1720,14 +1833,16 @@ export default function POSMain() {
               {modalProduct.addons.map((a) => (
                 <button
                   key={a.label}
-                  onClick={() =>
-                    setModalProduct((p) => ({
-                      ...p,
-                      selectedAddons: p.selectedAddons.includes(a)
+                  onClick={() => {
+                    setModalProduct((p) => {
+                      const isSelected = p.selectedAddons.includes(a);
+                      const updatedAddons = isSelected
                         ? p.selectedAddons.filter((x) => x !== a)
-                        : [...p.selectedAddons, a]
-                    }))
-                  }
+                        : [...p.selectedAddons, a];
+                      return { ...p, selectedAddons: updatedAddons };
+                    });
+                    setModalEdited(true);
+                  }}
                   className={`px-4 py-2 rounded-lg text-sm border ${
                     modalProduct.selectedAddons.includes(a)
                       ? "bg-gray-200 border-gray-400 font-semibold"
@@ -1746,9 +1861,10 @@ export default function POSMain() {
           <span className="font-medium block mb-2">Special instructions</span>
           <textarea
             value={modalProduct.notes}
-            onChange={(e) =>
-              setModalProduct((p) => ({ ...p, notes: e.target.value }))
-            }
+            onChange={(e) => {
+              setModalProduct((p) => ({ ...p, notes: e.target.value }));
+              setModalEdited(true);
+            }}
             placeholder="e.g No onions"
             className="w-full border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring"
             rows={3}
@@ -1757,33 +1873,61 @@ export default function POSMain() {
       </div>
 
       {/* — FOOTER — */}
-<div className="bg-gray-50 rounded-b-2xl p-4">
-  {/* First row: Total label and amount */}
-  <div className="flex justify-between">
-    <span className="text-lg font-semibold px-2">Total</span>
-    <span className="text-xl font-bold px-2">₱{(
-      (modalProduct.price + modalProduct.size.price) * modalProduct.quantity +
-      modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0) * modalProduct.quantity
-    ).toFixed(2)}</span>
-  </div>
-
-  {/* Second row: Buttons */}
-  <div className="flex space-x-4 mt-3">
-    <button
-      onClick={() => setShowModal(false)}
-      className="flex-1 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-[#F6EBCE]"
-    >
-      Cancel
-    </button>
-    <button
-      onClick={addToCart}
-      className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:font-bold"
-    >
-      Add to Order
-    </button>
-  </div>
-</div>
+      <div className="bg-gray-50 rounded-b-2xl p-4">
+        {/* Total */}
+        <div className="flex justify-between">
+          <span className="text-lg font-semibold px-2">Total</span>
+          <span className="text-xl font-bold px-2">₱{(
+            (modalProduct.price + modalProduct.size.price) * modalProduct.quantity +
+            modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0) * modalProduct.quantity
+          ).toFixed(2)}</span>
         </div>
+
+        {/* Buttons */}
+        <div className="flex space-x-4 mt-3">
+          {editingCartIndex !== null ? (
+            <>
+              <button
+                onClick={() => {
+                  removeCartItem(editingCartIndex);
+                  setShowModal(false);
+                  setEditingCartIndex(null);
+                  setModalEdited(false);
+                }}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
+              >
+                Remove
+              </button>
+              <button
+                onClick={modalEdited ? applyCartItemChanges : () => {
+                  setShowModal(false);
+                  setEditingCartIndex(null);
+                  setModalEdited(false);
+                }}
+                className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:font-bold"
+              >
+                {modalEdited ? "Apply Changes" : "Done"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-2 bg-gray-200 rounded-lg font-semibold hover:bg-[#F6EBCE]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addToCart}
+                className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:font-bold"
+              >
+                Add to Order
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   </div>
 )}
 

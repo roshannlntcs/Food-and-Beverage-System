@@ -36,3 +36,24 @@
     transform: rotate(360deg);
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  /* 2. Un-hide the receipt container and its contents */
+  .printable-receipt,
+  .printable-receipt * {
+    visibility: visible !important;
+  }
+  /* 3. Position the receipt at the top-left, full width */
+  .printable-receipt {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
