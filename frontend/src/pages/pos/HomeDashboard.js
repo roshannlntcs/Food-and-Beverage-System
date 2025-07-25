@@ -34,14 +34,13 @@ export default function HomeDashboard() {
   ];
 
   return (
-    <div className="flex bg-gray-100 min-h-screen">
+    <div className="flex bg-[#f9f6ee] min-h-screen">
       <Sidebar />
-      <div className="flex-1 p-6 ml-48 overflow-hidden">
-        <div className="bg-white px-6 py-4 rounded-t-xl shadow mb-4">
-          <h1 className="text-xl font-semibold text-gray-800">Welcome, {fullName}</h1>
-          <p className="text-sm text-gray-500">Here’s your business overview</p>
-        </div>
-
+      <div className="flex-1 p-6 ml-20 overflow-hidden">
+        <div className="bg-[#800000] px-6 py-4 rounded-t-xl shadow mb-4">
+            <h1 className="text-xl font-semibold text-white">Welcome, {fullName}</h1>
+            <p className="text-sm text-gray-200">Here’s your business overview</p>
+          </div>
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-5 rounded-xl shadow">
