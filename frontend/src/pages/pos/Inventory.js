@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import { FaSearch, FaPen } from 'react-icons/fa';
+import AdminInfo from '../../components/AdminInfo';
 
 const initialInventoryData = [
   { name: 'Arozcaldo', price: 80, category: 'Soup', quantity: 50, status: 'Available' },
@@ -136,15 +137,8 @@ export default function Inventory() {
       <div className="ml-20 p-6 w-full">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Inventory</h1>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center bg-gray-200 px-4 py-2 rounded-full shadow">
-              <div>
-                <div className="text-sm font-semibold">Neziel Aniga</div>
-                <div className="text-xs text-gray-500">Admin</div>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold">Transaction</h1>
+          <AdminInfo />
         </div>
 
         {/* Search & Add */}

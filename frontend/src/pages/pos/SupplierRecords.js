@@ -1,7 +1,7 @@
-// src/pages/pos/SupplierRecords.js
-import React, { useState } from 'react';
-import Sidebar from '../../components/Sidebar';
-import { FaSearch, FaPen } from 'react-icons/fa';
+import React, { useState } from "react";
+import Sidebar from "../../components/Sidebar";
+import AdminInfo from "../../components/AdminInfo";
+import { FaSearch, FaPen } from "react-icons/fa";
 
 const initialSuppliers = [
   {
@@ -201,7 +201,7 @@ const SupplierRecords = () => {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#f9f6ee]">
+    <div className="flex h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
       <div className="ml-20 p-6 w-full">
         <div className="flex justify-between items-center mb-6">
@@ -218,7 +218,7 @@ const SupplierRecords = () => {
           <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search Supplier"
               className="outline-none w-full"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -386,6 +386,4 @@ const SupplierRecords = () => {
       </div>
     </div>
   );
-};
-
-export default SupplierRecords;
+}
