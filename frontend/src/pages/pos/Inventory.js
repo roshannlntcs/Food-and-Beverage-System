@@ -132,12 +132,12 @@ export default function Inventory() {
 
 
   return (
-    <div className="flex min-h-screen bg-[#f9f6ee]">
+    <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
       <div className="ml-20 p-6 w-full">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Transaction</h1>
+          <h1 className="text-3xl font-bold">Inventory </h1>
           <AdminInfo />
         </div>
 
@@ -164,7 +164,7 @@ export default function Inventory() {
     setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' }); // Reset form
     setShowAddModal(true);
   }}
-  className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded shadow text-lg font-semibold border border-yellow-500"
+  className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500"
 >
   + Add Item
 </button>
