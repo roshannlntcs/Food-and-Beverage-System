@@ -1,6 +1,7 @@
 // src/POSMain.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+
 // import your icons...
 const importAll = (r) => r.keys().reduce((acc, k) => ({ ...acc, [k.replace('./','')]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
@@ -642,6 +643,12 @@ export default function POSMain() {
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
+
+  useEffect(() => {
+  const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
+  if (saved.length) setTransactions(saved);
+}, []);
+
   const [editingCartIndex, setEditingCartIndex] = useState(null);
   const [modalEdited, setModalEdited] = useState(false);
 
@@ -661,9 +668,15 @@ export default function POSMain() {
   const [paymentMethod, setPaymentMethod] = useState("");
 
   const [voidLogs, setVoidLogs] = useState([]);  
+  useEffect(() => {
+  const saved = JSON.parse(localStorage.getItem("voidLogs") || "[]");
+  if (saved.length) setVoidLogs(saved);
+}, []);
+
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyContext, setHistoryContext] = useState(null);
 
+  
   // get user info
   const userName = localStorage.getItem("userName") || "Cashier";
   const schoolId = localStorage.getItem("schoolId") || "";
@@ -769,169 +782,185 @@ const applyCartItemChanges = () => {
   };
 
     // Handle processing a transaction
-    const processTransaction = () => {
-      if (cart.length === 0) {
-        alert("Cart is empty.");
-        return;
-      }
-      if (!paymentMethod) {
-        alert("Please select a payment method before processing the transaction.");
-        return;
-      }
-    
-      const orderID = generateOrderID();
-      const transactionID = generateTransactionID();
-    
-      const subtotal = cart.reduce((sum, item) => {
-        const base = item.price;
-        const sizeUp = item.size.price;
-        const addons = (item.selectedAddons || []).reduce((a, x) => a + x.price, 0);
-        return sum + (base + sizeUp + addons) * item.quantity;
-      }, 0);
-    
-      const computedDiscountAmt = +(subtotal * (discountPct / 100)).toFixed(2);
-      const tax = +(subtotal * 0.12).toFixed(2);
-      const total = +(subtotal + tax - computedDiscountAmt).toFixed(2);
-    
-      const newTransaction = {
-        id: transactionID,
-        transactionID,
-        orderID,
-        items: cart.map(item => ({ ...item, voided: false })),
-        subtotal,
-        discountPct,
-        discountAmt: computedDiscountAmt,
-        tax,
-        total,
-        method: paymentMethod || "N/A",
-        cashier: userName || "N/A",
-        date: new Date().toLocaleString(),
-        voided: false,
-      };
-    
-      const newOrder = {
-        id: orderID,
-        orderID,
-        transactionID,
-        items: cart,
-        status: "pending",
-        date: new Date().toLocaleString(),
-      };
-    
-      setTransactions(prev => [newTransaction, ...prev]);
-      setOrders(prev => [newOrder, ...prev]);
-      setCart([]);
-      setPaymentMethod("");
-      setShowOrderSuccess(true);
+const processTransaction = () => {
+  if (cart.length === 0) {
+    alert("Cart is empty.");
+    return;
+  }
+  if (!paymentMethod) {
+    alert("Please select a payment method before processing the transaction.");
+    return;
+  }
 
-      // Reset discounts for the next transaction
-      setDiscountType("");
-      setDiscountPct(0);
-      setCouponCode("");
-    };
-    
+  const orderID = generateOrderID();
+  const transactionID = generateTransactionID();
+
+  const subtotal = cart.reduce((sum, item) => {
+    const base = item.price;
+    const sizeUp = item.size.price;
+    const addons = (item.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+    return sum + (base + sizeUp + addons) * item.quantity;
+  }, 0);
+
+  const computedDiscountAmt = +(subtotal * (discountPct / 100)).toFixed(2);
+  const tax = +(subtotal * 0.12).toFixed(2);
+  const total = +(subtotal + tax - computedDiscountAmt).toFixed(2);
+
+  const newTransaction = {
+    id: transactionID,
+    transactionID,
+    orderID,
+    items: cart.map((item) => ({ ...item, voided: false })),
+    subtotal,
+    discountPct,
+    discountAmt: computedDiscountAmt,
+    tax,
+    total,
+    method: paymentMethod || "N/A",
+    cashier: userName || "N/A",
+    date: new Date().toLocaleString(),
+    voided: false,
+  };
+
+  // ✅ Add new transaction to localStorage
+  const existing = JSON.parse(localStorage.getItem("transactions") || "[]");
+  const updatedTransactions = [newTransaction, ...existing];
+  localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
+
+  // Update state for this session
+  setTransactions(updatedTransactions);
+
+  const newOrder = {
+    id: orderID,
+    orderID,
+    transactionID,
+    items: cart,
+    status: "pending",
+    date: new Date().toLocaleString(),
+  };
+
+  setOrders((prev) => [newOrder, ...prev]);
+  setCart([]);
+  setPaymentMethod("");
+  setShowOrderSuccess(true);
+
+  // Reset discounts for the next transaction
+  setDiscountType("");
+  setDiscountPct(0);
+  setCouponCode("");
+};
+
   const triggerVoid = (type, idx = null) => {
     setVoidContext({ type, index: idx });
     setShowVoidPassword(true);
   };
 
   const confirmVoid = () => {
-    if (voidPasswordInput !== basePassword) {
-      alert("Wrong password");
-      return;
-    }
-  
-    const { type, tx, index } = voidContext;
-  
-    // Update Transactions
-    setTransactions(prev =>
-      prev.map(t => {
-        if (t.id !== tx.id) return t;
-  
-        const updatedItems = t.items.map((it, idx) =>
-          (type === "transaction" || idx === index)
-            ? { ...it, voided: true }
-            : it
-        );
-  
-        const subtotal = updatedItems
-          .filter(it => !it.voided)
-          .reduce((sum, it) => {
-            const base = it.price;
-            const sizeUp = it.size.price;
-            const addons = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
-            return sum + (base + sizeUp + addons) * it.quantity;
-          }, 0);
-  
-        const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
-        const tax = +(subtotal * 0.12).toFixed(2);
-        const total = +(subtotal + tax - discountAmt).toFixed(2);
-  
-        return {
-          ...t,
-          items: updatedItems,
-          voided: type === "transaction" ? true : t.voided,
-          subtotal,
-          discountAmt,
-          tax,
-          total,
-        };
-      })
-    );
-  
-    // Update Orders to reflect voids
-    setOrders(prev =>
-      prev.map(order => {
-        if (order.transactionID !== tx.transactionID) return order;
-  
-        if (type === "transaction") {
-          // Entire transaction voided: mark all items and the order
-          return {
-            ...order,
-            voided: true,
-            items: order.items.map(it => ({ ...it, voided: true })),
-          };
-        } else {
-          // Void single item by matching the item in the order by name, size, and price
-          const updatedItems = order.items.map((it, idx) => {
-            const txItem = tx.items[index];
-            const isMatch =
-              it.name === txItem.name &&
-              it.size.label === txItem.size.label &&
-              it.price === txItem.price &&
-              !it.voided; // ensure not already voided
-            return isMatch ? { ...it, voided: true } : it;
-          });
-          return { ...order, items: updatedItems };
-        }
-      })
-    );
-  
-    // Update Void Logs
-    setVoidLogs(prev => {
-      const existing = prev.find(v => v.txId === tx.id);
-      const newVoidedItems = type === "transaction"
-        ? tx.items.map(i => i.name)
-        : [...(existing?.voidedItems || []), tx.items[index].name];
-      const newLog = {
-        voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
-        txId: tx.id,
-        voidedItems: Array.from(new Set(newVoidedItems)),
-        fullyVoided: type === "transaction",
-      };
-      if (existing) {
-        return prev.map(v => v.txId === tx.id ? newLog : v);
-      } else {
-        return [...prev, newLog];
-      }
-    });
-  
-    setShowVoidPassword(false);
-    setShowHistoryModal(false);
-    setVoidContext(null);
-    setVoidPasswordInput('');
-  };  
+  if (voidPasswordInput !== basePassword) {
+    alert("Wrong password");
+    return;
+  }
 
+  const { type, tx, index } = voidContext;
+    
+   // Update Transactions
+  setTransactions(prev =>
+    prev.map(t => {
+      if (t.id !== tx.id) return t;
+
+      const updatedItems = t.items.map((it, idx) =>
+        (type === "transaction" || idx === index)
+          ? { ...it, voided: true }
+          : it
+      );
+
+      const subtotal = updatedItems
+        .filter(it => !it.voided)
+        .reduce((sum, it) => {
+          const base = it.price;
+          const sizeUp = it.size.price;
+          const addons = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
+          return sum + (base + sizeUp + addons) * it.quantity;
+        }, 0);
+
+      const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
+      const tax = +(subtotal * 0.12).toFixed(2);
+      const total = +(subtotal + tax - discountAmt).toFixed(2);
+
+      return {
+        ...t,
+        items: updatedItems,
+        voided: type === "transaction" ? true : t.voided,
+        subtotal,
+        discountAmt,
+        tax,
+        total,
+      };
+    })
+  );
+  
+      // Update Orders
+  setOrders(prev =>
+    prev.map(order => {
+      if (order.transactionID !== tx.transactionID) return order;
+
+      if (type === "transaction") {
+        return {
+          ...order,
+          voided: true,
+          items: order.items.map(it => ({ ...it, voided: true })),
+        };
+      } else {
+        const updatedItems = order.items.map((it, idx) => {
+          const txItem = tx.items[index];
+          const isMatch =
+            it.name === txItem.name &&
+            it.size.label === txItem.size.label &&
+            it.price === txItem.price &&
+            !it.voided;
+          return isMatch ? { ...it, voided: true } : it;
+        });
+        return { ...order, items: updatedItems };
+      }
+    })
+  );
+  
+setVoidLogs(prev => {
+  // Always fetch latest saved logs to avoid re-adding cleared ones
+  const existingLogs = JSON.parse(localStorage.getItem("voidLogs") || "[]");
+
+  const existing = existingLogs.find(v => v.txId === tx.id);
+  const newVoidedItems = type === "transaction"
+    ? tx.items.map(i => i.name)
+    : [...(existing?.voidedItems || []), tx.items[index].name];
+
+  const newLog = {
+    voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
+    txId: tx.id,
+    transactionId: tx.transactionID,
+    cashier: userName,
+    manager: "Admin", // change to logged in manager if you have one
+    reason: type === "transaction" ? "Full transaction void" : `Item void: ${tx.items[index].name}`,
+    dateTime: new Date().toLocaleString(),
+    voidedItems: Array.from(new Set(newVoidedItems))
+  };
+
+  const updatedLogs = existing
+    ? existingLogs.map(v => v.txId === tx.id ? newLog : v)
+    : [newLog, ...existingLogs]; // prepend new
+
+  localStorage.setItem("voidLogs", JSON.stringify(updatedLogs));
+  return updatedLogs;
+});
+
+
+
+
+  setShowVoidPassword(false);
+  setShowHistoryModal(false);
+  setVoidContext(null);
+  setVoidPasswordInput("");
+};
   useEffect(() => {
     if (activeTab === "Discount") setShowDiscountModal(true);
   }, [activeTab]);
@@ -2053,7 +2082,9 @@ const applyCartItemChanges = () => {
       </div>
     </div>
   </div>
+  
 )}
+
 
 
      {/* Profile Modal */}

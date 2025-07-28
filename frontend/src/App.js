@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
+
 // General Pages
 import LandingPage from './pages/LandingPage';
 import RoleSelection from './pages/RoleSelection';
@@ -15,6 +16,7 @@ import Inventory from './pages/pos/Inventory';
 import POSMonitoring from './pages/pos/POSMonitoring';
 import SupplierRecords from './pages/pos/SupplierRecords';
 import VoidLogs from './pages/pos/VoidLogs';
+import SalesReport from "./pages/pos/SalesReport"; // <-- Import it
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
         <Route path="/admin/pos-monitoring" element={<POSMonitoring />} />
         <Route path="/admin/supplier-records" element={<SupplierRecords />} />
         <Route path="/admin/void-logs" element={<VoidLogs />} />
+        
+<Route path="/pos/sales-report" element={<SalesReport />} /> {/* <-- Add this */}
       </Routes>
     </Router>
   );

@@ -1,116 +1,119 @@
-import React, { useState } from 'react';
-import Sidebar from '../../components/Sidebar';
-import AdminInfo from '../../components/AdminInfo';
-import { FaSearch } from 'react-icons/fa';
-
-const generateRandomDate = () => {
-  const start = new Date('2025-01-01');
-  const end = new Date('2025-12-31');
-  const date = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
-  return date.toISOString().split('T')[0];
-};
-
-const generateSchoolId = (index) => {
-  const year = 2022 + (index % 3); // Randomize year between 2022-2024
-  const id = String(10000 + index).slice(1); // Generates 00123 style
-  return `${year}-${id}`;
-};
-
-const dummyTransactions = Array.from({ length: 50 }, (_, i) => ({
-  date: generateRandomDate(),
-  userId: generateSchoolId(i),
-  transactionNo: `TXN-${2000 + i}`,
-  orderedItems: ['2x Burger, 1x Fries', '1x Steak, 1x Mojito', '3x Pasta'][i % 3],
-  paymentMethod: ['Cash', 'GCash', 'Card'][i % 3],
-  amount: (Math.random() * 1000 + 100).toFixed(2),
-}));
+import React, { useState, useEffect } from "react";
+import Sidebar from "../../components/Sidebar";
+import AdminInfo from "../../components/AdminInfo";
+import { useNavigate } from "react-router-dom";
+import { FaSearch, FaTrash } from "react-icons/fa";
 
 const POSMonitoring = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
 
-  const filteredData = dummyTransactions.filter((txn) => {
-    const matchSearch = txn.transactionNo.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStart = !startDate || txn.date >= startDate;
-    const matchEnd = !endDate || txn.date <= endDate;
-    return matchSearch && matchStart && matchEnd;
-  });
+  // Load transactions from localStorage
+  useEffect(() => {
+    const loadData = () => {
+      const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
+      setTransactions(saved);
+    };
+    loadData();
+    window.addEventListener("storage", loadData);
+    return () => window.removeEventListener("storage", loadData);
+  }, []);
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(
+    (tx) =>
+      tx.transactionID.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tx.cashier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tx.method.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Delete one transaction
+  const deleteTransaction = (id) => {
+    const updated = transactions.filter((tx) => tx.id !== id);
+    setTransactions(updated);
+    localStorage.setItem("transactions", JSON.stringify(updated));
+  };
+
+  // Clear all transactions
+  const clearTransactions = () => {
+    if (window.confirm("Are you sure you want to clear all transactions?")) {
+      localStorage.removeItem("transactions");
+      setTransactions([]);
+    }
+  };
 
   return (
-    <div className="flex min-h-screen bg-[#f9f6ee]">
+    <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
-      <div className="ml-20 p-6 w-[calc(100%-5rem)]">
-        {/* Header */}
+      <div className="ml-20 p-6 w-full">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Transaction</h1>
+          <h1 className="text-3xl font-bold">Transactions</h1>
           <AdminInfo />
         </div>
 
-        {/* Filters */}
+        {/* Search Bar */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
             <input
               type="text"
-              placeholder="Search Transaction No."
+              placeholder="Search Transaction, Cashier or Payment"
               className="outline-none w-full"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <FaSearch className="text-gray-500" />
           </div>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              className="border px-3 py-2 rounded-md text-sm"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-            <span className="mx-1 text-gray-600">to</span>
-            <input
-              type="date"
-              className="border px-3 py-2 rounded-md text-sm"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </div>
         </div>
 
-        {/* Scrollable Table */}
-        <div className="border rounded-md overflow-hidden">
+        {/* Table */}
+        <div className="border rounded-md overflow-hidden bg-white">
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full table-auto border-collapse">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left">
+                  <th className="p-3">No.</th>
                   <th className="p-3">Date</th>
-                  <th className="p-3">User ID</th>
-                  <th className="p-3">Transaction No.</th>
-                  <th className="p-3">Ordered Items</th>
-                  <th className="p-3 text-center">Payment Method</th>
-                  <th className="p-3">Amount</th>
+                  <th className="p-3">Transaction ID</th>
+                  <th className="p-3 text-center">Cashier</th>
+                  <th className="p-3 text-center">Payment</th>
+                  <th className="p-3">Items</th>
+                  <th className="p-3">Subtotal</th>
+                  <th className="p-3">Discount</th>
+                  <th className="p-3">Tax</th>
+                  <th className="p-3">Total</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredData.length > 0 ? (
-                  filteredData.map((txn, index) => (
-                    <tr key={index} className="bg-[#fdfdfd] border-b hover:bg-[#f1f1f1]">
-                      <td className="p-3">{txn.date}</td>
-                      <td className="p-3">{txn.userId}</td>
-                      <td
-                        className="p-3 text-blue-600 underline cursor-pointer"
-                        onClick={() => setSelectedTransaction(txn)}
-                      >
-                        {txn.transactionNo}
+                {filteredTransactions.length > 0 ? (
+                  filteredTransactions.map((tx, i) => (
+                    <tr key={i} className="bg-white border-b hover:bg-[#f1f1f1]">
+                       <td className="p-3">{i + 1}</td>
+                      <td className="p-3">{tx.date}</td>
+                      <td className="p-3">{tx.transactionID}</td>
+                      <td className="p-3 text-center">{tx.cashier}</td>
+                      <td className="p-3 text-center">{tx.method}</td>
+                      <td className="p-3">
+                        {tx.items.map((i) => `${i.name} x${i.quantity}`).join(", ")}
                       </td>
-                      <td className="p-3">{txn.orderedItems}</td>
-                      <td className="p-3 text-center">{txn.paymentMethod}</td>
-                      <td className="p-3">₱{txn.amount}</td>
+                      <td className="p-3">₱{tx.subtotal.toFixed(2)}</td>
+                      <td className="p-3">₱{tx.discountAmt.toFixed(2)}</td>
+                      <td className="p-3">₱{tx.tax.toFixed(2)}</td>
+                      <td className="p-3 font-semibold">₱{tx.total.toFixed(2)}</td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => deleteTransaction(tx.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <FaTrash />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="p-4 text-center text-gray-500">
+                    <td colSpan="10" className="p-4 text-center text-gray-500">
                       No transactions found.
                     </td>
                   </tr>
@@ -120,104 +123,22 @@ const POSMonitoring = () => {
           </div>
         </div>
 
-        {/* Bottom Button */}
-        <div className="mt-4 flex justify-end">
-          <button className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500">
+        {/* Buttons Below Table */}
+        <div className="mt-4 flex justify-end space-x-2">
+          <button
+            onClick={clearTransactions}
+            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow"
+          >
+            Clear All Transactions
+          </button>
+          <button
+            onClick={() => navigate("/pos/sales-report")}
+            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500"
+          >
             View Sales Reports
           </button>
         </div>
       </div>
-
-      {/* Receipt Modal */}
-      {selectedTransaction && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white w-[380px] rounded-lg shadow-lg p-4 font-mono">
-            <div className="text-center mb-4">
-              <img
-                src="https://via.placeholder.com/80x40?text=LOGO"
-                alt="Logo"
-                className="mx-auto mb-1"
-              />
-              <h2 className="text-lg font-bold">RENTAL CAFE POS</h2>
-              <p className="text-xs text-gray-600">Davao City, Philippines</p>
-              <p className="text-xs text-gray-600">Tel: (082) 123-4567</p>
-            </div>
-            <div className="text-sm mb-2">
-              <div className="flex justify-between">
-                <span>Txn No:</span>
-                <span>{selectedTransaction.transactionNo}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Date:</span>
-                <span>{selectedTransaction.date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Cashier:</span>
-                <span>{selectedTransaction.userId}</span>
-              </div>
-            </div>
-            <hr className="border-dashed my-2" />
-            <div className="text-sm mb-2">
-              <div className="flex justify-between font-semibold">
-                <span>QTY ITEM</span>
-                <span>AMOUNT</span>
-              </div>
-              <div className="mt-1">
-                {selectedTransaction.orderedItems.split(',').map((item, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span>{item.trim()}</span>
-                    <span>
-                      ₱
-                      {(
-                        Number(selectedTransaction.amount) /
-                        selectedTransaction.orderedItems.split(',').length
-                      ).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <hr className="border-dashed my-2" />
-            <div className="text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>₱{(Number(selectedTransaction.amount) * 0.89).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>VAT (12%)</span>
-                <span>₱{(Number(selectedTransaction.amount) * 0.11).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-base mt-2">
-                <span>Total</span>
-                <span>₱{selectedTransaction.amount}</span>
-              </div>
-              <div className="flex justify-between mt-1">
-                <span>Payment Method</span>
-                <span>{selectedTransaction.paymentMethod}</span>
-              </div>
-            </div>
-            <hr className="border-dashed my-2" />
-            <div className="text-center text-sm mt-2">
-              <p className="text-gray-700">Thank you for dining with us!</p>
-              <p className="text-gray-500 text-xs">This serves as your official receipt.</p>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setSelectedTransaction(null)}
-                className="px-4 py-1 bg-gray-300 text-sm text-black rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-1 bg-green-600 text-sm text-white rounded hover:bg-green-700"
-              >
-                Print
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

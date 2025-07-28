@@ -201,7 +201,7 @@ const SupplierRecords = () => {
   );
 
   return (
-    <div className="flex h-screen bg-[#f9f6ee] overflow-hidden">
+    <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
       <div className="ml-20 p-6 w-full">
         <div className="flex justify-between items-center mb-6">
@@ -225,7 +225,7 @@ const SupplierRecords = () => {
               setNewSupplier({ name: '', contactPerson: '', phone: '', email: '', address: '', products: '', status: 'Active' });
               setShowAddModal(true);
             }}
-            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded shadow text-lg font-semibold border border-yellow-500"
+            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500"
           >
             + Add Supplier
           </button>
