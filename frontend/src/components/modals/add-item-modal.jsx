@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function AddItemModal({
   newItem,
@@ -7,6 +7,8 @@ export default function AddItemModal({
   onClose,
   onSave
 }) {
+  const [imagePreview, setImagePreview] = useState(null);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 relative">
@@ -43,7 +45,7 @@ export default function AddItemModal({
             </select>
           </div>
 
-          {/* Description (Full width) */}
+          {/* Description */}
           <div className="col-span-2">
             <label className="block text-sm font-semibold mb-1">Description</label>
             <textarea
@@ -120,24 +122,54 @@ export default function AddItemModal({
             <label className="block text-sm font-semibold mb-1">Allergen</label>
             <input
               type="text"
-              placeholder="Pls. specify"
+              placeholder="e.g. Chicken, Nuts"
               className="w-full border rounded px-3 py-2"
               value={newItem.allergens || ''}
               onChange={(e) => setNewItem({ ...newItem, allergens: e.target.value })}
             />
           </div>
 
-          {/* Upload Image (Full width) */}
+          {/* Upload Image */}
           <div className="col-span-2">
             <label className="block text-sm font-semibold mb-1">Upload image</label>
             <div className="w-full border-2 border-dashed border-gray-300 rounded px-4 py-6 text-center">
-              <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                  d="M7 16v-4m0 0V9a4 4 0 014-4h1m4 0h1a4 4 0 014 4v2m0 4v4M3 16v-4m0 0V9a4 4 0 014-4h1" />
-              </svg>
-              <p className="text-sm mt-2 text-gray-600">
-                Drop files here or <span className="text-blue-600 cursor-pointer underline">browse</span>
-              </p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const imageUrl = URL.createObjectURL(file);
+                    setImagePreview(imageUrl);
+                    setNewItem({ ...newItem, image: imageUrl });
+                  }
+                }}
+                className="hidden"
+                id="add-upload-image"
+              />
+              <label htmlFor="add-upload-image" className="cursor-pointer block">
+                <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M7 16v-4m0 0V9a4 4 0 014-4h1m4 0h1a4 4 0 014 4v2m0 4v4M3 16v-4m0 0V9a4 4 0 014-4h1"
+                  />
+                </svg>
+                <p className="text-sm mt-2 text-gray-600">
+                  Drop files here or <span className="text-blue-600 underline">browse</span>
+                </p>
+              </label>
+
+              {imagePreview && (
+                <div className="mt-4">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="mx-auto h-20 w-20 rounded object-cover"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

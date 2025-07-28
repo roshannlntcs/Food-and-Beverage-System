@@ -201,22 +201,32 @@ export default function Inventory() {
                   <th className="p-3">No.</th>
                   <th className="p-3">Name</th>
                   <th className="p-3">Price</th>
-                  <th className="p-3 relative">
-                    <div className="flex items-center gap-1">
-                      <span>Category</span>
-                      <button
-                        onClick={() => setShowCategoryFilter(true)}
-                        className="focus:outline-none"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white hover:text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
-                  </th>
+                 <th className="p-3">
+                      <div className="relative inline-block">
+                        <select
+                          value={selectedCategory}
+                          onChange={(e) => setSelectedCategory(e.target.value)}
+                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none"
+                        >
+                          <option value="">All</option>
+                          {uniqueCategories.map((cat, i) => (
+                            <option key={i} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                        {/* Arrow Icon Overlay */}
+                        <div className="absolute top-1/2 right-2 transform -translate-y-1/2 pointer-events-none">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </th>
+
+
                   <th className="p-3">Allergens</th>
-                  <th className="p-3">Addons</th>
+                  <th className="p-3">Add-ons</th>
                   <th className="p-3">Description</th>
+                  <th className="p-3">Sizes</th>
                   <th className="p-3 text-center">Quantity</th>
                   <th className="p-3 text-center">Status</th>
                   <th className="p-3 text-center">Edit</th>
@@ -243,6 +253,15 @@ export default function Inventory() {
                       : '—'}
                   </td>
                   <td className="p-3">{item.description || '—'}</td>
+                  <td className="p-3">
+                      {Array.isArray(item.sizes)
+                        ? item.sizes.map(size =>
+                            typeof size === 'string'
+                              ? size
+                              : `${size.label}${size.price ? ` (₱${size.price})` : ''}`
+                          ).join(', ')
+                        : '—'}
+                    </td>
                   <td className="p-3 text-center">{item.quantity}</td>
                   <td className="p-3 text-center">
                     <span className={`px-3 py-1 text-sm font-medium rounded-full ${
@@ -264,7 +283,8 @@ export default function Inventory() {
                           status: item.status,
                           allergens: item.allergens,
                           addons: item.addons,
-                          description: item.description
+                          description: item.description,
+                          sizes: item.sizes || []
                         });
                         setShowEditModal(true);
                       }}

@@ -11,7 +11,9 @@ export const allItemsFlat = Object.entries(placeholders).flatMap(([category, ite
     status: 'Available',
     allergens: item.allergens || '',
     addons: item.addons || [],
-    description: item.description || '' 
+    description: item.description || '',
+    sizes: item.sizes || [] 
   }))
 );
+
 

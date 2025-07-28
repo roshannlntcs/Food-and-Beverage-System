@@ -6,21 +6,54 @@ export default function EditItemModal({
   onClose,
   onSave
 }) {
+  const [imagePreview, setImagePreview] = React.useState(null);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto p-6 rounded-lg shadow-xl">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        
         {/* Header */}
-        <h2 className="text-2xl font-bold mb-4 border-b pb-2 text-center">Edit Item</h2>
+        <div className="bg-[#8B0000] text-white text-center py-3 rounded-t-xl text-xl font-semibold">
+          Edit Item
+        </div>
 
-        <div className="space-y-4">
+        {/* Form Body */}
+        <div className="p-6 grid grid-cols-2 gap-4">
           {/* Name */}
           <div>
-            <label className="block text-sm font-semibold mb-1">Item Name</label>
+            <label className="block text-sm font-semibold mb-1">Name</label>
             <input
               type="text"
-              className="w-full border rounded px-4 py-2"
+              className="w-full border rounded px-3 py-2"
               value={newItem.name}
               onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-semibold mb-1">Category</label>
+            <select
+              className="w-full border rounded px-3 py-2"
+              value={newItem.category}
+              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+            >
+              <option value="">Select category</option>
+              <option value="Soup">Soup</option>
+              <option value="Drink">Drink</option>
+              <option value="Meal">Meal</option>
+              {/* Add your categories */}
+            </select>
+          </div>
+
+          {/* Description */}
+          <div className="col-span-2">
+            <label className="block text-sm font-semibold mb-1">Description</label>
+            <textarea
+              className="w-full border rounded px-3 py-2"
+              rows="2"
+              value={newItem.description}
+              onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
             />
           </div>
 
@@ -29,20 +62,9 @@ export default function EditItemModal({
             <label className="block text-sm font-semibold mb-1">Price</label>
             <input
               type="number"
-              className="w-full border rounded px-4 py-2"
+              className="w-full border rounded px-3 py-2"
               value={newItem.price}
               onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-            />
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Category</label>
-            <input
-              type="text"
-              className="w-full border rounded px-4 py-2"
-              value={newItem.category}
-              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
             />
           </div>
 
@@ -51,44 +73,32 @@ export default function EditItemModal({
             <label className="block text-sm font-semibold mb-1">Quantity</label>
             <input
               type="number"
-              className="w-full border rounded px-4 py-2"
+              className="w-full border rounded px-3 py-2"
               value={newItem.quantity}
               onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Status</label>
-            <select
-              className="w-full border rounded px-4 py-2"
-              value={newItem.status}
-              onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
-            >
-              <option value="Available">Available</option>
-              <option value="Unavailable">Unavailable</option>
-            </select>
-          </div>
+          {/* Size */}
+<div className="col-span-2">
+  <label className="block text-sm font-semibold mb-1">Size</label>
+  <input
+    type="text"
+    className="w-full border rounded px-3 py-2"
+    placeholder="e.g. Regular, 1 Pc, Bowl, 500ml"
+    value={newItem.size || ''}
+    onChange={(e) => setNewItem({ ...newItem, size: e.target.value })}
+  />
+</div>
 
-          {/* Allergens */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Allergens</label>
-            <input
-              type="text"
-              placeholder="e.g. dairy, nuts"
-              className="w-full border rounded px-4 py-2"
-              value={newItem.allergens || ''}
-              onChange={(e) => setNewItem({ ...newItem, allergens: e.target.value })}
-            />
-          </div>
 
           {/* Add-ons */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Add-ons</label>
+          <div className="col-span-2">
+            <label className="block text-sm font-semibold mb-1">Add ons</label>
             <input
               type="text"
               placeholder="e.g. Cheese (₱10), Bacon (₱15)"
-              className="w-full border rounded px-4 py-2"
+              className="w-full border rounded px-3 py-2"
               value={
                 Array.isArray(newItem.addons)
                   ? newItem.addons.map(addon =>
@@ -101,38 +111,110 @@ export default function EditItemModal({
               onChange={(e) =>
                 setNewItem({
                   ...newItem,
-                  addons: e.target.value.split(',').map(a => a.trim())
+                  addons: e.target.value.split(',').map((a) => {
+                    const match = a.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                    return match
+                      ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                      : a.trim();
+                  })
                 })
               }
             />
           </div>
 
-          {/* Description */}
+
+          {/* Status */}
           <div>
-            <label className="block text-sm font-semibold mb-1">Description</label>
-            <textarea
-              placeholder="Short product description"
-              className="w-full border rounded px-4 py-2"
-              value={newItem.description || ''}
-              onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+            <label className="block text-sm font-semibold mb-1">Status</label>
+            <select
+              className="w-full border rounded px-3 py-2"
+              value={newItem.status}
+              onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
+            >
+              <option value="Available">Available</option>
+              <option value="Unavailable">Unavailable</option>
+            </select>
+          </div>
+
+          {/* Allergen */}
+          <div>
+            <label className="block text-sm font-semibold mb-1">Allergen</label>
+            <input
+              type="text"
+              className="w-full border rounded px-3 py-2"
+              placeholder="e.g. Chicken, Nuts"
+              value={newItem.allergens || ''}
+              onChange={(e) => setNewItem({ ...newItem, allergens: e.target.value })}
             />
           </div>
-        </div>
 
-        {/* Buttons */}
-        <div className="flex justify-end gap-2 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded font-semibold"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSave}
-            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded font-semibold"
-          >
-            Update
-          </button>
+        {/* Upload Image */}
+<div className="col-span-2">
+  <label className="block text-sm font-semibold mb-1">Upload image</label>
+  <div className="w-full border-2 border-dashed border-gray-300 rounded px-4 py-6 text-center">
+    <input
+      type="file"
+      accept="image/*"
+      onChange={(e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const imageURL = URL.createObjectURL(file);
+          setImagePreview(imageURL);
+          setNewItem({ ...newItem, image: imageURL });
+        }
+      }}
+      className="hidden"
+      id="upload-image"
+    />
+    <label htmlFor="upload-image" className="cursor-pointer">
+      <svg
+        className="mx-auto h-8 w-8 text-gray-400"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M7 16v-4m0 0V9a4 4 0 014-4h1m4 0h1a4 4 0 014 4v2m0 4v4M3 16v-4m0 0V9a4 4 0 014-4h1"
+        />
+      </svg>
+      <p className="text-sm mt-2 text-gray-600">
+        Drop files here or <span className="text-blue-600 underline">browse</span>
+      </p>
+    </label>
+
+    {/* ✅ Preview existing or uploaded image */}
+    {(imagePreview || newItem.image) && (
+      <div className="mt-4">
+        <img
+          src={imagePreview || newItem.image}
+          alt="Preview"
+          className="mx-auto h-20 w-20 rounded object-cover"
+        />
+      </div>
+    )}
+  </div>
+</div>
+
+
+
+                 {/* Action Buttons */}
+          <div className="flex justify-end gap-3 mt-6 px-6 pb-6">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-black text-white rounded-full font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSave}
+              className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full font-semibold"
+            >
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>
