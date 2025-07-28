@@ -150,7 +150,9 @@ const SupplierRecords = () => {
   const [logs, setLogs] = useState([]);
   const [selectedSupplierIndex, setSelectedSupplierIndex] = useState(null);
   const [newSupplier, setNewSupplier] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '', products: '', status: 'Active' });
+  const adminName = localStorage.getItem('adminFullName') || 'Admin';
 
+  
   const handleAddSupplier = () => {
     setSuppliers([...suppliers, newSupplier]);
     setLogs([...
@@ -158,7 +160,7 @@ const SupplierRecords = () => {
       {
         datetime: new Date().toISOString().slice(0, 16).replace('T', ' '),
         action: 'Add',
-        admin: 'Neziel Aniga',
+        admin: adminName,
         supplier: newSupplier.name,
         detail: `Added new supplier: ${newSupplier.name}`,
       },
@@ -187,7 +189,7 @@ const SupplierRecords = () => {
       {
         datetime: new Date().toISOString().slice(0, 16).replace('T', ' '),
         action: 'Update',
-        admin: 'Neziel Aniga',
+        admin: adminName,
         supplier: newSupplier.name,
         detail,
       },

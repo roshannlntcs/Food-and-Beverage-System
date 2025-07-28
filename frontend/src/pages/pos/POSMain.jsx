@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 const importAll = (r) => r.keys().reduce((acc, k) => ({ ...acc, [k.replace('./','')]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
 
-const placeholders = {
+export const placeholders = {
   "Main Dish": [
     {
       name:        "Humba",
@@ -2123,3 +2123,4 @@ setVoidLogs(prev => {
     </div>
   );
 } 
+
