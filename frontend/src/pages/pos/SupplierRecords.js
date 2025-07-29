@@ -30,34 +30,61 @@ const SupplierRecords = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [logs, setLogs] = useState([]);
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [selectedSupplierIndex, setSelectedSupplierIndex] = useState(null);
+  const [newSupplier, setNewSupplier] = useState({
+    name: "",
+    contactPerson: "",
+    phone: "",
+    email: "",
+    address: "",
+    products: "",
+    status: "Active",
+  });
+
+  const adminName = localStorage.getItem("adminFullName") || "Admin";
 
   const handleAddSupplier = (supplier) => {
     setSuppliers([...suppliers, supplier]);
     setLogs([
       ...logs,
       {
-        datetime: new Date().toLocaleString(),
+        datetime: new Date().toISOString().slice(0, 16).replace("T", " "),
         action: "Add",
-        admin: "Admin",
+        admin: adminName,
         supplier: supplier.name,
-        detail: `Added new supplier: ${supplier.name}`,
+        detail: `Added new supplier: 
+Name: ${supplier.name}
+Contact Person: ${supplier.contactPerson}
+Phone: ${supplier.phone}
+Email: ${supplier.email}
+Address: ${supplier.address}
+Products: ${supplier.products}
+Status: ${supplier.status}`,
       },
     ]);
   };
 
   const handleEditSupplier = (updatedSupplier) => {
-    setSuppliers((prev) =>
-      prev.map((sup) => (sup.name === selectedSupplier.name ? updatedSupplier : sup))
-    );
+    const updated = [...suppliers];
+    const old = updated[selectedSupplierIndex];
+    updated[selectedSupplierIndex] = updatedSupplier;
+    setSuppliers(updated);
+
+    let changes = [];
+    for (let key in old) {
+      if (old[key] !== updatedSupplier[key]) {
+        changes.push(`${key}: "${old[key]}" → "${updatedSupplier[key]}"`);
+      }
+    }
+
     setLogs([
       ...logs,
       {
-        datetime: new Date().toLocaleString(),
+        datetime: new Date().toISOString().slice(0, 16).replace("T", " "),
         action: "Update",
-        admin: "Admin",
+        admin: adminName,
         supplier: updatedSupplier.name,
-        detail: `Edited supplier details for: ${updatedSupplier.name}`,
+        detail: changes.length > 0 ? changes.join("\n") : "No changes made",
       },
     ]);
   };
@@ -76,7 +103,7 @@ const SupplierRecords = () => {
           <AdminInfo />
         </div>
 
-        {/* Search & Add Button */}
+        {/* Search & Add */}
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
             <input
@@ -126,7 +153,9 @@ const SupplierRecords = () => {
                     <td className="p-3 text-center">
                       <span
                         className={`px-3 py-1 text-sm font-medium rounded-full ${
-                          supplier.status === "Active" ? "bg-green-500" : "bg-red-500"
+                          supplier.status === "Active"
+                            ? "bg-green-500"
+                            : "bg-red-500"
                         } text-white`}
                       >
                         {supplier.status}
@@ -136,8 +165,9 @@ const SupplierRecords = () => {
                       <FaPen
                         className="text-red-600 cursor-pointer mx-auto"
                         onClick={() => {
-                          setSelectedSupplier(supplier);
+                          setSelectedSupplierIndex(i);
                           setShowEditModal(true);
+                          setNewSupplier(supplier);
                         }}
                       />
                     </td>
@@ -165,59 +195,6 @@ const SupplierRecords = () => {
           </button>
         </div>
 
-        {/* Logs Modal */}
-{/* Logs Modal */}
-{showLogsModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] overflow-auto">
-      <h2 className="text-xl font-bold mb-4">Supplier Logs</h2>
-      <div className="overflow-auto max-h-[60vh] border rounded mb-4">
-        <table className="table-auto w-full text-sm">
-          <thead className="bg-[#8B0000] text-white sticky top-0">
-            <tr>
-              <th className="p-2 text-left">Date/Time</th>
-              <th className="p-2 text-left">Action</th>
-              <th className="p-2 text-left">Admin</th>
-              <th className="p-2 text-left">Supplier</th>
-              <th className="p-2 text-left">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((log, i) => (
-              <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                <td className="p-2">{log.datetime}</td>
-                <td className="p-2">{log.action}</td>
-                <td className="p-2">{log.admin}</td>
-                <td className="p-2">{log.supplier}</td>
-                <td className="p-2">{log.detail}</td>
-              </tr>
-            ))}
-            {logs.length === 0 && (
-              <tr>
-                <td colSpan="5" className="text-center p-4 text-gray-500">
-                  No logs found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Close Button Below */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowLogsModal(false)}
-          className="bg-gray-400 hover:bg-gray-500 text-black px-6 py-2 rounded-full font-semibold"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-
         {/* Add Supplier Modal */}
         {showAddModal && (
           <AddSupplierModal
@@ -229,10 +206,59 @@ const SupplierRecords = () => {
         {/* Edit Supplier Modal */}
         {showEditModal && (
           <EditSupplierModal
-            supplierData={selectedSupplier}
+            supplierData={newSupplier}
             onClose={() => setShowEditModal(false)}
             onSave={handleEditSupplier}
           />
+        )}
+
+        {/* Logs Modal */}
+        {showLogsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] flex flex-col">
+              <h2 className="text-xl font-bold mb-4">Supplier Logs</h2>
+              <div className="overflow-auto max-h-[60vh] border rounded mb-4">
+                <table className="table-auto w-full text-sm">
+                  <thead className="bg-[#8B0000] text-white sticky top-0">
+                    <tr>
+                      <th className="p-2 text-left">Date/Time</th>
+                      <th className="p-2 text-left">Action</th>
+                      <th className="p-2 text-left">Admin</th>
+                      <th className="p-2 text-left">Supplier</th>
+                      <th className="p-2 text-left">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.length > 0 ? (
+                      logs.map((log, i) => (
+                        <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="p-2 align-top">{log.datetime}</td>
+                          <td className="p-2 align-top font-semibold">{log.action}</td>
+                          <td className="p-2 align-top">{log.admin}</td>
+                          <td className="p-2 align-top">{log.supplier}</td>
+                          <td className="p-2 whitespace-pre-line">{log.detail}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="text-center p-4 text-gray-500">
+                          No logs found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowLogsModal(false)}
+                  className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-full"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
