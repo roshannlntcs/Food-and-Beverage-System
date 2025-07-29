@@ -11,7 +11,7 @@ export default function AddItemModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 relative">
+       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-[#8B0000] text-white text-center py-3 rounded-t-lg text-xl font-semibold">
           New Item
@@ -78,16 +78,32 @@ export default function AddItemModal({
             />
           </div>
 
-          {/* Size */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Size</label>
-            <input
-              type="text"
-              className="w-full border rounded px-3 py-2"
-              value={newItem.size || ''}
-              onChange={(e) => setNewItem({ ...newItem, size: e.target.value })}
-            />
-          </div>
+          {/* Sizes */}
+            <div className="col-span-2">
+              <label className="block text-sm font-semibold mb-1">Sizes</label>
+              <input
+                type="text"
+                className="w-full border rounded px-3 py-2"
+                placeholder="e.g. Regular (₱0), Large (₱20)"
+                value={Array.isArray(newItem.sizes)
+                  ? newItem.sizes.map(s =>
+                      typeof s === 'string'
+                        ? s
+                        : `${s.label}${s.price ? ` (₱${s.price})` : ''}`
+                    ).join(', ')
+                  : ''}
+                onChange={(e) => {
+                  const parsedSizes = e.target.value.split(',').map(str => {
+                    const match = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                    return match
+                      ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                      : { label: str.trim(), price: 0 };
+                  });
+                  setNewItem({ ...newItem, sizes: parsedSizes });
+                }}
+              />
+            </div>
+
 
           {/* Add-ons */}
           <div>
