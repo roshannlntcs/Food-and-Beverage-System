@@ -42,10 +42,12 @@ export default function Inventory() {
 
  const handleAddItem = () => {
   const newItemData = {
-    ...newItem,
-    price: parseFloat(newItem.price),
-    quantity: parseInt(newItem.quantity)
-  };
+  ...newItem,
+  price: parseFloat(newItem.price),
+  quantity: parseInt(newItem.quantity),
+  sizes: newItem.sizes || []
+};
+
 
   setInventory([...inventory, newItemData]);
   setLogs([
@@ -81,10 +83,20 @@ export default function Inventory() {
     status: newItem.status,
     allergens: newItem.allergens || '',
     addons: newItem.addons || [],
-    description: newItem.description || ''
+    description: newItem.description || '',
+    sizes: newItem.sizes || []
   };
 
-  // Build detailed change description
+  // ✅ Format helper for size display
+  const formatSizes = (sizes) => {
+    return sizes.map(s =>
+      typeof s === 'string'
+        ? s
+        : `${s.label}${s.price ? ` (₱${s.price})` : ''}`
+    ).join(', ');
+  };
+
+  // ✅ Compare fields
   let changes = [];
   if (oldItem.name !== updatedItem.name) {
     changes.push(`name from "${oldItem.name}" to "${updatedItem.name}"`);
@@ -111,6 +123,13 @@ export default function Inventory() {
     changes.push(`description updated`);
   }
 
+  // ✅ Sizes comparison
+  if (JSON.stringify(oldItem.sizes) !== JSON.stringify(updatedItem.sizes)) {
+    changes.push(
+      `sizes from "${formatSizes(oldItem.sizes)}" to "${formatSizes(updatedItem.sizes)}"`
+    );
+  }
+
   const detailText = changes.length > 0
     ? `Updated ${changes.join(', ')}`
     : `No changes made`;
@@ -123,19 +142,20 @@ export default function Inventory() {
     {
       datetime: new Date().toISOString().slice(0, 16).replace("T", " "),
       action: "Update",
-      admin: adminName,
-      product: updatedItem.name,
+      admin: adminName || '—',
+      product: updatedItem.name || '—',
       field: "Edited Fields",
-      stock: `${updatedItem.quantity} pcs`,
-      oldPrice: `₱${oldItem.price}`,
-      newPrice: `₱${updatedItem.price}`,
-      category: updatedItem.category,
+      stock: `${updatedItem.quantity ?? 0} pcs`,
+      oldPrice: updatedItem.price ? `₱${oldItem.price}` : '—',
+      newPrice: updatedItem.price ? `₱${updatedItem.price}` : '—',
+      category: updatedItem.category || '—',
       detail: detailText
     }
   ]);
 
   setShowEditModal(false);
 };
+
 
 
 
@@ -192,7 +212,7 @@ export default function Inventory() {
 
        
 
-        {/* Inventory Table */}
+   {/* Inventory Table */}
         <div className="border rounded-md overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full table-auto border-collapse">
@@ -202,27 +222,30 @@ export default function Inventory() {
                   <th className="p-3">Name</th>
                   <th className="p-3">Price</th>
                  <th className="p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-medium">Category</span>
                       <div className="relative inline-block">
                         <select
                           value={selectedCategory}
                           onChange={(e) => setSelectedCategory(e.target.value)}
-                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none"
+                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+                          style={{ width: '24px' }} 
                         >
                           <option value="">All</option>
                           {uniqueCategories.map((cat, i) => (
                             <option key={i} value={cat}>{cat}</option>
                           ))}
                         </select>
-                        {/* Arrow Icon Overlay */}
-                        <div className="absolute top-1/2 right-2 transform -translate-y-1/2 pointer-events-none">
+
+                        {/* Custom arrow icon positioned over native arrow */}
+                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
                         </div>
                       </div>
-                    </th>
-
-
+                    </div>
+                  </th>
                   <th className="p-3">Allergens</th>
                   <th className="p-3">Add-ons</th>
                   <th className="p-3">Description</th>
@@ -332,10 +355,12 @@ export default function Inventory() {
           <EditItemModal
             newItem={newItem}
             setNewItem={setNewItem}
+            uniqueCategories={uniqueCategories}
             onClose={() => setShowEditModal(false)}
             onSave={handleEditItem}
           />
-         )}
+        )}
+
 
 
       {/* Category popup Modal */}

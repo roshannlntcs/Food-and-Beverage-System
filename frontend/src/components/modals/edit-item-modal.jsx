@@ -3,9 +3,11 @@ import React from 'react';
 export default function EditItemModal({
   newItem,
   setNewItem,
+  uniqueCategories,
   onClose,
   onSave
 }) {
+
   const [imagePreview, setImagePreview] = React.useState(null);
 
   return (
@@ -31,20 +33,17 @@ export default function EditItemModal({
           </div>
 
           {/* Category */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Category</label>
-            <select
-              className="w-full border rounded px-3 py-2"
-              value={newItem.category}
-              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-            >
-              <option value="">Select category</option>
-              <option value="Soup">Soup</option>
-              <option value="Drink">Drink</option>
-              <option value="Meal">Meal</option>
-              {/* Add your categories */}
-            </select>
-          </div>
+          <select
+                className="w-full border rounded px-3 py-2"
+                value={newItem.category}
+                onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
+              >
+                <option value="">Select category</option>
+                {uniqueCategories.map((cat, i) => (
+                  <option key={i} value={cat}>{cat}</option>
+                ))}
+              </select>
+
 
           {/* Description */}
           <div className="col-span-2">
@@ -79,74 +78,88 @@ export default function EditItemModal({
             />
           </div>
 
-          {/* Size */}
-<div className="col-span-2">
-  <label className="block text-sm font-semibold mb-1">Size</label>
-  <input
-    type="text"
-    className="w-full border rounded px-3 py-2"
-    placeholder="e.g. Regular, 1 Pc, Bowl, 500ml"
-    value={newItem.size || ''}
-    onChange={(e) => setNewItem({ ...newItem, size: e.target.value })}
-  />
-</div>
+         {/* Sizes */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold mb-1">Sizes</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="e.g. Regular (₱0), Large (₱20)"
+                    value={Array.isArray(newItem.sizes)
+                      ? newItem.sizes.map(s =>
+                          typeof s === 'string'
+                            ? s
+                            : `${s.label}${s.price ? ` (₱${s.price})` : ''}`
+                        ).join(', ')
+                      : ''}
+                    onChange={(e) => {
+                      const parsedSizes = e.target.value.split(',').map(str => {
+                        const match = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                        return match
+                          ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                          : { label: str.trim(), price: 0 };
+                      });
+                      setNewItem({ ...newItem, sizes: parsedSizes });
+                    }}
+                  />
+                </div>
 
 
           {/* Add-ons */}
-          <div className="col-span-2">
-            <label className="block text-sm font-semibold mb-1">Add ons</label>
-            <input
-              type="text"
-              placeholder="e.g. Cheese (₱10), Bacon (₱15)"
-              className="w-full border rounded px-3 py-2"
-              value={
-                Array.isArray(newItem.addons)
-                  ? newItem.addons.map(addon =>
-                      typeof addon === 'string'
-                        ? addon
-                        : `${addon.label}${addon.price ? ` (₱${addon.price})` : ''}`
-                    ).join(', ')
-                  : newItem.addons
-              }
-              onChange={(e) =>
-                setNewItem({
-                  ...newItem,
-                  addons: e.target.value.split(',').map((a) => {
-                    const match = a.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
-                    return match
-                      ? { label: match[1].trim(), price: parseFloat(match[2]) }
-                      : a.trim();
-                  })
-                })
-              }
-            />
-          </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-semibold mb-1">Add ons</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Cheese (₱10), Bacon (₱15)"
+                    className="w-full border rounded px-3 py-2"
+                    value={
+                      Array.isArray(newItem.addons)
+                        ? newItem.addons.map(addon =>
+                            typeof addon === 'string'
+                              ? addon
+                              : `${addon.label}${addon.price ? ` (₱${addon.price})` : ''}`
+                          ).join(', ')
+                        : newItem.addons
+                    }
+                    onChange={(e) =>
+                      setNewItem({
+                        ...newItem,
+                        addons: e.target.value.split(',').map((a) => {
+                          const match = a.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                          return match
+                            ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                            : a.trim();
+                        })
+                      })
+                    }
+                  />
+                </div>
 
 
           {/* Status */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Status</label>
-            <select
-              className="w-full border rounded px-3 py-2"
-              value={newItem.status}
-              onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
-            >
-              <option value="Available">Available</option>
-              <option value="Unavailable">Unavailable</option>
-            </select>
-          </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Status</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={newItem.status}
+                    onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
+                  >
+                    <option value="Available">Available</option>
+                    <option value="Unavailable">Unavailable</option>
+                  </select>
+                </div>
 
-          {/* Allergen */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Allergen</label>
-            <input
-              type="text"
-              className="w-full border rounded px-3 py-2"
-              placeholder="e.g. Chicken, Nuts"
-              value={newItem.allergens || ''}
-              onChange={(e) => setNewItem({ ...newItem, allergens: e.target.value })}
-            />
-          </div>
+                {/* Allergen */}
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Allergen</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="e.g. Chicken, Nuts"
+                    value={newItem.allergens || ''}
+                    onChange={(e) => setNewItem({ ...newItem, allergens: e.target.value })}
+                  />
+                </div>
 
         {/* Upload Image */}
 <div className="col-span-2">
@@ -185,7 +198,6 @@ export default function EditItemModal({
       </p>
     </label>
 
-    {/* ✅ Preview existing or uploaded image */}
     {(imagePreview || newItem.image) && (
       <div className="mt-4">
         <img
@@ -197,26 +209,26 @@ export default function EditItemModal({
     )}
   </div>
 </div>
+</div> {/* ✅ Close the .grid form layout here */}
 
 
+{/* ✅ Now place the buttons OUTSIDE the grid */}
+<div className="flex justify-end gap-3 mt-6 pr-6 pb-6">
+  <button
+    onClick={onClose}
+    className="px-6 py-2 bg-black text-white rounded-full font-semibold"
+  >
+    Cancel
+  </button>
+  <button
+    onClick={onSave}
+    className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full font-semibold"
+  >
+    Save
+  </button>
+</div>
 
-                 {/* Action Buttons */}
-          <div className="flex justify-end gap-3 mt-6 px-6 pb-6">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 bg-black text-white rounded-full font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSave}
-              className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black rounded-full font-semibold"
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+              </div>
+            </div>
+        );
+      }
