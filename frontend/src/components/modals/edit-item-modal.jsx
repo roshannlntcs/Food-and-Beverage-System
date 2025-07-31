@@ -69,7 +69,7 @@ export default function EditItemModal({
 
           {/* Quantity */}
           <div>
-            <label className="block text-sm font-semibold mb-1">Quantity</label>
+            <label className="block text-sm font-semibold mb-1">Stock</label>
             <input
               type="number"
               className="w-full border rounded px-3 py-2"

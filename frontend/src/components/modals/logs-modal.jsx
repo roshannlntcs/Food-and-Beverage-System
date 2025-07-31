@@ -33,7 +33,6 @@ export default function LogsModal({
                 <th className="p-2 text-left">Action</th>
                 <th className="p-2 text-left">Admin</th>
                 <th className="p-2 text-left">Product</th>
-                <th className="p-2 text-left">Field</th>
                 <th className="p-2 text-left">Stock</th>
                 <th className="p-2 text-left">Old Price</th>
                 <th className="p-2 text-left">New Price</th>
@@ -48,7 +47,6 @@ export default function LogsModal({
                   <td className="p-2">{log.action}</td>
                   <td className="p-2">{log.admin}</td>
                   <td className="p-2">{log.product}</td>
-                  <td className="p-2">{log.field}</td>
                   <td className="p-2">{log.stock}</td>
                   <td className="p-2">{log.oldPrice}</td>
                   <td className="p-2">{log.newPrice}</td>

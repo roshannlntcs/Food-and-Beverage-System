@@ -8,6 +8,8 @@ const POSMonitoring = () => {
   const [transactions, setTransactions] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   // Load transactions from localStorage
   useEffect(() => {
@@ -20,13 +22,23 @@ const POSMonitoring = () => {
     return () => window.removeEventListener("storage", loadData);
   }, []);
 
-  // Filter transactions
-  const filteredTransactions = transactions.filter(
-    (tx) =>
-      tx.transactionID.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.cashier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.method.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+ const filteredTransactions = transactions.filter((tx) => {
+  const txDate = new Date(tx.date);
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
+
+  const matchesSearch =
+    tx.transactionID.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    tx.cashier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    tx.method.toLowerCase().includes(searchQuery.toLowerCase());
+
+  const withinDateRange =
+    (!start || txDate >= start) &&
+    (!end || txDate <= end);
+
+  return matchesSearch && withinDateRange;
+});
+
 
   // Delete one transaction
   const deleteTransaction = (id) => {
@@ -52,19 +64,39 @@ const POSMonitoring = () => {
           <AdminInfo />
         </div>
 
-        {/* Search Bar */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
-            <input
-              type="text"
-              placeholder="Search Transaction, Cashier or Payment"
-              className="outline-none w-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <FaSearch className="text-gray-500" />
-          </div>
-        </div>
+        {/* Search and Date Filter Row */}
+            <div className="flex flex-wrap gap-4 items-center mb-4">
+              {/* Search Bar */}
+              <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
+                <input
+                  type="text"
+                  placeholder="Search Transaction, Cashier or Payment"
+                  className="outline-none w-full"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <FaSearch className="text-gray-500" />
+              </div>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">From:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border rounded px-2 py-1 text-sm"
+                />
+                <label className="text-sm font-medium text-gray-700">To:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border rounded px-2 py-1 text-sm"
+                />
+              </div>
+            </div>
+
 
         {/* Table */}
         <div className="border rounded-md overflow-hidden bg-white">
