@@ -1,6 +1,5 @@
 // src/utils/productData.js
-import { placeholders } from '../pages/pos/POSMain';
-
+import { placeholders, shopDetails } from "../../utils/data";
 
 export const allItemsFlat = Object.entries(placeholders).flatMap(([category, items]) =>
   items.map(item => ({
