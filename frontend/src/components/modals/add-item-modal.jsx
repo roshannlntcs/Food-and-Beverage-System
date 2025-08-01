@@ -1,13 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function AddItemModal({
   newItem,
   setNewItem,
   uniqueCategories,
   onClose,
-  onSave
+  onSave,
+  showErrorModal
 }) {
+
   const [imagePreview, setImagePreview] = useState(null);
+
+    useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (showErrorModal) {
+        if (e.key === 'Escape') {
+          e.preventDefault();         // prevent closing
+          e.stopPropagation();        // prevent bubbling to AddItemModal
+        } else if (e.key === 'Enter') {
+          e.preventDefault();         // optionally prevent form submit
+          // Let ValidationErrorModal handle Enter
+        }
+      } else {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onClose();                  // only close if no error modal
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          onSave();                   // only save if no error modal
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose, onSave, showErrorModal]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

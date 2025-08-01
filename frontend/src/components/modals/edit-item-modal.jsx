@@ -9,7 +9,21 @@ export default function EditItemModal({
 }) {
 
   const [imagePreview, setImagePreview] = React.useState(null);
+  React.useEffect(() => {
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); 
+      onSave();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
 
+  window.addEventListener('keydown', handleKeyDown);
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+  };
+}, [onSave, onClose]);
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">

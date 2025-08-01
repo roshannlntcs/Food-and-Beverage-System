@@ -16,13 +16,6 @@ const VoidLogs = () => {
     item.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const clearVoidLogs = () => {
-    if (window.confirm("Are you sure you want to clear all void logs?")) {
-      localStorage.removeItem("voidLogs");
-      setVoidLogs([]);
-    }
-  };
-
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
@@ -102,15 +95,7 @@ const VoidLogs = () => {
           </div>
         </div>
 
-        {/* Clear Button */}
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={clearVoidLogs}
-            className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded shadow"
-          >
-            Clear Void Logs
-          </button>
-        </div>
+        
       </div>
     </div>
   );

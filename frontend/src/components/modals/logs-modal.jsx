@@ -69,7 +69,7 @@ export default function LogsModal({
         <div className="mt-4 text-right">
           <button
             onClick={onClose}
-            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-full"
           >
             Close
           </button>

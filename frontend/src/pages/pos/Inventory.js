@@ -8,7 +8,7 @@ import LogsModal from '../../components/modals/logs-modal';
 import CategoryFilterModal from '../../components/modals/category-filter-modal';
 import { allItemsFlat } from '../../utils/data';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
-
+import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
 
 
 
@@ -29,17 +29,22 @@ export default function Inventory() {
   });
   const [filterDate, setFilterDate] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isEditSuccess, setIsEditSuccess] = useState(false);
 
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const uniqueCategories = [...new Set(inventory.map(item => item.category))];
 
   const filteredInventory = inventory.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (selectedCategory === '' || item.category === selectedCategory)
+  item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+  (selectedCategory === '' || item.category === selectedCategory) &&
+  (selectedStatus === '' || item.status === selectedStatus)
   );
+
 
   const filteredLogs = logs.filter(log =>
     !filterDate || log.datetime.startsWith(filterDate)
@@ -57,36 +62,47 @@ export default function Inventory() {
   };
 
   const handleAddItem = () => {
-    const newItemData = {
-      ...newItem,
-      price: parseFloat(newItem.price),
-      quantity: parseInt(newItem.quantity),
-      sizes: newItem.sizes || []
-    };
+  if (!newItem.name || !newItem.category || newItem.price === '' || newItem.quantity === '') {
+    setErrorMessage('Please fill out all required fields: Name, Category, Price, and Quantity.');
+    setShowErrorModal(true);
+    return;
+  }
 
-    setInventory([...inventory, newItemData]);
-    setLogs([
-      ...logs,
-      {
-        datetime: formatDateTime(),
-        action: "Add",
-        admin: adminName,
-        product: newItemData.name,
-        field: "New Product",
-        stock: `${newItemData.quantity} pcs`,
-        oldPrice: "",
-        newPrice: `₱${newItemData.price}`,
-        category: newItemData.category,
-        detail: `Added new item: ${newItemData.name}`
-      }
-    ]);
+  const price = parseFloat(newItem.price);
+  const quantity = parseInt(newItem.quantity);
 
-    setShowAddModal(false);
-    setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available', sizes: [] });
+  if (isNaN(price) || isNaN(quantity)) {
+    setErrorMessage('Invalid value for price or stock.');
+    setShowErrorModal(true);
+    return;
+  }
 
-    setIsEditSuccess(false);
-    setShowSaveModal(true);
+  const newItemData = {
+    ...newItem,
+    price,
+    quantity,
+    sizes: newItem.sizes || [],
   };
+
+  setInventory([...inventory, newItemData]);
+  setLogs([...logs, {
+    datetime: formatDateTime(),
+    action: "Add",
+    admin: adminName,
+    product: newItemData.name,
+    field: "New Product",
+    stock: `${newItemData.quantity} pcs`,
+    oldPrice: "",
+    newPrice: `₱${newItemData.price}`,
+    category: newItemData.category,
+    detail: `Added new item: ${newItemData.name}`
+  }]);
+
+  setShowAddModal(false);
+  setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available', sizes: [] });
+  setIsEditSuccess(false);
+  setShowSaveModal(true);
+};
 
   const handleEditItem = () => {
     const updated = [...inventory];
@@ -216,7 +232,7 @@ setShowSaveModal(true);
               setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' });
               setShowAddModal(true);
             }}
-            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500"
+            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
           >
             + Add Item
           </button>
@@ -258,7 +274,29 @@ setShowSaveModal(true);
                   <th className="p-3">Description</th>
                   <th className="p-3">Sizes</th>
                   <th className="p-3 text-center">Stock</th>
-                  <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-white font-semibold">Status</span>
+                      <div className="relative inline-block">
+                        <select
+                          value={selectedStatus}
+                          onChange={(e) => setSelectedStatus(e.target.value)}
+                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+                          style={{ width: '24px' }}
+                        >
+                          <option value="">All</option>
+                          <option value="Available">Available</option>
+                          <option value="Unavailable">Unavailable</option>
+                        </select>
+                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </th>
+
                   <th className="p-3 text-center">Edit</th>
                 </tr>
               </thead>
@@ -332,7 +370,7 @@ setShowSaveModal(true);
         <div className="mt-4 flex justify-end">
           <button
             onClick={() => setShowLogsModal(true)}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500"
+            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full"
           >
             View Logs
           </button>
@@ -384,6 +422,13 @@ setShowSaveModal(true);
               isEdit={isEditSuccess}
             />
           )}
+          {showErrorModal && (
+            <ValidationErrorModal
+              message={errorMessage}
+              onClose={() => setShowErrorModal(false)}
+            />
+          )}
+
 
       </div>
     </div>

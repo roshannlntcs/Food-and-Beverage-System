@@ -117,7 +117,7 @@ Status: ${supplier.status}`,
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500"
+            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
           >
             + Add Supplier
           </button>
@@ -189,7 +189,7 @@ Status: ${supplier.status}`,
         <div className="mt-4 flex justify-end">
           <button
             onClick={() => setShowLogsModal(true)}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500"
+            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full  "
           >
             View Logs
           </button>

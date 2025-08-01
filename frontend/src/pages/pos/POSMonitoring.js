@@ -47,13 +47,7 @@ const POSMonitoring = () => {
     localStorage.setItem("transactions", JSON.stringify(updated));
   };
 
-  // Clear all transactions
-  const clearTransactions = () => {
-    if (window.confirm("Are you sure you want to clear all transactions?")) {
-      localStorage.removeItem("transactions");
-      setTransactions([]);
-    }
-  };
+ 
 
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
@@ -158,14 +152,8 @@ const POSMonitoring = () => {
         {/* Buttons Below Table */}
         <div className="mt-4 flex justify-end space-x-2">
           <button
-            onClick={clearTransactions}
-            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow"
-          >
-            Clear All Transactions
-          </button>
-          <button
             onClick={() => navigate("/pos/sales-report")}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500"
+            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full"
           >
             View Sales Reports
           </button>
