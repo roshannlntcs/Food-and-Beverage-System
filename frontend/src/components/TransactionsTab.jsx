@@ -77,9 +77,6 @@ export default function TransactionsPanel({
                       <div className="text-xs text-gray-600">
                         TRN ID: {vl.txId}
                       </div>
-                      <div className="text-xs">
-                        Items: {(vl.voidedItems || []).join(", ")}
-                      </div>
                     </span>
                   </div>
                   {vl.fullyVoided && (

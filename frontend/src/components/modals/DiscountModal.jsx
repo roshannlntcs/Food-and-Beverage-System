@@ -1,5 +1,6 @@
 // src/components/modals/DiscountModal.jsx
 import React, { useState, useEffect } from "react";
+import ModalWrapper from "../ModalWrapper";
 
 export default function DiscountModal({
   isOpen,
@@ -35,8 +36,7 @@ export default function DiscountModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-40">
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-96">
+    <ModalWrapper isOpen={isOpen} onClose={onClose} className="w-96 text-center">
         <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
         <div className="space-y-2 mb-4">
           {[
@@ -59,7 +59,7 @@ export default function DiscountModal({
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm mb-1">Coupon Code</label>
+          <label className="align-justify block text-sm mb-1">Coupon Code</label>
           <input
             type="text"
             value={couponCode}
@@ -89,7 +89,6 @@ export default function DiscountModal({
             Apply
           </button>
         </div>
-      </div>
-    </div>
+        </ModalWrapper>
   );
 }

@@ -25,6 +25,7 @@ import HistoryModal from "../../components/modals/HistoryModal";
 import ProfileModal from "../../components/modals/ProfileModal";
 import TransactionDetailModal from "../../components/modals/TransactionDetailModal";
 import OrderDetailModal from "../../components/modals/OrderDetailModal";
+import VoidDetailModal from "../../components/modals/VoidDetailModal";
 
 // ─── Utilities ──
 import { placeholders, shopDetails } from "../../utils/data";
@@ -74,6 +75,10 @@ export default function POSMain() {
 
   const [showVoidPassword, setShowVoidPassword] = useState(false);
   const [voidPasswordInput, setVoidPasswordInput] = useState("");
+  const [voidReason, setVoidReason] = useState("");
+
+  const [showVoidDetailModal, setShowVoidDetailModal] = useState(false);
+  const [selectedVoidLog, setSelectedVoidLog] = useState(null);
 
   const [voidContext, setVoidContext] = useState({ type: null, index: null });
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -170,7 +175,6 @@ const applyCartItemChanges = () => {
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - discountAmt).toFixed(2);
 
-  
 
   const addToCart = () => {
     const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
@@ -257,114 +261,136 @@ const processTransaction = () => {
     setShowVoidPassword(true);
   };
 
-  const confirmVoid = () => {
-  if (voidPasswordInput !== basePassword) {
-    alert("Wrong password");
-    return;
-  }
-
-  const { type, tx, index } = voidContext;
-    
-   // Update Transactions
-  setTransactions(prev =>
-    prev.map(t => {
-      if (t.id !== tx.id) return t;
-
-      const updatedItems = t.items.map((it, idx) =>
-        (type === "transaction" || idx === index)
-          ? { ...it, voided: true }
-          : it
-      );
-
-      const subtotal = updatedItems
-        .filter(it => !it.voided)
-        .reduce((sum, it) => {
-          const base = it.price;
-          const sizeUp = it.size.price;
-          const addons = (it.selectedAddons || []).reduce((a, x) => a + x.price, 0);
-          return sum + (base + sizeUp + addons) * it.quantity;
-        }, 0);
-
-      const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
-      const tax = +(subtotal * 0.12).toFixed(2);
-      const total = +(subtotal + tax - discountAmt).toFixed(2);
-
-      return {
-        ...t,
-        items: updatedItems,
-        voided: type === "transaction" ? true : t.voided,
-        subtotal,
-        discountAmt,
-        tax,
-        total,
-      };
-    })
-  );
+  const confirmVoid = (reason = "No reason provided") => {
+    const { type, tx, index } = voidContext;
+    if (!tx) return;
   
-      // Update Orders
-  setOrders(prev =>
-    prev.map(order => {
-      if (order.transactionID !== tx.transactionID) return order;
-
-      if (type === "transaction") {
+    // Update Transactions
+    setTransactions(prev =>
+      prev.map(t => {
+        if (t.id !== tx.id) return t;
+  
+        const updatedItems = t.items.map((it, idx) =>
+          (type === "transaction" || idx === index)
+            ? { ...it, voided: true }
+            : it
+        );
+  
+        const subtotal = updatedItems
+          .filter(it => !it.voided)
+          .reduce((sum, it) => {
+            const base = typeof it.price === "number" ? it.price : 0;
+            const sizeUp = it.size?.price || 0;
+            const addons = (it.selectedAddons || []).reduce((a, x) => a + (x.price || 0), 0);
+            return sum + (base + sizeUp + addons) * it.quantity;
+          }, 0);
+  
+        const discountAmt = +(subtotal * (t.discountPct / 100)).toFixed(2);
+        const tax = +(subtotal * 0.12).toFixed(2);
+        const total = +(subtotal + tax - discountAmt).toFixed(2);
+  
         return {
-          ...order,
-          voided: true,
-          items: order.items.map(it => ({ ...it, voided: true })),
+          ...t,
+          items: updatedItems,
+          voided: type === "transaction" ? true : t.voided,
+          subtotal,
+          discountAmt,
+          tax,
+          total,
         };
-      } else {
-        const updatedItems = order.items.map((it, idx) => {
-          const txItem = tx.items[index];
-          const isMatch =
-            it.name === txItem.name &&
-            it.size.label === txItem.size.label &&
-            it.price === txItem.price &&
-            !it.voided;
-          return isMatch ? { ...it, voided: true } : it;
-        });
-        return { ...order, items: updatedItems };
-      }
-    })
-  );
+      })
+    );
   
-setVoidLogs(prev => {
-  // Always fetch latest saved logs to avoid re-adding cleared ones
-  const existingLogs = JSON.parse(localStorage.getItem("voidLogs") || "[]");
-
-  const existing = existingLogs.find(v => v.txId === tx.id);
-  const newVoidedItems = type === "transaction"
-    ? tx.items.map(i => i.name)
-    : [...(existing?.voidedItems || []), tx.items[index].name];
-
-  const newLog = {
-    voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
-    txId: tx.id,
-    transactionId: tx.transactionID,
-    cashier: userName,
-    manager: "Admin", // change to logged in manager if you have one
-    reason: type === "transaction" ? "Full transaction void" : `Item void: ${tx.items[index].name}`,
-    dateTime: new Date().toLocaleString(),
-    voidedItems: Array.from(new Set(newVoidedItems))
+    // Update Orders
+    setOrders(prev =>
+      prev.map(order => {
+        if (order.transactionID !== tx.transactionID) return order;
+  
+        if (type === "transaction") {
+          return {
+            ...order,
+            voided: true,
+            items: order.items.map(it => ({ ...it, voided: true })),
+          };
+        } else {
+          const updatedItems = order.items.map((it, idx) => {
+            const txItem = tx.items[index];
+            const isMatch =
+              it.name === txItem.name &&
+              it.size?.label === txItem.size?.label &&
+              it.price === txItem.price &&
+              !it.voided;
+            return isMatch ? { ...it, voided: true } : it;
+          });
+          return { ...order, items: updatedItems };
+        }
+      })
+    );
+  
+    // Update Void Logs
+    setVoidLogs(prev => {
+      const existingLogs = JSON.parse(localStorage.getItem("voidLogs") || "[]");
+      const existing = existingLogs.find(v => v.txId === tx.id);
+  
+      const newVoidedItem = { ...tx.items[index] }; // full copy
+  
+      // Build the full array of voided items (with full details)
+      const newVoidedDetailed =
+        type === "transaction"
+          ? tx.items.map(it => ({ ...it }))
+          : [...(existing?.voidedItemsDetailed || []), newVoidedItem];
+  
+      // Deduplicate voidedItems by key
+      const uniqueDetailedItems = Array.from(
+        new Map(
+          newVoidedDetailed.map(it => {
+            const key = `${it.name}-${it.size?.label || "N/A"}-${it.notes || ""}-${(it.selectedAddons || []).map(a => a.label).join(",")}`;
+            return [key, it];
+          })
+        ).values()
+      );
+  
+      // Item name list (for compact viewing)
+      const voidedItemNames = uniqueDetailedItems.map(i => i.name);
+  
+      const newLog = {
+        voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
+        txId: tx.id,
+        transactionId: tx.transactionID,
+        cashier: userName,
+        manager: "Admin",
+        reason: reason || "No reason provided",
+        dateTime: new Date().toLocaleString(),
+        type: type === "transaction" ? "Full Transaction Void" : "Item Void",
+        voidedItems: Array.from(new Set(voidedItemNames)),
+        voidedItemsDetailed: uniqueDetailedItems,
+      };
+  
+      const updatedLogs = existing
+        ? existingLogs.map(v => (v.txId === tx.id ? newLog : v))
+        : [newLog, ...existingLogs];
+  
+      localStorage.setItem("voidLogs", JSON.stringify(updatedLogs));
+      return updatedLogs;
+    });
+  
+    // Reset
+    setShowVoidPassword(false);
+    setShowHistoryModal(false);
+    setVoidContext(null);
+    setVoidPasswordInput("");
+    setVoidReason("");
   };
+  
 
-  const updatedLogs = existing
-    ? existingLogs.map(v => v.txId === tx.id ? newLog : v)
-    : [newLog, ...existingLogs]; // prepend new
-
-  localStorage.setItem("voidLogs", JSON.stringify(updatedLogs));
-  return updatedLogs;
-});
-
-  setShowVoidPassword(false);
-  setShowHistoryModal(false);
-  setVoidContext(null);
-  setVoidPasswordInput("");
-};
   useEffect(() => {
-    if (activeTab === "Discount") setShowDiscountModal(true);
+    if (activeTab === "Discount") {
+      setShowDiscountModal(true);
+      setActiveTab("Menu");
+    }
   }, [activeTab]);
 
-  return (
+return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
       {/* LEFT COLUMN */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -389,10 +415,15 @@ setVoidLogs(prev => {
                 <TabsPanel
                 activeTab={activeTab}
                 onTabSelect={(key) => {
-                  setActiveTab(key);
-                  setSearchTerm("");
-                 }}
-                 />
+                   // If they clicked “Discount,” just open the modal
+                   if (key === "Discount") {
+                    setShowDiscountModal(true);
+                    return;}
+                    // Otherwise, switch tabs as normal
+                    setActiveTab(key);
+                    setSearchTerm("");
+                    }}
+                    />
                  {/* TAB CONTENT */}
                  <div className="flex-1 flex overflow-hidden">
                   {/* MENU */}
@@ -423,7 +454,8 @@ setVoidLogs(prev => {
                     setHistoryContext({ type: "detail", tx })
                   }
                   // optionally, if you need clicks on void logs:
-                  onVoidSelect={(vl) => { /* handle it if needed */ }}
+                  onVoidSelect={(vl) => { setSelectedVoidLog(vl);
+                    setShowVoidDetailModal(true); }}
                   />
                   )}
                   {/* ─── Transaction Detail Popup ─── */}
@@ -435,32 +467,19 @@ setVoidLogs(prev => {
                   )}
                   {/* Items Availability */}
                   {activeTab === "Items" && (
-  <ItemsTab
-    placeholders={placeholders}
-    activeCategory={activeCategory}
-    searchTerm={searchTerm}
-    itemAvailability={itemAvailability}
-    setItemAvailability={setItemAvailability}
-  />
-)}
-
-
-{/* DISCOUNT */}
-{activeTab==="Discount" && (
-<div className="flex-1 flex items-center justify-center">
-  <button
-  onClick={()=>setShowDiscountModal(true)}
-  className="bg-yellow-300 px-6 py-3 rounded-lg font-semibold"
-  >
-    Apply Discount
-    </button>
-    </div>
-  )}
-  </div>
-  </div>
-  </div>
-  </div>
-
+                  <ItemsTab
+                  placeholders={placeholders}
+                  activeCategory={activeCategory}
+                  searchTerm={searchTerm}
+                  itemAvailability={itemAvailability}
+                  setItemAvailability={setItemAvailability}
+                  />
+                  )}
+                  </div>
+                  </div>
+                  </div>
+                  </div>
+                  
 {/* ─── Order Details Pane ─── */}
 <CartPanel
   cart={cart}
@@ -503,20 +522,33 @@ setVoidLogs(prev => {
 
 {/* ─── Void Password Modal (as before) ─── */}
 <VoidPasswordModal
-isOpen={showVoidPassword}
-passwordValue={voidPasswordInput}
-onPasswordChange={setVoidPasswordInput}
-onClose={() => setShowVoidPassword(false)}
-onConfirm={() => {
-  if (voidPasswordInput !== basePassword) {
-    alert("Wrong password");
-    return;
-  }
-  confirmVoid();
-  setShowVoidPassword(false);
-  setVoidPasswordInput("");
+  isOpen={showVoidPassword}
+  passwordValue={voidPasswordInput}
+  onPasswordChange={setVoidPasswordInput}
+  onClose={() => {
+    setShowVoidPassword(false);
+    setVoidPasswordInput("");
+  }}
+  onConfirm={(passwordEntered, reasonEntered) => {
+    if (passwordEntered !== basePassword) {
+      alert("Wrong password");
+      return;
+   }
+    confirmVoid(reasonEntered);
   }}
 />
+
+{/* ─── Void Detail Modal ─── */}
+{showVoidDetailModal && selectedVoidLog && (
+  <VoidDetailModal
+    voidLog={selectedVoidLog}
+    onClose={() => {
+      setShowVoidDetailModal(false);
+      setSelectedVoidLog(null);
+    }}
+  />
+)}
+
 
 {/* ITEM MODAL */}
 <ItemDetailModal
@@ -552,18 +584,18 @@ onRemove={idx => {
   }}
   />
 
-   {/* DISCOUNT MODAL */}
-   <DiscountModal
-  isOpen={showDiscountModal}
-  currentType={discountType}
-  currentCoupon={couponCode}
-  onClose={() => setShowDiscountModal(false)}
-  onApply={(pct, type, coupon) => {
-    setDiscountPct(pct);
-    setDiscountType(type);
-    setCouponCode(coupon);
-  }}
-/>
+  {/* Discount Modal */}
+  <DiscountModal
+        isOpen={showDiscountModal}
+        currentType={discountType}
+        currentCoupon={couponCode}
+        onClose={() => setShowDiscountModal(false)}
+        onApply={(pct, type, coupon) => {
+          setDiscountPct(pct);
+          setDiscountType(type);
+          setCouponCode(coupon);
+        }}
+      />
 
 {/* ─── Order Success Modal ─── */}
 <OrderSuccessModal

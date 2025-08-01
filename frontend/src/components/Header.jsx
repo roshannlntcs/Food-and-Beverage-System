@@ -10,7 +10,7 @@ export default function Header({
   onSearchChange,
 }) {
   return (
-    <header className="bg-[#800000] text-white flex justify-between items-center px-6 py-4 h-20 shadow-md border-b border-gray-200 rounded-b-2xl">
+    <header className="bg-[#800000] text-white flex justify-between items-center px-6 py-4 h-20 shadow-md border-b border-gray-200">
       {/* Left: Logo + Title */}
       <div className="flex items-center space-x-3">
         <img
