@@ -6,7 +6,7 @@ import AddItemModal from '../../components/modals/add-item-modal';
 import EditItemModal from '../../components/modals/edit-item-modal';
 import LogsModal from '../../components/modals/logs-modal';
 import CategoryFilterModal from '../../components/modals/category-filter-modal';
-import { allItemsFlat } from '../../utils/productData';
+import { allItemsFlat } from '../../utils/data';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
 
 

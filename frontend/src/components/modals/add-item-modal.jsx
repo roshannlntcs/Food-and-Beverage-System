@@ -120,19 +120,7 @@ export default function AddItemModal({
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Status</label>
-            <select
-              className="w-full border rounded px-3 py-2"
-              value={newItem.status}
-              onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
-            >
-              <option value="Available">Available</option>
-              <option value="Unavailable">Unavailable</option>
-            </select>
-          </div>
-
+          
           {/* Allergen */}
           <div>
             <label className="block text-sm font-semibold mb-1">Allergen</label>

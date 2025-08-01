@@ -56,6 +56,7 @@ const VoidLogs = () => {
                   <th className="p-3">Date & Time</th>
                   <th className="p-3">Void ID</th>
                   <th className="p-3">Transaction ID</th>
+                  <th className="p-3">Type</th>
                   <th className="p-3">Voided Items</th>
                   <th className="p-3 text-center">Cashier</th>
                   <th className="p-3 text-center">Manager</th>
@@ -69,6 +70,16 @@ const VoidLogs = () => {
                       <td className="p-3">{item.dateTime}</td>
                       <td className="p-3">{item.voidId}</td>
                       <td className="p-3">{item.transactionId}</td>
+                       <td className="p-3">
+                        {item.voidType
+                          ? item.voidType 
+                          : Array.isArray(item.voidedItems) && item.totalItems
+                          ? item.voidedItems.length === item.totalItems
+                            ? "Transaction"
+                            : "Item"
+                          : "Item"}
+                      </td>
+
                       <td className="p-3">
                         {Array.isArray(item.voidedItems)
                           ? item.voidedItems.join(", ")
