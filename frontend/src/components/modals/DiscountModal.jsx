@@ -1,6 +1,5 @@
 // src/components/modals/DiscountModal.jsx
 import React, { useState, useEffect } from "react";
-import ModalWrapper from "../ModalWrapper";
 
 export default function DiscountModal({
   isOpen,
@@ -9,7 +8,6 @@ export default function DiscountModal({
   onClose,
   onApply
 }) {
-  // Hooks at the top
   const [discountType, setDiscountType] = useState(currentType || "");
   const [couponCode, setCouponCode]     = useState(currentCoupon || "");
 
@@ -36,13 +34,14 @@ export default function DiscountModal({
   };
 
   return (
-    <ModalWrapper isOpen={isOpen} onClose={onClose} className="w-96 text-center">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[1000]">
+      <div className="bg-white rounded-lg shadow-xl w-80 p-6">
         <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
         <div className="space-y-2 mb-4">
           {[
             { key: "senior", label: "Senior Citizen (20%)" },
             { key: "pwd",    label: "PWD (20%)" },
-            { key: "student",label: "Student (5%)" },
+            { key: "student",label: "Student (5%)" }
           ].map((opt) => (
             <label key={opt.key} className="flex items-center">
               <input
@@ -59,7 +58,7 @@ export default function DiscountModal({
         </div>
 
         <div className="mb-4">
-          <label className="align-justify block text-sm mb-1">Coupon Code</label>
+          <label className="block text-sm font-semibold mb-3">Coupon Code</label>
           <input
             type="text"
             value={couponCode}
@@ -71,9 +70,7 @@ export default function DiscountModal({
 
         <div className="flex justify-end space-x-4">
           <button
-            onClick={() => {
-              onClose();
-            }}
+            onClick={onClose}
             className="px-4 py-2 rounded border"
           >
             Cancel
@@ -89,6 +86,7 @@ export default function DiscountModal({
             Apply
           </button>
         </div>
-        </ModalWrapper>
+      </div>
+    </div>
   );
 }

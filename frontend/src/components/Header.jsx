@@ -33,12 +33,12 @@ export default function Header({
       {/* Right: Profile */}
       <button
         onClick={onProfileClick}
-        className="flex items-center space-x-2 bg-[#FFC72C] px-4 py-1 rounded-full shadow hover:scale-105 transition-transform duration-150"
+        className="flex items-center space-x-2 bg-[#FFC72C] px-3 py-1.5 rounded-full shadow hover:scale-105 transition-transform duration-150"
       >
         <img
           src={avatar}
           alt="Avatar"
-          className="w-8 h-8 rounded-full object-cover"
+          className="w-9 h-9 rounded-full object-cover"
         />
         <div className="text-left leading-tight">
           <div className="font-bold text-sm text-black">{userName}</div>

@@ -35,6 +35,15 @@ const importAll = (r) =>
   r.keys().reduce((acc, k) => ({ ...acc, [k.replace("./", "")]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
 
+let orderCounter = 1;
+let transactionCounter = 2;
+let voidCounter = 3;
+
+const formatID = (prefix, num) => `${prefix}-${num.toString().padStart(8, '0')}`;
+
+const generateOrderID = () => formatID("ORD", orderCounter++);
+const generateTransactionID = () => formatID("TRN", transactionCounter++);
+const generateVoidID = () => formatID("VOI", voidCounter++);
 
 export default function POSMain() {
 
@@ -55,6 +64,9 @@ export default function POSMain() {
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
+
+  const formatID = (prefix, num) => `${prefix}-${num.toString().padStart(8, '0')}`;
+
 
   useEffect(() => {
   const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
@@ -99,9 +111,6 @@ export default function POSMain() {
   const basePassword = "123456";
 
  // ID Generators ensuring uniqueness
- const generateOrderID = () => `ORD-${Date.now()}`;
- const generateTransactionID = () => `TR-${Date.now() + Math.floor(Math.random() * 1000)}`;
- const generateVoidID = () => `VOID-${Date.now() + Math.floor(Math.random() * 2000)}`;
 
   // recompute product list
   const filteredProducts = useMemo(() => {
@@ -198,9 +207,6 @@ const processTransaction = () => {
     return;
   }
 
-  const orderID = generateOrderID();
-  const transactionID = generateTransactionID();
-
   const subtotal = cart.reduce((sum, item) => {
     const base = item.price;
     const sizeUp = item.size.price;
@@ -211,6 +217,11 @@ const processTransaction = () => {
   const computedDiscountAmt = +(subtotal * (discountPct / 100)).toFixed(2);
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - computedDiscountAmt).toFixed(2);
+
+ 
+  const orderID = generateOrderID();
+  const transactionID = generateTransactionID();
+  const voidID = generateVoidID();
 
   const newTransaction = {
     id: transactionID,
@@ -354,12 +365,12 @@ const processTransaction = () => {
       const voidedItemNames = uniqueDetailedItems.map(i => i.name);
   
       const newLog = {
-        voidId: existing ? existing.voidId : `VOID-${Date.now()}`,
+        voidId: existing ? existing.voidId : generateVoidID(),
         txId: tx.id,
         transactionId: tx.transactionID,
         cashier: userName,
         manager: "Admin",
-        reason: reason || "No reason provided",
+        reason: reason || "No reason provided", 
         dateTime: new Date().toLocaleString(),
         type: type === "transaction" ? "Full Transaction Void" : "Item Void",
         voidedItems: Array.from(new Set(voidedItemNames)),
@@ -381,7 +392,6 @@ const processTransaction = () => {
     setVoidPasswordInput("");
     setVoidReason("");
   };
-  
 
   useEffect(() => {
     if (activeTab === "Discount") {
@@ -389,6 +399,16 @@ const processTransaction = () => {
       setActiveTab("Menu");
     }
   }, [activeTab]);
+
+  const updateOrderStatus = (orderID, newStatus) => {
+    setOrders(prev =>
+      prev.map(o =>
+        o.orderID === orderID
+          ? { ...o, status: newStatus }
+          : o
+      )
+    );
+  };
 
 return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
@@ -444,7 +464,12 @@ return (
                   <OrderDetailModal
                   historyContext={historyContext}
                   setHistoryContext={setHistoryContext}
-                  />)}
+                  onStatusChange={(orderID, status) =>
+                    setOrders(prev =>
+                      prev.map(o => o.orderID === orderID ? { ...o, status } : o)
+                    )
+                  }
+                />)}
                   {/* TRANSACTIONS TAB */}
                   {activeTab === "Transactions" && (
                   <TransactionsPanel

@@ -10,7 +10,7 @@ export default function HistoryModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-[32rem] max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-[28rem] max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-[#800000] px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-xl text-white font-bold">Transaction History</h2>
@@ -89,7 +89,7 @@ export default function HistoryModal({
         </div>
 
         {/* Sticky footer */}
-        <div className="px-6 py-3 border-t bg-white flex justify-end">
+        <div className="px-6 py-2 border-t bg-white flex justify-end">
           <button
             onClick={() => setShowHistoryModal(false)}
             className="px-4 py-2 rounded-lg border hover:bg-gray-100"
