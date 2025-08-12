@@ -5,9 +5,18 @@ import statusIcon from "../../assets/status.png";
 export default function OrderDetailModal({
   historyContext,
   setHistoryContext,
-  onStatusChange
+  onStatusChange,
+  orders = []   // <-- accept orders prop (default empty)
 }) {
-  const order = historyContext?.order;
+  // historyContext may hold a snapshot `order` or we may have a transactionID/orderID
+  const snapshotOrder = historyContext?.order;
+  const lookupKey = snapshotOrder?.transactionID || snapshotOrder?.orderID || historyContext?.transactionID || historyContext?.orderID;
+
+  // Try to pick fresh order from orders state; fallback to snapshot if not found
+  const order = (lookupKey && orders.length)
+    ? orders.find(o => o.transactionID === lookupKey || o.orderID === lookupKey) || snapshotOrder
+    : snapshotOrder;
+
   const [newStatus, setNewStatus] = useState(order?.status || "");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
@@ -50,7 +59,7 @@ export default function OrderDetailModal({
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white w-1/3 max-h-[85vh] rounded-xl flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-[#800000] text-white rounded-t px-4 py-2 flex justify-between items-center">
+        <div className="sticky top-0 bg-[#800000] text-white rounded-t-lg px-4 py-3 flex justify-between items-center">
           <h2 className="text-lg font-bold">{order.orderID} Details</h2>
           <div className="flex items-center space-x-2">
             <div className="relative">
@@ -98,9 +107,9 @@ export default function OrderDetailModal({
               <strong>Status:</strong>
               <span className={`ml-2 px-2 py-0.5 text-white rounded ${statusColors[newStatus]}`}>
                 {statusLabels[newStatus] || "N/A"}
-                </span>
-                </div>
-                </div>
+              </span>
+            </div>
+          </div>
 
           {/* Ordered Items by Category */}
           {Object.entries(categorizedItems).map(([category, items]) =>
@@ -113,22 +122,27 @@ export default function OrderDetailModal({
                   const addons = item.selectedAddons || [];
                   const addonLabels = addons.map(a => a.label).join(", ") || "None";
 
+                  const isVoided = !!item.voided;
+
                   return (
-                    <div key={i} className="p-3 border rounded-lg bg-gray-50 space-y-1 mb-2 hover:shadow-md transition-shadow duration-150">
+                    <div key={i} className={`p-3 border rounded-lg ${isVoided ? "bg-gray-100" : "bg-gray-50"} space-y-1 mb-2 hover:shadow-md transition-shadow duration-150`}>
                       <div className="font-semibold">
-                        {item.name}
+                        <span className={isVoided ? "line-through text-gray-500" : ""}>
+                          {item.name}
+                        </span>
+                        {isVoided && <span className="text-sm text-gray-500 ml-2">(Voided)</span>}
                       </div>
                       <div className="text-sm flex justify-between">
-                        <span>Size:</span><span>{sizeLabel}</span>
+                        <span>Size:</span><span className={isVoided ? "line-through text-gray-500" : ""}>{sizeLabel}</span>
                       </div>
                       <div className="text-sm flex justify-between">
-                        <span>Add-ons:</span><span>{addonLabels}</span>
+                        <span>Add-ons:</span><span className={isVoided ? "line-through text-gray-500" : ""}>{addonLabels}</span>
                       </div>
                       <div className="text-sm flex justify-between">
-                        <span>Quantity:</span><span>{item.quantity}</span>
+                        <span>Quantity:</span><span className={isVoided ? "line-through text-gray-500" : ""}>{item.quantity}</span>
                       </div>
                       {item.notes && (
-                        <div className="text-sm italic">Notes: {item.notes}</div>
+                        <div className={`text-sm italic ${isVoided ? "line-through text-gray-500" : ""}`}>Notes: {item.notes}</div>
                       )}
                     </div>
                   );
@@ -139,7 +153,7 @@ export default function OrderDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t bg-white flex justify-end space-x-2">
+        <div className="px-4 py-3 rounded-b-lg bg-white flex justify-end space-x-2">
           <button
             onClick={() => setHistoryContext(null)}
             className="flex-1 py-2 rounded-lg border hover:bg-gray-100"

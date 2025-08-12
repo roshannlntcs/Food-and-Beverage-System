@@ -15,28 +15,51 @@ export default function CartPanel({
   removeCartItem,
   processTransaction,
   setShowHistoryModal,
-  transactions
+  transactions,
+  customerConfirmed, // <-- existing prop
+  openCustomerView   // <-- new prop
 }) {
   return (
-    <div className="w-80 bg-[#F6F3EA] border-l border-gray-200 p-6 flex flex-col overflow-hidden shadow">
+    <div className="w-80 bg-[#F6F3EA] border-l border-gray-200 p-6 flex flex-col overflow-hidden shadow relative">
       <div className="flex-1 flex flex-col h-full">
-        {/* Title + History & Void Launcher */}
-        <div className="mb-4 flex justify-between items-center">
-          <h3 className="text-xl font-bold">Order Details</h3>
-          <button
-            onClick={() => transactions.length && setShowHistoryModal(true)}
-            disabled={!transactions.length}
-            className={`p-1 rounded ${
-              transactions.length ? "hover:bg-gray-200" : "opacity-50 cursor-not-allowed"
-            }`}
-          >
-            <img
-              src={images["void-trans.png"]}
-              alt="History & Void"
-              className="w-5 h-5"
-            />
-          </button>
-        </div>
+        {/* Title + Customer View + History & Void Launcher */}
+        {/* Title + Customer View + History */}
+<div className="mb-4 flex justify-between items-center">
+  <h3 className="text-xl font-bold">Order Details</h3>
+
+  <div className="flex items-center space-x-1">
+    {/* Customer View icon button */}
+    <button
+      onClick={() => openCustomerView && openCustomerView()}
+      className="p-1 rounded hover:bg-gray-200 transition-colors"
+      title="Customer View"
+    >
+      <img
+        src={images["cusview.png"]}
+        alt="Customer View"
+        className="w-5 h-5"
+      />
+    </button>
+
+    {/* History icon button */}
+    <button
+      onClick={() => transactions.length && setShowHistoryModal(true)}
+      disabled={!transactions.length}
+      className={`p-1 rounded ${
+        transactions.length
+          ? "hover:bg-gray-200"
+          : "opacity-50 cursor-not-allowed"
+      }`}
+      title="History"
+    >
+      <img
+        src={images["history.png"]}
+        alt="History & Void"
+        className="w-5 h-5"
+      />
+    </button>
+  </div>
+</div>
 
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto mb-4 space-y-2">
@@ -75,7 +98,7 @@ export default function CartPanel({
                         </div>
                         {item.addons.length > 0 && (
                           <div className="text-[10px] text-gray-700 truncate">
-                            Add‑ons: {item.addons.map(a => a.label).join(", ")}
+                            Add-ons: {item.addons.map(a => a.label).join(", ")}
                           </div>
                         )}
                         {item.notes && (
@@ -140,7 +163,17 @@ export default function CartPanel({
         </div>
 
         {/* Payment Method Buttons */}
-        <div className="space-y-3">
+        <div className="space-y-3 relative">
+          {/* Overlay indicator when customer hasn't confirmed */}
+          {!customerConfirmed && (
+            <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+              <div className="bg-white/80 rounded p-3 text-center w-full">
+                <div className="font-semibold">Waiting for customer confirmation</div>
+                <div className="text-sm text-gray-600">Payment options will be enabled after the customer confirms on the customer view.</div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-around">
             {[
               { key: "Cash", icon: "cash.png" },
@@ -154,11 +187,12 @@ export default function CartPanel({
                     prev === method.key ? "" : method.key
                   )
                 }
+                disabled={!customerConfirmed}
                 className={`bg-white h-16 w-16 rounded-lg flex flex-col items-center justify-center space-y-1 ${
                   paymentMethod === method.key
                     ? "bg-yellow-100 scale-105"
                     : "hover:scale-105 shadow-md transition-shadow"
-                }`}
+                } ${!customerConfirmed ? "opacity-60 cursor-not-allowed" : ""}`}
               >
                 <img
                   src={images[method.icon]}
@@ -169,9 +203,13 @@ export default function CartPanel({
               </button>
             ))}
           </div>
+
           <button
             onClick={processTransaction}
-            className="w-full bg-red-800 text-white py-2 rounded-lg font-semibold text-sm"
+            disabled={!customerConfirmed}
+            className={`w-full py-2 rounded-lg font-semibold text-sm ${
+              customerConfirmed ? "bg-red-800 text-white" : "bg-gray-300 text-gray-600 cursor-not-allowed"
+            }`}
           >
             Process Transaction
           </button>
