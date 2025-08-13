@@ -15,19 +15,18 @@ export default function AddItemModal({
     const handleKeyDown = (e) => {
       if (showErrorModal) {
         if (e.key === 'Escape') {
-          e.preventDefault();         // prevent closing
-          e.stopPropagation();        // prevent bubbling to AddItemModal
+          e.preventDefault();         
+          e.stopPropagation();        
         } else if (e.key === 'Enter') {
-          e.preventDefault();         // optionally prevent form submit
-          // Let ValidationErrorModal handle Enter
+          e.preventDefault();         
         }
       } else {
         if (e.key === 'Escape') {
           e.preventDefault();
-          onClose();                  // only close if no error modal
+          onClose();                  
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          onSave();                   // only save if no error modal
+          onSave();                   
         }
       }
     };
