@@ -63,7 +63,7 @@ export default function TransactionsPanel({
     {/* ─── Transactions Panel ──────────────────────────────── */}
     <div className="flex-1 flex flex-col relative" ref={txFilterRef}>
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-bold">Transactions</h2>
+        <h2 className="text-lg font-bold">Transaction Log</h2>
             <button
               onClick={() => setShowTxFilter(v => !v)}
               className="p-1 hover:bg-gray-200 rounded"

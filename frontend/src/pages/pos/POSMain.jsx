@@ -1,4 +1,4 @@
-// src/POSMain.jsx
+// src/pages/pos/POSMain.jsx
 // ─── React & Router ────
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +26,11 @@ import ProfileModal from "../../components/modals/ProfileModal";
 import TransactionDetailModal from "../../components/modals/TransactionDetailModal";
 import OrderDetailModal from "../../components/modals/OrderDetailModal";
 import VoidDetailModal from "../../components/modals/VoidDetailModal";
+
+// ─── Payment Modals (new) ───
+import CashPaymentModal from "../../components/modals/CashPaymentModal";
+import CardPaymentModal from "../../components/modals/CardPaymentModal";
+import QRSPaymentModal from "../../components/modals/QRSPaymentModal";
 
 // ─── Utilities ──
 import { placeholders, shopDetails } from "../../utils/data";
@@ -140,6 +145,12 @@ export default function POSMain() {
   const customerWinRef = React.useRef(null);
   const bcRef = React.useRef(null);
   const [customerConfirmed, setCustomerConfirmed] = useState(false);
+
+  // Payment modal states
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [lastPaymentInfo, setLastPaymentInfo] = useState(null);
 
   // ID Generators ensuring uniqueness
 
@@ -299,37 +310,51 @@ export default function POSMain() {
     broadcastCart({ cart, subtotal, tax, total, discountPct });
   }, [cart, subtotal, tax, total, discountPct]);
 
-  // Handle processing a transaction
-  const processTransaction = () => {
-    // block processing if customer hasn't confirmed
+  // PAYMENT FLOW
+  // Called when user clicks "Proceed to Payment" in CartPanel
+  const initiatePayment = () => {
     if (!customerConfirmed) {
-      alert("Waiting for customer confirmation. Please ask the customer to confirm the order.");
+      alert("Waiting for customer confirmation.");
+      return;
+    }
+    if (!paymentMethod) {
+      alert("Please choose a payment method first.");
       return;
     }
 
+    if (paymentMethod === "Cash") {
+      setShowCashModal(true);
+    } else if (paymentMethod === "Card") {
+      setShowCardModal(true);
+    } else if (paymentMethod === "QRS") {
+      setShowQRModal(true);
+    } else {
+      alert("Unknown payment method.");
+    }
+  };
+
+  // Finalizes transaction: persists transaction & order and clears cart
+  const finalizeTransaction = (paymentInfo = {}) => {
+    // paymentInfo: { method: "Cash"|"Card"|"QRS", tendered?, change?, cardNumberMasked?, authCode?, reference?, payload? }
     if (cart.length === 0) {
       alert("Cart is empty.");
       return;
     }
-    if (!paymentMethod) {
-      alert("Please select a payment method before processing the transaction.");
-      return;
-    }
 
+    // recompute to be safe
     const subtotalCalc = cart.reduce((sum, item) => {
-      const base = item.price;
-      const sizeUp = item.size.price;
-      const addons = (item.selectedAddons || []).reduce((a, x) => a + x.price, 0);
-      return sum + (base + sizeUp + addons) * item.quantity;
+      const base = item.price ?? 0;
+      const sizeUp = item.size?.price ?? 0;
+      const addons = (item.selectedAddons || []).reduce((a, x) => a + (x.price || 0), 0);
+      return sum + (base + sizeUp + addons) * (item.quantity || 1);
     }, 0);
 
     const computedDiscountAmt = +(subtotalCalc * (discountPct / 100)).toFixed(2);
     const taxCalc = +(subtotalCalc * 0.12).toFixed(2);
     const totalCalc = +(subtotalCalc + taxCalc - computedDiscountAmt).toFixed(2);
 
-    const orderID       = generateOrderID();        // -> "ORD-1XXXXXXX"
-    const transactionID = generateTransactionID();  // -> "TRN-2XXXXXXX"
-    const voidID        = generateVoidID();         // -> "VOI-3XXXXXXX"
+    const orderID = generateOrderID();
+    const transactionID = generateTransactionID();
 
     const newTransaction = {
       id: transactionID,
@@ -341,18 +366,17 @@ export default function POSMain() {
       discountAmt: computedDiscountAmt,
       tax: taxCalc,
       total: totalCalc,
-      method: paymentMethod || "N/A",
+      method: paymentInfo.method || paymentMethod || "N/A",
+      paymentDetails: paymentInfo,
       cashier: userName || "N/A",
       date: new Date().toLocaleString(),
       voided: false,
     };
 
-    // ✅ Add new transaction to localStorage
+    // Save transactions (prepend)
     const existing = JSON.parse(localStorage.getItem("transactions") || "[]");
     const updatedTransactions = [newTransaction, ...existing];
     localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
-
-    // Update state for this session
     setTransactions(updatedTransactions);
 
     const newOrder = {
@@ -363,23 +387,26 @@ export default function POSMain() {
       status: "pending",
       date: new Date().toLocaleString(),
     };
-    
-    // persist new order immediately so confirmVoid() can read + update it later
+
     const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]");
     const updatedOrders = [newOrder, ...existingOrders];
     localStorage.setItem("orders", JSON.stringify(updatedOrders));
     setOrders(updatedOrders);
+
+    // Clear cart & reset relevant UI
     setCart([]);
     setPaymentMethod("");
     setShowOrderSuccess(true);
-
-    // Reset discounts for the next transaction
-    setDiscountType("");
-    setDiscountPct(0);
-    setCouponCode("");
-
-    // reset confirmation for next order
+    setLastPaymentInfo(paymentInfo);
     setCustomerConfirmed(false);
+
+    // set selected transaction for immediate receipt print if needed
+    setSelectedTransaction(newTransaction);
+
+    // close modals
+    setShowCashModal(false);
+    setShowCardModal(false);
+    setShowQRModal(false);
   };
 
   const triggerVoid = (type, idx = null) => {
@@ -542,6 +569,65 @@ export default function POSMain() {
     );
   };
 
+  //
+  // --- Minimal in-app QR payload scanner & storage listener (for tests) ---
+  //
+
+  // manual scan helper: read payload from localStorage key 'pos_qr_payload'
+  // NOTE: For this to work automatically, ensure your QR modal writes the JSON payload
+  // into localStorage under the key 'pos_qr_payload' when generating the QR payload.
+  // Example to add inside QRSPaymentModal (where payload is created):
+  //   localStorage.setItem('pos_qr_payload', JSON.stringify(payload));
+  //
+  const scanQRPayloadFromLocalStorage = (autoConfirm = false) => {
+    const raw = localStorage.getItem('pos_qr_payload');
+    if (!raw) {
+      alert("No QR payload found in localStorage (key: pos_qr_payload).");
+      return null;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      alert("Invalid QR payload in localStorage.");
+      return null;
+    }
+
+    // By default, prompt cashier to confirm simulated scan action
+    if (!autoConfirm) {
+      const ok = window.confirm(`QR payload found (ref: ${parsed.txRef || parsed.reference || "N/A"}). Simulate 'scanned+paid' and finalize payment?`);
+      if (!ok) return null;
+    }
+
+    // finalize payment with QRS method and include payload
+    finalizeTransaction({ method: "QRS", reference: parsed.txRef || parsed.reference, payload: parsed });
+    return parsed;
+  };
+
+  // Listen for storage events from other windows (customer view or tests)
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'pos_qr_payload' && e.newValue) {
+        // auto prompt when another window writes the payload
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const proceed = window.confirm(`QR payload written by another window (ref: ${parsed.txRef || parsed.reference || "N/A"}). Finalize payment?`);
+          if (proceed) {
+            finalizeTransaction({ method: "QRS", reference: parsed.txRef || parsed.reference, payload: parsed });
+          }
+        } catch (err) {
+          // ignore parse errors
+        }
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [cart, paymentMethod, discountPct]);
+
+  //
+  // --- End scanner & listeners
+  //
+
   return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
       {/* LEFT COLUMN */}
@@ -653,12 +739,24 @@ export default function POSMain() {
         setPaymentMethod={setPaymentMethod}
         openEditModal={openEditModal}
         removeCartItem={removeCartItem}
-        processTransaction={processTransaction}
+        // start payment flow
+        initiatePayment={initiatePayment}
         setShowHistoryModal={setShowHistoryModal}
         transactions={transactions}
         customerConfirmed={customerConfirmed}
         openCustomerView={openCustomerView}
       />
+
+      {/* Small floating 'Scan QR payload' helper (useful for tests / scanning QR payload) */}
+      <div className="fixed left-4 bottom-6 z-50">
+        <button
+          onClick={() => scanQRPayloadFromLocalStorage(false)}
+          className="px-3 py-2 rounded shadow bg-indigo-600 text-white text-sm hover:bg-indigo-700"
+          title="Read QR payload from localStorage (key: pos_qr_payload) and simulate payment"
+        >
+          Scan QR payload
+        </button>
+      </div>
 
       {/* ─── History & Void Modal (z-50) ─── */}
       {showHistoryModal && (
@@ -760,13 +858,54 @@ export default function POSMain() {
         }}
       />
 
+      {/* Payment Modals */}
+      <CashPaymentModal
+        isOpen={showCashModal}
+        total={total}
+        onClose={() => setShowCashModal(false)}
+        onSuccess={(paymentInfo) => {
+          // paymentInfo: { method: "Cash", tendered, change }
+          finalizeTransaction(paymentInfo);
+        }}
+      />
+
+      <CardPaymentModal
+        isOpen={showCardModal}
+        total={total}
+        onClose={() => setShowCardModal(false)}
+        onSuccess={(paymentInfo) => {
+          // paymentInfo: { method: "Card", cardNumberMasked, authCode }
+          finalizeTransaction(paymentInfo);
+        }}
+        onFailure={(info) => {
+          alert("Card payment failed: " + (info?.reason || "Unknown"));
+        }}
+      />
+
+      <QRSPaymentModal
+        isOpen={showQRModal}
+        total={total}
+        onClose={() => setShowQRModal(false)}
+        onSuccess={(paymentInfo) => {
+          // paymentInfo: { method: "QRS", reference, payload? }
+          finalizeTransaction(paymentInfo);
+        }}
+      />
+
       {/* ─── Order Success Modal ─── */}
       <OrderSuccessModal
         show={showOrderSuccess}
+        paymentSummary={lastPaymentInfo} // <-- pass payment summary (tendered/change/authCode/reference/payload)
         onClose={() => setShowOrderSuccess(false)}
         onPrintReceipt={() => {
-          setSelectedTransaction(transactions[0]); // ✅ Use existing transaction
-          setShowReceiptModal(true);
+          // prefer explicit selectedTransaction, fallback to transactions[0]
+          const tx = selectedTransaction || transactions[0];
+          if (tx) {
+            setSelectedTransaction(tx);
+            setShowReceiptModal(true);
+          } else {
+            alert("No transaction available to print.");
+          }
           setShowOrderSuccess(false);
         }}
       />

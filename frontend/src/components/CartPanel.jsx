@@ -13,53 +13,51 @@ export default function CartPanel({
   setPaymentMethod,
   openEditModal,
   removeCartItem,
-  processTransaction,
+  // processTransaction was the old prop - now we call initiatePayment
+  initiatePayment,
   setShowHistoryModal,
   transactions,
-  customerConfirmed, // <-- existing prop
-  openCustomerView   // <-- new prop
+  customerConfirmed,
+  openCustomerView
 }) {
   return (
     <div className="w-80 bg-[#F6F3EA] border-l border-gray-200 p-6 flex flex-col overflow-hidden shadow relative">
       <div className="flex-1 flex flex-col h-full">
-        {/* Title + Customer View + History & Void Launcher */}
-        {/* Title + Customer View + History */}
-<div className="mb-4 flex justify-between items-center">
-  <h3 className="text-xl font-bold">Order Details</h3>
+        {/* Title + right-side icon buttons */}
+        <div className="mb-4 flex justify-between items-center">
+          <h3 className="text-xl font-bold">Order Details</h3>
 
-  <div className="flex items-center space-x-1">
-    {/* Customer View icon button */}
-    <button
-      onClick={() => openCustomerView && openCustomerView()}
-      className="p-1 rounded hover:bg-gray-200 transition-colors"
-      title="Customer View"
-    >
-      <img
-        src={images["cusview.png"]}
-        alt="Customer View"
-        className="w-5 h-5"
-      />
-    </button>
+          <div className="flex items-center space-x-2">
+            {/* Customer View icon button */}
+            <button
+              onClick={() => openCustomerView && openCustomerView()}
+              className="p-1 rounded hover:bg-gray-200 transition-colors"
+              title="Customer View"
+            >
+              <img
+                src={images["cusview.png"]}
+                alt="Customer View"
+                className="w-5 h-5"
+              />
+            </button>
 
-    {/* History icon button */}
-    <button
-      onClick={() => transactions.length && setShowHistoryModal(true)}
-      disabled={!transactions.length}
-      className={`p-1 rounded ${
-        transactions.length
-          ? "hover:bg-gray-200"
-          : "opacity-50 cursor-not-allowed"
-      }`}
-      title="History"
-    >
-      <img
-        src={images["history.png"]}
-        alt="History & Void"
-        className="w-5 h-5"
-      />
-    </button>
-  </div>
-</div>
+            {/* History icon button */}
+            <button
+              onClick={() => transactions.length && setShowHistoryModal(true)}
+              disabled={!transactions.length}
+              className={`p-1 rounded ${
+                transactions.length ? "hover:bg-gray-200" : "opacity-50 cursor-not-allowed"
+              }`}
+              title="History"
+            >
+              <img
+                src={images["history.png"]}
+                alt="History & Void"
+                className="w-5 h-5"
+              />
+            </button>
+          </div>
+        </div>
 
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto mb-4 space-y-2">
@@ -193,6 +191,7 @@ export default function CartPanel({
                     ? "bg-yellow-100 scale-105"
                     : "hover:scale-105 shadow-md transition-shadow"
                 } ${!customerConfirmed ? "opacity-60 cursor-not-allowed" : ""}`}
+                title={method.key}
               >
                 <img
                   src={images[method.icon]}
@@ -205,13 +204,14 @@ export default function CartPanel({
           </div>
 
           <button
-            onClick={processTransaction}
-            disabled={!customerConfirmed}
+            onClick={() => initiatePayment && initiatePayment()}
+            disabled={!customerConfirmed || !paymentMethod}
             className={`w-full py-2 rounded-lg font-semibold text-sm ${
-              customerConfirmed ? "bg-red-800 text-white" : "bg-gray-300 text-gray-600 cursor-not-allowed"
+              (customerConfirmed && paymentMethod) ? "bg-red-800 text-white" : "bg-gray-300 text-gray-600 cursor-not-allowed"
             }`}
+            title={!paymentMethod ? "Select payment method" : ""}
           >
-            Process Transaction
+            Proceed to Payment
           </button>
         </div>
       </div>
