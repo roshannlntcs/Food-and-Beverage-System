@@ -1,95 +1,269 @@
 import React from "react";
 import Sidebar from "../../components/Sidebar";
+import AdminInfo from "../../components/AdminInfo";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
 } from "recharts";
+import { Bell, Package, ShoppingCart, User } from "lucide-react";
 
-export default function HomeDashboard() {
-  const fullName = localStorage.getItem("adminFullName") || "Admin";
+const topProducts = [
+  { name: "Mechado", sales: 18500 },
+  { name: "Chicken Adobo", sales: 22476 },
+  { name: "Bicol Express", sales: 16000 },
+  { name: "Pork Sisig", sales: 20123 },
+  { name: "Laing", sales: 8567 },
+];
 
-  const salesData = [
-    { date: "Jul 1", sales: 25000 },
-    { date: "Jul 2", sales: 20000 },
-    { date: "Jul 3", sales: 27000 },
-    { date: "Jul 4", sales: 30000 },
-    { date: "Jul 5", sales: 15000 },
-    { date: "Jul 6", sales: 28000 },
-    { date: "Jul 7", sales: 22000 },
-  ];
+const orderSummaryData = [
+  { name: "Mon", profit: 500 },
+  { name: "Tue", profit: 1000 },
+  { name: "Wed", profit: 1200 },
+  { name: "Thu", profit: 1674 },
+  { name: "Fri", profit: 1500 },
+  { name: "Sat", profit: 1800 },
+  { name: "Sun", profit: 1600 },
+];
 
-  const topProducts = [
-    { name: "Cheeseburger", sold: 120 },
-    { name: "Iced Tea", sold: 98 },
-    { name: "Fries", sold: 90 },
-    { name: "Pizza Slice", sold: 80 },
-    { name: "Chocolate Cake", sold: 60 },
-  ];
+const recentLogins = [
+  {
+    name: "Paula Marie Smith",
+    username: "@paulwcszzz",
+    time: "5 mins ago",
+    img: "https://i.pravatar.cc/40?img=1",
+  },
+  {
+    name: "Japit Self Fish",
+    username: "@japitkupsiss",
+    time: "3 days ago",
+    img: "https://i.pravatar.cc/40?img=2",
+  },
+  {
+    name: "Andrea Jane Swift",
+    username: "@andreaas",
+    time: "30 July 2025",
+    img: "https://i.pravatar.cc/40?img=3",
+  },
+];
 
+const notifications = [
+  {
+    icon: <Package size={16} />,
+    text: "Low stock: Cheesecake (5 left)",
+    time: "3:30 PM",
+  },
+  {
+    icon: <ShoppingCart size={16} />,
+    text: "New transaction: TXN-2045 completed",
+    time: "3:30 PM",
+  },
+  {
+    icon: <User size={16} />,
+    text: "Inventory updated by Rose",
+    time: "2:15 PM",
+  },
+  {
+    icon: <Package size={16} />,
+    text: "Low stock: Cheesecake (5 left)",
+    time: "3:30 PM",
+  },
+  {
+    icon: <ShoppingCart size={16} />,
+    text: "New transaction: TXN-2045 completed",
+    time: "3:30 PM",
+  },
+];
+
+const Dashboard = () => {
   return (
-    <div className="flex bg-[#f9f6ee] min-h-screen">
+    <div className="bg-[#f9f6ee] h-screen w-screen p-4 font-sans flex">
       <Sidebar />
-      <div className="flex-1 p-6 ml-20 overflow-hidden">
-        <div className="bg-[#800000] px-6 py-4 rounded-t-xl shadow mb-4">
-            <h1 className="text-xl font-semibold text-white">Welcome, {fullName}</h1>
-            <p className="text-sm text-gray-200">Here’s your business overview</p>
+
+      <div className="flex flex-col w-full">
+        {/* HEADER */}
+        <div className="bg-[#8B0000] text-white rounded-lg px-6 py-4 flex justify-between items-center ml-20 w-[calc(100%-5rem)]">
+          <div>
+            <h1 className="text-2xl font-bold">Welcome, admin!</h1>
+            <p>Here&apos;s your business overview</p>
           </div>
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-5 rounded-xl shadow">
-            <h2 className="text-xs text-gray-500">Total Sales</h2>
-            <p className="text-2xl font-bold text-yellow-500">₱245,300</p>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow">
-            <h2 className="text-xs text-gray-500">Orders Today</h2>
-            <p className="text-2xl font-bold text-yellow-500">123</p>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow">
-            <h2 className="text-xs text-gray-500">Inventory Items</h2>
-            <p className="text-2xl font-bold text-yellow-500">874</p>
-          </div>
-          <div className="bg-white p-5 rounded-xl shadow">
-            <h2 className="text-xs text-gray-500">Active POS</h2>
-            <p className="text-2xl font-bold text-yellow-500">5</p>
+          <div className="flex items-center gap-4">
+            <AdminInfo />
           </div>
         </div>
 
-        {/* Analytics Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow h-[350px]">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">Sales Trend (₱)</h2>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="sales" stroke="#facc15" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* MAIN CONTENT */}
+        <div className="grid grid-cols-12 gap-2 mt-4 ml-20 w-[calc(100%-5rem)] h-[calc(100%-110px)]">
+          {/* LEFT CONTENT */}
+          <div className="col-span-9 flex flex-col gap-2">
+            {/* TOP 4 CARDS */}
+            <div className="grid grid-cols-4 gap-2 h-[100px]">
+              <div className="bg-white rounded-lg p-4 flex flex-col justify-center shadow">
+                <p className="text-gray-500">Revenue</p>
+                <h2 className="text-2xl font-bold">₱25,000</h2>
+                <p className="text-green-500 text-sm">↑ 5.67% from last week</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 flex flex-col justify-center shadow">
+                <p className="text-gray-500">Available stocks</p>
+                <h2 className="text-2xl font-bold">2,536</h2>
+                <p className="text-red-500 text-sm">↓ 6.24% from last week</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 flex flex-col justify-center shadow">
+                <p className="text-gray-500">Low stock</p>
+                <h2 className="text-2xl font-bold">1,312</h2>
+                <p className="text-green-500 text-sm">↑ 1.53% from last week</p>
+              </div>
+              <div className="bg-white rounded-lg p-4 flex flex-col justify-center shadow">
+                <p className="text-gray-500">Out of stock</p>
+                <h2 className="text-2xl font-bold">789</h2>
+                <p className="text-red-500 text-sm">↓ 1.22% from last week</p>
+              </div>
+            </div>
+
+            {/* STOCK LEVEL & TOP SELLING */}
+            <div className="grid grid-cols-2 gap-2 mt-4 h-[220px]">
+              {/* Enhanced Stock Level */}
+              <div className="bg-white rounded-lg p-4 shadow flex flex-col">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="font-bold">Stock Level</h2>
+                  <span className="text-gray-400 text-sm">Updated daily</span>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { name: "Chicken Adobo", current: 123, total: 500 },
+                    { name: "Humba (Low stock)", current: 21, total: 150 },
+                    { name: "French fries", current: 57, total: 150 },
+                    { name: "Tinola", current: 82, total: 150 },
+                    { name: "Kaldereta", current: 13, total: 150 },
+                  ].map((item, idx) => {
+                    const percentage = (item.current / item.total) * 100;
+                    return (
+                      <div key={idx}>
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>{item.name}</span>
+                          <span>
+                            {item.current}/{item.total}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${
+                              percentage < 30
+                                ? "bg-red-500"
+                                : percentage < 70
+                                ? "bg-yellow-400"
+                                : "bg-green-500"
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Enhanced Top Selling */}
+              <div className="bg-white rounded-lg p-4 shadow flex flex-col">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="font-bold">Top Selling Products</h2>
+                  <span className="text-gray-400 text-sm">Main Dish</span>
+                </div>
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={topProducts}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar
+                      dataKey="sales"
+                      fill="#f59e0b"
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* ORDER SUMMARY */}
+            <div className="bg-white rounded-lg mt-12 p- shadow h-[200px]">
+              <div className="flex justify-between">
+                <div>
+                  <p className="text-gray-500">Order Summary</p>
+                  <h2 className="text-2xl font-bold">₱8,689</h2>
+                  <p className="text-gray-400 text-sm">Total Profit</p>
+                </div>
+                <span className="text-gray-400 text-sm">This week</span>
+              </div>
+              <ResponsiveContainer width="100%" height={90}>
+                <AreaChart data={orderSummaryData}>
+                  <defs>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="name" />
+                  <YAxis hide />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <Tooltip />
+                  <Area
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="#8b5cf6"
+                    fillOpacity={1}
+                    fill="url(#colorProfit)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow h-[350px]">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">Top Products</h2>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProducts} layout="vertical" margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" />
-                <Tooltip />
-                <Bar dataKey="sold" fill="#facc15" barSize={30} />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* RIGHT CONTENT */}
+          <div className="col-span-3 flex flex-col gap-2">
+            {/* NOTIFICATIONS */}
+            <div className="bg-white rounded-lg p-4 shadow flex flex-col">
+              <h2 className="font-bold mb-3">Notifications</h2>
+              {notifications.map((n, idx) => (
+                <div key={idx} className="mb-3">
+                  <div className="flex items-center gap-2">
+                    {n.icon}
+                    <p>{n.text}</p>
+                  </div>
+                  <p className="text-gray-400 text-xs ml-6">{n.time}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* RECENT LOGIN */}
+            <div className="bg-white rounded-lg mt-2 p-7 shadow">
+              <h2 className="font-bold mb-3">Recent Login</h2>
+              {recentLogins.map((u, idx) => (
+                <div key={idx} className="flex items-center gap-3 mb-3">
+                  <img
+                    src={u.img}
+                    alt={u.name}
+                    className="w-10 h-10 rounded-full"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold">{u.name}</p>
+                    <p className="text-gray-500 text-sm">{u.username}</p>
+                  </div>
+                  <p className="text-gray-400 text-xs">{u.time}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;

@@ -4,6 +4,8 @@ import AdminInfo from "../../components/AdminInfo";
 import { FaSearch, FaPen } from "react-icons/fa";
 import AddSupplierModal from "../../components/AddSupplierModal";
 import EditSupplierModal from "../../components/EditSupplierModal";
+import Pagination from "../../components/Pagination";
+import ShowEntries from "../../components/ShowEntries";
 
 const initialSuppliers = [
   { name: "Davao Fresh Supplies", contactPerson: "Maria Santos", phone: "09171234567", email: "davaofresh@example.com", address: "Davao City", products: "Eggs, Chicken", status: "Active" },
@@ -40,6 +42,9 @@ const SupplierRecords = () => {
     products: "",
     status: "Active",
   });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
 
   const adminName = localStorage.getItem("adminFullName") || "Admin";
 
@@ -93,6 +98,11 @@ Status: ${supplier.status}`,
     supplier.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const indexOfLastEntry = currentPage * entriesPerPage;
+  const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
+  const currentSuppliers = filteredSuppliers.slice(indexOfFirstEntry, indexOfLastEntry);
+  const totalPages = Math.ceil(filteredSuppliers.length / entriesPerPage);
+
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
@@ -141,39 +151,40 @@ Status: ${supplier.status}`,
                 </tr>
               </thead>
               <tbody>
-                {filteredSuppliers.map((supplier, i) => (
-                  <tr key={i} className="bg-white border-b hover:bg-[#f1f1f1]">
-                    <td className="p-3">{i + 1}</td>
-                    <td className="p-3">{supplier.name}</td>
-                    <td className="p-3">{supplier.contactPerson}</td>
-                    <td className="p-3">{supplier.phone}</td>
-                    <td className="p-3">{supplier.email}</td>
-                    <td className="p-3">{supplier.address}</td>
-                    <td className="p-3">{supplier.products}</td>
-                    <td className="p-3 text-center">
-                      <span
-                        className={`px-3 py-1 text-sm font-medium rounded-full ${
-                          supplier.status === "Active"
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                        } text-white`}
-                      >
-                        {supplier.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center">
-                      <FaPen
-                        className="text-red-600 cursor-pointer mx-auto"
-                        onClick={() => {
-                          setSelectedSupplierIndex(i);
-                          setShowEditModal(true);
-                          setNewSupplier(supplier);
-                        }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-                {filteredSuppliers.length === 0 && (
+                {currentSuppliers.length > 0 ? (
+                  currentSuppliers.map((supplier, i) => (
+                    <tr key={i} className="bg-white border-b hover:bg-[#f1f1f1]">
+                      <td className="p-3">{indexOfFirstEntry + i + 1}</td>
+                      <td className="p-3">{supplier.name}</td>
+                      <td className="p-3">{supplier.contactPerson}</td>
+                      <td className="p-3">{supplier.phone}</td>
+                      <td className="p-3">{supplier.email}</td>
+                      <td className="p-3">{supplier.address}</td>
+                      <td className="p-3">{supplier.products}</td>
+                      <td className="p-3 text-center">
+                        <span
+                          className={`px-3 py-1 text-sm font-medium rounded-full ${
+                            supplier.status === "Active"
+                              ? "bg-green-500"
+                              : "bg-red-500"
+                          } text-white`}
+                        >
+                          {supplier.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <FaPen
+                          className="text-red-600 cursor-pointer mx-auto"
+                          onClick={() => {
+                            setSelectedSupplierIndex(indexOfFirstEntry + i);
+                            setShowEditModal(true);
+                            setNewSupplier(supplier);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
                     <td colSpan="9" className="text-center p-4 text-gray-500">
                       No suppliers found.
@@ -185,11 +196,23 @@ Status: ${supplier.status}`,
           </div>
         </div>
 
-        {/* View Logs Button */}
-        <div className="mt-4 flex justify-end">
+        {/* Bottom Controls */}
+        <div className="flex flex-col md:flex-row items-center justify-between mt-4 gap-4">
+          <ShowEntries
+            entriesPerPage={entriesPerPage}
+            setEntriesPerPage={setEntriesPerPage}
+            setCurrentPage={setCurrentPage}
+          />
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            setCurrentPage={setCurrentPage}
+          />
+
           <button
             onClick={() => setShowLogsModal(true)}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full  "
+            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full"
           >
             View Logs
           </button>

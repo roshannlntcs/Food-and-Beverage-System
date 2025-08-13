@@ -16,6 +16,7 @@ import Inventory from './pages/pos/Inventory';
 import POSMonitoring from './pages/pos/POSMonitoring';
 import SupplierRecords from './pages/pos/SupplierRecords';
 import VoidLogs from './pages/pos/VoidLogs';
+import SuperAdmin from './pages/pos/SuperAdmin'; // adjust path if needed
 import SalesReport from "./pages/pos/SalesReport"; // <-- Import it
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
         <Route path="/admin/pos-monitoring" element={<POSMonitoring />} />
         <Route path="/admin/supplier-records" element={<SupplierRecords />} />
         <Route path="/admin/void-logs" element={<VoidLogs />} />
+       <Route path="/admin/super-admin" element={<SuperAdmin />} />
         
 <Route path="/pos/sales-report" element={<SalesReport />} /> {/* <-- Add this */}
       </Routes>

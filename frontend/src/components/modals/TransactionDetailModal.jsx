@@ -8,6 +8,7 @@ export default function TransactionDetailModal({ historyContext, setHistoryConte
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white w-1/3 max-h-[85vh] rounded-xl flex flex-col">
+       
         {/* Sticky Header */}
         <div className="sticky top-0 z-10 bg-[#800000] rounded-t border-b px-4 py-2 flex justify-between items-center">
           <h2 className="text-lg text-white font-bold">{tx.transactionID} Details</h2>

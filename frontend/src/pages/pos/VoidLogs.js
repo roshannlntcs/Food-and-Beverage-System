@@ -2,10 +2,15 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "../../components/Sidebar";
 import { FaSearch } from "react-icons/fa";
 import AdminInfo from "../../components/AdminInfo";
+import Pagination from "../../components/Pagination";
+import ShowEntries from "../../components/ShowEntries";
 
 const VoidLogs = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [voidLogs, setVoidLogs] = useState([]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("voidLogs") || "[]");
@@ -15,6 +20,11 @@ const VoidLogs = () => {
   const filteredData = voidLogs.filter((item) =>
     item.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const indexOfLastEntry = currentPage * entriesPerPage;
+  const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
+  const currentData = filteredData.slice(indexOfFirstEntry, indexOfLastEntry);
+  const totalPages = Math.ceil(filteredData.length / entriesPerPage);
 
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
@@ -34,7 +44,10 @@ const VoidLogs = () => {
               placeholder="Search Transaction ID"
               className="outline-none w-full"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
             />
             <FaSearch className="text-gray-500" />
           </div>
@@ -57,22 +70,21 @@ const VoidLogs = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredData.length > 0 ? (
-                  filteredData.map((item) => (
+                {currentData.length > 0 ? (
+                  currentData.map((item) => (
                     <tr key={item.voidId} className="border-b hover:bg-gray-50">
                       <td className="p-3">{item.dateTime}</td>
                       <td className="p-3">{item.voidId}</td>
                       <td className="p-3">{item.transactionId}</td>
-                       <td className="p-3">
+                      <td className="p-3">
                         {item.voidType
-                          ? item.voidType 
+                          ? item.voidType
                           : Array.isArray(item.voidedItems) && item.totalItems
                           ? item.voidedItems.length === item.totalItems
                             ? "Transaction"
                             : "Item"
                           : "Item"}
                       </td>
-
                       <td className="p-3">
                         {Array.isArray(item.voidedItems)
                           ? item.voidedItems.join(", ")
@@ -85,7 +97,7 @@ const VoidLogs = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="text-center p-4 text-gray-500">
+                    <td colSpan="8" className="text-center p-4 text-gray-500">
                       No void logs found.
                     </td>
                   </tr>
@@ -95,7 +107,26 @@ const VoidLogs = () => {
           </div>
         </div>
 
-        
+        {/* Bottom Controls (center pagination, left show entries) */}
+        <div className="flex flex-col md:flex-row items-center justify-between mt-4 gap-4">
+          <div className="self-start md:self-auto">
+            <ShowEntries
+              entriesPerPage={entriesPerPage}
+              setEntriesPerPage={setEntriesPerPage}
+              setCurrentPage={setCurrentPage}
+            />
+          </div>
+
+          <div className="flex justify-center flex-1">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+            />
+          </div>
+
+          <div className="w-[150px]" /> {/* spacer to balance flex */}
+        </div>
       </div>
     </div>
   );
