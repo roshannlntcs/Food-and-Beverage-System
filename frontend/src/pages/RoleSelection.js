@@ -1,15 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaUserCircle } from "react-icons/fa";
 
 export default function RoleSelection() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState(null);
+  const [fullName, setFullName] = useState("");
+
+  useEffect(() => {
+    // Get full name from localStorage
+    const storedName = localStorage.getItem("fullName");
+    if (storedName) {
+      setFullName(storedName);
+    }
+  }, []);
 
   const handleContinue = () => {
     if (selectedRole === "admin") {
-      navigate("/admin-login");
+      navigate("/admin/home");
     } else if (selectedRole === "user") {
-      navigate("/user-login");
+      const isLoggedIn = localStorage.getItem("isLoggedIn");
+      if (isLoggedIn === "true") {
+        navigate("/user");
+      } else {
+        navigate("/user-login");
+      }
     }
   };
 
@@ -17,7 +32,7 @@ export default function RoleSelection() {
     <div
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
       style={{
-        backgroundImage: "url('/b.jpg')", // Replace with your actual image filename
+        backgroundImage: "url('/b.jpg')",
       }}
     >
       {/* Optional dark overlay */}
@@ -25,6 +40,20 @@ export default function RoleSelection() {
 
       {/* Modal */}
       <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[500px] text-center">
+        {/* Display User's Full Name */}
+        {fullName && (
+          <>
+            <h2 className="text-lg font-semibold mb-2 text-gray-700">
+              Welcome, <span className="text-yellow-500">{fullName}</span>!
+            </h2>
+
+            {/* Profile Picture Icon */}
+            <div className="flex justify-center mb-6">
+              <FaUserCircle className="text-gray-400" size={80} />
+            </div>
+          </>
+        )}
+
         <h1 className="text-2xl font-semibold mb-8">Please select your role</h1>
 
         <div className="flex justify-center gap-6 mb-8">
@@ -39,12 +68,16 @@ export default function RoleSelection() {
           >
             <i
               className={`fas fa-wrench text-2xl mb-2 transition-colors ${
-                selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
+                selectedRole === "admin"
+                  ? "text-[#FFC72C]"
+                  : "text-gray-500 group-hover:text-[#FFC72C]"
               }`}
             />
             <span
               className={`transition-colors ${
-                selectedRole === "admin" ? "text-[#FFC72C]" : "group-hover:text-[#FFC72C]"
+                selectedRole === "admin"
+                  ? "text-[#FFC72C]"
+                  : "group-hover:text-[#FFC72C]"
               }`}
             >
               ADMIN
@@ -62,12 +95,16 @@ export default function RoleSelection() {
           >
             <i
               className={`fas fa-user text-2xl mb-2 transition-colors ${
-                selectedRole === "user" ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
+                selectedRole === "user"
+                  ? "text-[#FFC72C]"
+                  : "text-gray-500 group-hover:text-[#FFC72C]"
               }`}
             />
             <span
               className={`transition-colors ${
-                selectedRole === "user" ? "text-[#FFC72C]" : "group-hover:text-[#FFC72C]"
+                selectedRole === "user"
+                  ? "text-[#FFC72C]"
+                  : "group-hover:text-[#FFC72C]"
               }`}
             >
               USER

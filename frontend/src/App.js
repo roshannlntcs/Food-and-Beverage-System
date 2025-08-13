@@ -6,8 +6,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 // General Pages
 import LandingPage from './pages/LandingPage';
 import RoleSelection from './pages/RoleSelection';
-import AdminLoginPage from './pages/AdminLoginPage';
 import UserLoginPage from './pages/UserLoginPage';
+import UserRegisterPage from './pages/UserRegisterPage';
 import POSMain from './pages/pos/POSMain';
 
 // Customer view component (new)
@@ -28,8 +28,8 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/roles" element={<RoleSelection />} />
-        <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route path="/user-login" element={<UserLoginPage />} />
+        <Route path="/register" element={<UserRegisterPage />} />
         <Route path="/user" element={<POSMain />} />
         <Route path="/customer-view" element={<CustomerView />} />
 
