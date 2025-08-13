@@ -4,8 +4,8 @@ import images from "../utils/images";
 
 const tabs = [
   { key: "Menu", icon: "menu.png" },
-  { key: "Orders", icon: "orders.png" },
-  { key: "Transactions", icon: "transactions.png" },
+  { key: "KVS", icon: "orders.png" },
+  { key: "Logs", icon: "transactions.png" },
   { key: "Items", icon: "items.png" },
   { key: "Discount", icon: "discount.png" },
 ];

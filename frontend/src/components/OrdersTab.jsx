@@ -34,7 +34,7 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
     <div className="flex-1 p-4 flex flex-col h-full relative">
       {/* Header + Filter Toggle */}
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-2xl font-bold">KVS • Order Logs</h2>
+        <h3 className="text-2xl font-bold">Order Logs</h3>
 
         <div className="relative" ref={filterRef}>
           <button
@@ -87,7 +87,7 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
                   }}
                   className="w-full text-sm text-blue-600 hover:underline"
                 >
-                  Reset Filters
+                  Reset
                 </button>
               </div>
             </div>
@@ -96,10 +96,10 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
       </div>
 
       {/* Orders Grid */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-2">
         <div
           className="grid auto-rows-min gap-2"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(175px,1fr))" }}
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))" }}
         >
           {!filteredOrders.length && (
             <div className="col-span-full text-gray-400 text-sm">
@@ -108,60 +108,54 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
           )}
 
           {filteredOrders.map(order => (
-            <button
-            key={order.orderID}
-            onClick={() => onSelectOrder(order)}
-            className={`
-              p-3 rounded-lg shadow flex flex-col justify-between
-              hover:shadow-md transition-shadow duration-150
-              ${order.voided ? "bg-gray-100 opacity-60" : "bg-white"}
-              ${order.status === "pending"   ? "border-2 border-yellow-300" : ""}
-              ${order.status === "ongoing"   ? "border-2 border-blue-300"   : ""}
-              ${order.status === "complete"  ? "border-2 border-green-300"  : ""}
-              ${order.status === "cancelled" ? "border-2 border-red-300"    : ""}
-
-             
-
-            `}
-          >
-        {  /* ${order.status === "pending"   ? "bg-yellow-50" : ""} 
+           <button
+           key={order.orderID}
+           onClick={() => onSelectOrder(order)}
+           className={`
+          p-3 rounded-lg shadow flex flex-col items-start text-left
+          hover:scale-105 transition-transform duration-150 cursor-pointer
+         bg-white
+             ${order.status === "pending"   ? "border-2 border-yellow-300" : ""}
+             ${order.status === "ongoing"   ? "border-2 border-blue-300"   : ""}
+             ${order.status === "complete"  ? "border-2 border-green-300"  : ""}
+             ${order.status === "cancelled" ? "border-2 border-red-300"    : ""}
+           `}
+           /* ${order.status === "pending"   ? "bg-yellow-50" : ""} 
               ${order.status === "ongoing"   ? "bg-blue-50"   : ""}
               ${order.status === "complete"  ? "bg-green-50"  : ""}
-              ${order.status === "cancelled" ? "bg-red-50"    : ""} */}
+              ${order.status === "cancelled" ? "bg-red-50"    : ""} */
+         >
+           <img
+    src={images[`order_log_${order.status}.png`] || images["order_log.png"]}
+    alt={order.status}
+    className="self-center w-20 h-20 mb-2 object-cover"
+  />
 
-              {/* Top: icon + IDs */}
-              <div className="flex items-center space-x-2 mb-2">
-                <img
-                  src={images["order_log.png"]}
-                  alt=""
-                  className="w-10 h-10 rounded-sm flex-shrink-0"
-                />
-                <div className="truncate">
-                  <div className="font-semibold">{order.orderID}</div>
-                  <div className="text-xs text-gray-500">{order.date}</div>
-                </div>
-              </div>
-
-              {/* Status pill */}
-              <span
-                className={`inline-block px-2 py-1 text-xs font-medium rounded-full self-start
-                ${
-                  order.status === "pending"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : order.status === "ongoing"
-                    ? "bg-blue-100 text-blue-800"
-                    : order.status === "complete"
-                    ? "bg-green-100 text-green-800"
-                    : order.status === "cancelled"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-gray-100 text-gray-600"
-                }`}
-              >
-                {order.status
-                  ? order.status.charAt(0).toUpperCase() + order.status.slice(1)
-                  : "N/A"}
-              </span>
-            </button>
+  {/* 2) Left-aligned IDs */}
+  <div className="w-full">
+    <div className="font-semibold text-base truncate">
+      {order.orderID}
+    </div>
+    <div className="text-xs text-gray-600 truncate">
+      Tx: {order.transactionID}
+    </div>
+  </div>
+         
+           {/* 3) Centered status pill */}
+  <span
+    className={`self-center mt-2 inline-block px-11 py-1 text-xs font-medium rounded-full
+      ${
+        order.status === "pending"    ? "bg-yellow-100 text-yellow-800" :
+        order.status === "ongoing"    ? "bg-blue-100   text-blue-800" :
+        order.status === "complete"   ? "bg-green-100  text-green-800" :
+        order.status === "cancelled"  ? "bg-red-100    text-red-800" :
+        "bg-gray-100    text-gray-600"
+      }
+    `}
+  >
+             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+           </span>
+         </button>
           ))}
         </div>
       </div>

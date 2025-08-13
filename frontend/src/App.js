@@ -10,6 +10,9 @@ import AdminLoginPage from './pages/AdminLoginPage';
 import UserLoginPage from './pages/UserLoginPage';
 import POSMain from './pages/pos/POSMain';
 
+// Customer view component (new)
+import CustomerView from './components/CustomerView';
+
 // Admin Pages
 import HomeDashboard from './pages/pos/HomeDashboard';
 import Inventory from './pages/pos/Inventory';
@@ -28,6 +31,7 @@ function App() {
         <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route path="/user-login" element={<UserLoginPage />} />
         <Route path="/user" element={<POSMain />} />
+        <Route path="/customer-view" element={<CustomerView />} />
 
         {/* Admin Pages */}
         <Route path="/admin/home" element={<HomeDashboard />} />

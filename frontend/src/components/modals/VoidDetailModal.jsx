@@ -58,11 +58,9 @@ export default function VoidDetailModal({ voidLog, onClose }) {
             </div>
             <div className="flex justify-between">
               <span><strong>Void Type:</strong></span>
-              <span>
-                {voidLog.reason?.includes("Full transaction")
-                  ? "Full Transaction Void"
-                  : "Item Void"}
-              </span>
+              <div className="flex justify-between">
+                <span>{voidLog.type}</span>
+                </div>
             </div>
             <div className="flex justify-between">
               <span><strong>Reason:</strong></span>
@@ -87,15 +85,15 @@ export default function VoidDetailModal({ voidLog, onClose }) {
                   className="p-3 border rounded-lg bg-gray-50 hover:shadow-md transition-shadow duration-150"
                 >
                   <div className="font-semibold">{item.name}</div>
-
-                  <div className="text-sm flex justify-between">
-                    <span>Size: {sizeLabel}</span>
-                    <span>₱{sizeUp.toFixed(2)}</span>
-                  </div>
-
+    
                   <div className="text-sm flex justify-between">
                     <span>Base Price:</span>
                     <span>₱{base.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="text-sm flex justify-between">
+                    <span>Size: </span>
+                    <span>{sizeLabel}</span>
                   </div>
 
                   <div className="text-sm flex justify-between">

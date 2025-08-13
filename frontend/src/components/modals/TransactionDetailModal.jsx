@@ -1,10 +1,12 @@
 import React from "react";
 
-export default function TransactionDetailModal({ historyContext, setHistoryContext }) {
-  if (!historyContext?.tx) return null;
+export default function TransactionDetailModal({ historyContext, setHistoryContext, transactions }) {
+  // support both patterns: historyContext may have txId or tx snapshot
+  const txId = historyContext?.txId || historyContext?.tx?.id;
+  const tx = txId ? transactions.find(t => t.id === txId) : historyContext?.tx;
 
-  const tx = historyContext.tx;
-
+  if (!tx) return null;
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white w-1/3 max-h-[85vh] rounded-xl flex flex-col">
