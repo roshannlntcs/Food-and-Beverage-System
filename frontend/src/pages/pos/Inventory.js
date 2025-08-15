@@ -9,13 +9,12 @@ import CategoryFilterModal from '../../components/modals/category-filter-modal';
 import { allItemsFlat } from '../../utils/data';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
 import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
-
-
+import AddCategoryModal from '../../components/modals/AddCategoryModal';
 
 const initialInventoryData = allItemsFlat;
 
 export default function Inventory() {
-  const [adminName, setAdminName] = useState(localStorage.getItem('adminFullName') || 'Admin');
+  const [adminName, setAdminName] = useState(localStorage.getItem('fullName') || 'Admin');
   const [searchQuery, setSearchQuery] = useState('');
   const [inventory, setInventory] = useState(initialInventoryData);
   const [logs, setLogs] = useState([]);
@@ -39,17 +38,22 @@ export default function Inventory() {
 
   const uniqueCategories = [...new Set(inventory.map(item => item.category))];
 
-  const filteredInventory = inventory.filter(item =>
-  item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-  (selectedCategory === '' || item.category === selectedCategory) &&
-  (selectedStatus === '' || item.status === selectedStatus)
-  );
+  // ADDED: global categories state (starts with existing uniqueCategories)
+  const [categories, setCategories] = useState(uniqueCategories);
+  // ADDED: merge to ensure both existing and newly-added categories appear everywhere
+  const mergedCategories = Array.from(new Set([...(categories || []), ...uniqueCategories]));
+  // ADDED: control AddCategory modal visibility
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
+  const filteredInventory = inventory.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (selectedCategory === '' || item.category === selectedCategory) &&
+    (selectedStatus === '' || item.status === selectedStatus)
+  );
 
   const filteredLogs = logs.filter(log =>
     !filterDate || log.datetime.startsWith(filterDate)
   );
-
 
   const formatDateTime = () => {
     const now = new Date();
@@ -62,47 +66,53 @@ export default function Inventory() {
   };
 
   const handleAddItem = () => {
-  if (!newItem.name || !newItem.category || newItem.price === '' || newItem.quantity === '') {
-    setErrorMessage('Please fill out all required fields: Name, Category, Price, and Quantity.');
-    setShowErrorModal(true);
-    return;
-  }
+    if (!newItem.name || !newItem.category || newItem.price === '' || newItem.quantity === '') {
+      setErrorMessage('Please fill out all required fields: Name, Category, Price, and Quantity.');
+      setShowErrorModal(true);
+      return;
+    }
 
-  const price = parseFloat(newItem.price);
-  const quantity = parseInt(newItem.quantity);
+    const price = parseFloat(newItem.price);
+    const quantity = parseInt(newItem.quantity);
 
-  if (isNaN(price) || isNaN(quantity)) {
-    setErrorMessage('Invalid value for price or stock.');
-    setShowErrorModal(true);
-    return;
-  }
+    if (isNaN(price) || isNaN(quantity)) {
+      setErrorMessage('Invalid value for price or stock.');
+      setShowErrorModal(true);
+      return;
+    }
 
-  const newItemData = {
-    ...newItem,
-    price,
-    quantity,
-    sizes: newItem.sizes || [],
+    const newItemData = {
+      ...newItem,
+      price,
+      quantity,
+      sizes: newItem.sizes || [],
+    };
+
+    setInventory([...inventory, newItemData]);
+
+    // ADDED: if a brand-new category was typed/selected, keep it globally
+    if (newItemData.category && !categories.includes(newItemData.category)) {
+      setCategories(prev => [...prev, newItemData.category]);
+    }
+
+    setLogs([...logs, {
+      datetime: formatDateTime(),
+      action: "Add",
+      admin: adminName,
+      product: newItemData.name,
+      field: "New Product",
+      stock: `${newItemData.quantity} pcs`,
+      oldPrice: "",
+      newPrice: `₱${newItemData.price}`,
+      category: newItemData.category,
+      detail: `Added new item: ${newItemData.name}`
+    }]);
+
+    setShowAddModal(false);
+    setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available', sizes: [] });
+    setIsEditSuccess(false);
+    setShowSaveModal(true);
   };
-
-  setInventory([...inventory, newItemData]);
-  setLogs([...logs, {
-    datetime: formatDateTime(),
-    action: "Add",
-    admin: adminName,
-    product: newItemData.name,
-    field: "New Product",
-    stock: `${newItemData.quantity} pcs`,
-    oldPrice: "",
-    newPrice: `₱${newItemData.price}`,
-    category: newItemData.category,
-    detail: `Added new item: ${newItemData.name}`
-  }]);
-
-  setShowAddModal(false);
-  setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available', sizes: [] });
-  setIsEditSuccess(false);
-  setShowSaveModal(true);
-};
 
   const handleEditItem = () => {
     const updated = [...inventory];
@@ -164,6 +174,11 @@ export default function Inventory() {
     updated[selectedItemIndex] = updatedItem;
     setInventory(updated);
 
+    // ADDED: ensure edited-in new category is tracked globally
+    if (updatedItem.category && !categories.includes(updatedItem.category)) {
+      setCategories(prev => [...prev, updatedItem.category]);
+    }
+
     setLogs([
       ...logs,
       {
@@ -182,14 +197,14 @@ export default function Inventory() {
 
     setShowEditModal(false);
     setIsEditSuccess(true);
-    
+
     {showSaveModal && (
-  <ItemSaveSuccessModal
-    onClose={() => setShowSaveModal(false)}
-    isEdit={isEditSuccess}
-  />
-)}
-setShowSaveModal(true);
+      <ItemSaveSuccessModal
+        onClose={() => setShowSaveModal(false)}
+        isEdit={isEditSuccess}
+      />
+    )}
+    setShowSaveModal(true);
   };
 
   return (
@@ -227,15 +242,25 @@ setShowSaveModal(true);
             )}
           </div>
 
-          <button
-            onClick={() => {
-              setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' });
-              setShowAddModal(true);
-            }}
-            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
-          >
-            + Add Item
-          </button>
+          <div className="flex items-center gap-2">
+            {/* ADDED: Add Category button */}
+            <button
+              onClick={() => setShowAddCategoryModal(true)}
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
+            >
+              + Add Category
+            </button>
+
+            <button
+              onClick={() => {
+                setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' });
+                setShowAddModal(true);
+              }}
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
+            >
+              + Add Item
+            </button>
+          </div>
         </div>
 
         <div className="border rounded-md overflow-hidden">
@@ -257,7 +282,8 @@ setShowSaveModal(true);
                           style={{ width: '24px' }}
                         >
                           <option value="">All</option>
-                          {uniqueCategories.map((cat, i) => (
+                          {/* ADDED: use mergedCategories so new categories show up immediately */}
+                          {mergedCategories.map((cat, i) => (
                             <option key={i} value={cat}>{cat}</option>
                           ))}
                         </select>
@@ -380,7 +406,8 @@ setShowSaveModal(true);
           <AddItemModal
             newItem={newItem}
             setNewItem={setNewItem}
-            uniqueCategories={uniqueCategories}
+            // ADDED: pass mergedCategories so new ones appear immediately
+            uniqueCategories={mergedCategories}
             onClose={() => setShowAddModal(false)}
             onSave={handleAddItem}
           />
@@ -390,7 +417,8 @@ setShowSaveModal(true);
           <EditItemModal
             newItem={newItem}
             setNewItem={setNewItem}
-            uniqueCategories={uniqueCategories}
+            // ADDED: pass mergedCategories so new ones appear immediately
+            uniqueCategories={mergedCategories}
             onClose={() => setShowEditModal(false)}
             onSave={handleEditItem}
           />
@@ -399,7 +427,8 @@ setShowSaveModal(true);
         {showCategoryFilter && (
           <CategoryFilterModal
             selectedCategory={selectedCategory}
-            uniqueCategories={uniqueCategories}
+            // ADDED: pass mergedCategories so filter sees new ones
+            uniqueCategories={mergedCategories}
             onSelect={(cat) => {
               setSelectedCategory(cat === 'All' ? '' : cat);
               setShowCategoryFilter(false);
@@ -417,19 +446,49 @@ setShowSaveModal(true);
           />
         )}
         {showSaveModal && (
-            <ItemSaveSuccessModal
-              onClose={() => setShowSaveModal(false)}
-              isEdit={isEditSuccess}
-            />
-          )}
-          {showErrorModal && (
-            <ValidationErrorModal
-              message={errorMessage}
-              onClose={() => setShowErrorModal(false)}
-            />
-          )}
+          <ItemSaveSuccessModal
+            onClose={() => setShowSaveModal(false)}
+            isEdit={isEditSuccess}
+          />
+        )}
+        {showErrorModal && (
+          <ValidationErrorModal
+            message={errorMessage}
+            onClose={() => setShowErrorModal(false)}
+          />
+        )}
+
+        
+        {showAddCategoryModal && (
+          <AddCategoryModal
+            onClose={() => setShowAddCategoryModal(false)}
+            onAdd={(newCat) => {
+              const clean = (newCat || '').trim();
+              if (!clean) return setShowAddCategoryModal(false);
+              if (!categories.includes(clean)) {
+  setCategories(prev => [...prev, clean]);
+  setLogs((prevLogs) => [
+    {
+      datetime: formatDateTime(),
+      action: "Add",
+      admin: adminName,
+      product: "—",
+      field: "Category",
+      stock: "—",
+      oldPrice: "",
+      newPrice: "",
+      category: clean,
+      detail: `Added new category: "${clean}"` 
+    },
+    ...prevLogs,
+  ]);
 
 
+              }
+              setShowAddCategoryModal(false);
+            }}
+          />
+        )}
       </div>
     </div>
   );

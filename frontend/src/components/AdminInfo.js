@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa';
 
 const AdminInfo = () => {
-  const adminName = localStorage.getItem('adminFullName') || 'Admin';
+  const adminName = localStorage.getItem('fullName') || 'Admin';
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
