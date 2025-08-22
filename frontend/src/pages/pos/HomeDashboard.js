@@ -1,6 +1,7 @@
 import React from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
+import AdminInfoDashboard from "../../components/AdminInfoDashboard";
 import {
   BarChart,
   Bar,
@@ -94,7 +95,7 @@ const Dashboard = () => {
             <p>Here&apos;s your business overview</p>
           </div>
           <div className="flex items-center gap-4">
-            <AdminInfo />
+            <AdminInfoDashboard />
           </div>
         </div>
 
