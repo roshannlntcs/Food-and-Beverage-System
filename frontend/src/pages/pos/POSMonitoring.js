@@ -166,68 +166,82 @@ const POSMonitoring = () => {
         </div>
       </div>
 
-      {/* Receipt Modal */}
-      {selectedTransaction && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg w-[400px] p-6 shadow-lg">
-            <div className="flex justify-end mb-2">
-              <button onClick={() => setSelectedTransaction(null)}>
-                <FaTimes className="text-gray-500 hover:text-black" />
-              </button>
-            </div>
-            <div className="text-center mb-4">
-              <img src="/poslogo.png" alt="POS Logo" className="mx-auto h-16 mb-2" />
-              <h3 className="font-semibold text-lg">POS SYSTEM</h3>
-              <p className="text-gray-600 text-sm">Transaction Receipt</p>
-            </div>
-            <div className="text-sm text-gray-700 space-y-1 mb-4">
-              <p><strong>Transaction ID:</strong> {selectedTransaction.transactionID}</p>
-              <p><strong>Date:</strong> {selectedTransaction.date}</p>
-              <p><strong>Cashier:</strong> {selectedTransaction.cashier}</p>
-              <p><strong>Payment Method:</strong> {selectedTransaction.method}</p>
-            </div>
-            <table className="w-full text-sm mb-6">
-              <thead>
-                <tr>
-                  <th className="text-left py-1">Item</th>
-                  <th className="text-center py-1 w-12">Qty</th>
-                  <th className="text-right py-1">Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedTransaction.items?.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="py-1">{item.name}</td>
-                    <td className="text-center py-1">{item.quantity}</td>
-                    <td className="text-right py-1">₱{(item.price * item.quantity).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="text-sm space-y-1 mb-2 mt-6">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>₱{selectedTransaction.subtotal?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Discount:</span>
-                <span>-₱{selectedTransaction.discountAmt?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tax:</span>
-                <span>₱{selectedTransaction.tax?.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total:</span>
-                <span>₱{selectedTransaction.total?.toFixed(2)}</span>
-              </div>
-            </div>
-            <p className="text-center text-gray-500 text-xs mt-4">
-              Thank you for your purchase!
-            </p>
-          </div>
+     {/* Receipt Modal */}
+{selectedTransaction && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div className="bg-white rounded-lg w-[400px] p-6 shadow-lg">
+      <div className="flex justify-end mb-2">
+        
+      </div>
+      <div className="text-center mb-4">
+        <img src="/splice.png" alt="Splice Logo" className="mx-auto h-16 mb-2" />
+        <p className="text-gray-600 text-sm">Transaction Receipt</p>
+      </div>
+      <div className="text-sm text-gray-700 space-y-1 mb-4">
+        <p><strong>Transaction ID:</strong> {selectedTransaction.transactionID}</p>
+        <p><strong>Date:</strong> {selectedTransaction.date}</p>
+        <p><strong>Cashier:</strong> {selectedTransaction.cashier}</p>
+        <p><strong>Payment Method:</strong> {selectedTransaction.method}</p>
+      </div>
+      <table className="w-full text-sm mb-6">
+        <thead>
+          <tr>
+            <th className="text-left py-1">Item</th>
+            <th className="text-center py-1 w-12">Qty</th>
+            <th className="text-right py-1">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {selectedTransaction.items?.map((item, idx) => (
+            <tr key={idx}>
+              <td className="py-1">{item.name}</td>
+              <td className="text-center py-1">{item.quantity}</td>
+              <td className="text-right py-1">₱{(item.price * item.quantity).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="text-sm space-y-1 mb-2 mt-6">
+        <div className="flex justify-between">
+          <span>Subtotal:</span>
+          <span>₱{selectedTransaction.subtotal?.toFixed(2)}</span>
         </div>
-      )}
+        <div className="flex justify-between">
+          <span>Discount:</span>
+          <span>-₱{selectedTransaction.discountAmt?.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Tax:</span>
+          <span>₱{selectedTransaction.tax?.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-lg">
+          <span>Total:</span>
+          <span>₱{selectedTransaction.total?.toFixed(2)}</span>
+        </div>
+      </div>
+      <p className="text-center text-gray-500 text-xs mt-4">
+        Thank you for your purchase!
+      </p>
+
+      {/* ✅ Buttons at the bottom */}
+      <div className="flex justify-center gap-4 mt-6">
+        <button
+          onClick={() => window.print()}
+          className="bg-yellow-500 text-black px-5 py-2 rounded-full hover:bg-yellow-600"
+        >
+          Print
+        </button>
+        <button
+          onClick={() => setSelectedTransaction(null)}
+          className=" bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

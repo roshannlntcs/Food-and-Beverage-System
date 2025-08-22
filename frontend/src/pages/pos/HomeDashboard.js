@@ -91,7 +91,7 @@ const Dashboard = () => {
         {/* HEADER */}
         <div className="bg-[#8B0000] text-white rounded-lg px-6 py-4 flex justify-between items-center ml-20 w-[calc(100%-5rem)]">
           <div>
-            <h1 className="text-2xl font-bold">Welcome, admin!</h1>
+            <h1 className="text-2xl font-bold">Welcome, Admin!</h1>
             <p>Here&apos;s your business overview</p>
           </div>
           <div className="flex items-center gap-4">
