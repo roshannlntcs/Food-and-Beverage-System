@@ -60,7 +60,7 @@ const SuperAdmin = () => {
 
       <div className="ml-20 p-8 flex-1">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Super Admin</h1>
+          <h1 className="text-3xl font-bold">System Admin</h1>
           <AdminInfo />
         </div>
 

@@ -14,12 +14,12 @@ const SuperAdminAccessModal = ({ onClose, onConfirm }) => {
         </div>
 
         {/* Title */}
-        <h2 className="text-lg font-semibold text-center">Super Admin Access</h2>
+        <h2 className="text-lg font-semibold text-center">System Admin Access</h2>
 
         {/* Description */}
         <p className="text-sm text-gray-600 mt-2 text-center leading-relaxed">
-          <strong>Note:</strong> A super admin is a user who has complete
-          access to all control. A Super Administrator can add users, delete
+          <strong>Note:</strong> A system admin is a user who has complete
+          access to all control. A System Administrator can add users, delete
           all transactions, logs and reset all data. Are you sure you want to
           continue?
         </p>
@@ -42,7 +42,7 @@ const SuperAdminAccessModal = ({ onClose, onConfirm }) => {
                 }`}
               />
             </div>
-            <span className="text-sm">Switch to Super Admin Access</span>
+            <span className="text-sm">Switch to System Admin Access</span>
           </div>
 
           {/* Buttons */}
@@ -56,7 +56,7 @@ const SuperAdminAccessModal = ({ onClose, onConfirm }) => {
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
-              Save
+              Confirm
             </button>
             <button
               onClick={onClose}

@@ -21,16 +21,13 @@ const SuperAdminPasswordModal = ({ onClose, onConfirm }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[101]">
-      <div className="bg-white rounded-lg p-6 w-[550px] shadow-lg">
+      <div className="bg-white rounded-lg p-6 w-[400px] shadow-lg">
         <div className="flex flex-col items-center">
           {/* Red icon */}
-          <div className="bg-red-800 rounded-full w-10 h-10 flex items-center justify-center mb-3">
-            <span className="text-white text-lg font-bold">!</span>
-          </div>
-
-          <h2 className="text-lg font-semibold">Enter Super Admin Password</h2>
+        
+          <h2 className="text-lg font-semibold">System Admin Password</h2>
           <p className="text-sm text-gray-600 mt-2 text-center">
-            Please enter the Superadmin password to continue.
+            Please enter the System admin password to continue.
           </p>
 
           <input
