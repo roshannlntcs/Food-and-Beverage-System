@@ -9,20 +9,23 @@ export default function UserLoginPage() {
   const [error, setError] = useState("");
 
   const handleLogin = () => {
-    const storedId = localStorage.getItem("schoolId");
-    const storedPassword = localStorage.getItem("password");
+    // Dummy admin account
+    const dummyId = "admin";
+    const dummyPassword = "admin123";
 
     if (schoolId.trim() === "" || password.trim() === "") {
       setError("Please enter both School ID and Password.");
       return;
     }
 
-    if (schoolId.trim() !== storedId || password.trim() !== storedPassword) {
+    if (schoolId.trim() !== dummyId || password.trim() !== dummyPassword) {
       setError("Invalid School ID or Password.");
       return;
     }
 
+    // Store login status
     localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("fullName", "Administrator"); // for RoleSelection greeting
     navigate("/roles");
   };
 
@@ -93,15 +96,8 @@ export default function UserLoginPage() {
             </button>
           </div>
 
+          {/* Buttons */}
           <div className="flex flex-col items-center space-y-4">
-            <button
-              type="button"
-              onClick={() => navigate("/register")}
-              className="text-black hover:underline text-sm"
-            >
-              Create an Account
-            </button>
-
             <button
               type="submit"
               className="h-[40px] w-[200px] bg-yellow-400 text-black py-2 px-4 rounded-[20px] hover:bg-yellow-500 transition"
