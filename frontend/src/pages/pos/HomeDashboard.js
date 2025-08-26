@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
 import AdminInfoDashboard from "../../components/AdminInfoDashboard";
@@ -13,7 +13,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { Bell, Package, ShoppingCart, User } from "lucide-react";
+import { Package, ShoppingCart, User, ChevronDown } from "lucide-react";
 
 const topProducts = [
   { name: "Mechado", sales: 18500 },
@@ -82,7 +82,15 @@ const notifications = [
   },
 ];
 
+const categories = ["Soup", "Main Dish", "Dessert", "Drinks", "Snacks"];
+
 const Dashboard = () => {
+  const [selectedStock, setSelectedStock] = useState("Soup");
+  const [stockOpen, setStockOpen] = useState(false);
+
+  const [selectedTop, setSelectedTop] = useState("Main Dish");
+  const [topOpen, setTopOpen] = useState(false);
+
   return (
     <div className="bg-[#f9f6ee] h-screen w-screen p-4 font-sans flex">
       <Sidebar />
@@ -131,9 +139,33 @@ const Dashboard = () => {
             <div className="grid grid-cols-2 gap-2 mt-4 h-[220px]">
               {/* Enhanced Stock Level */}
               <div className="bg-white rounded-lg p-4 shadow flex flex-col">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center mb-2 relative">
                   <h2 className="font-bold">Stock Level</h2>
-                  <span className="text-gray-400 text-sm">Updated daily</span>
+                  <div className="relative">
+                    <button
+                      onClick={() => setStockOpen(!stockOpen)}
+                      className="flex items-center border border-gray-300 rounded-md px-3 py-1 text-gray-500 text-sm hover:bg-gray-50"
+                    >
+                      {selectedStock}
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </button>
+                    {stockOpen && (
+                      <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded shadow-lg z-50">
+                        {categories.map((cat, idx) => (
+                          <div
+                            key={idx}
+                            className="px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setSelectedStock(cat);
+                              setStockOpen(false);
+                            }}
+                          >
+                            {cat}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-3">
                   {[
@@ -172,9 +204,33 @@ const Dashboard = () => {
 
               {/* Enhanced Top Selling */}
               <div className="bg-white rounded-lg p-4 shadow flex flex-col">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center mb-2 relative">
                   <h2 className="font-bold">Top Selling Products</h2>
-                  <span className="text-gray-400 text-sm">Main Dish</span>
+                  <div className="relative">
+                    <button
+                      onClick={() => setTopOpen(!topOpen)}
+                      className="flex items-center border border-gray-300 rounded-md px-3 py-1 text-gray-500 text-sm hover:bg-gray-50"
+                    >
+                      {selectedTop}
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </button>
+                    {topOpen && (
+                      <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded shadow-lg z-50">
+                        {categories.map((cat, idx) => (
+                          <div
+                            key={idx}
+                            className="px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                              setSelectedTop(cat);
+                              setTopOpen(false);
+                            }}
+                          >
+                            {cat}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <ResponsiveContainer width="100%" height={150}>
                   <BarChart data={topProducts}>
@@ -193,15 +249,15 @@ const Dashboard = () => {
             </div>
 
             {/* ORDER SUMMARY */}
-            <div className="bg-white rounded-lg mt-12 p- shadow h-[200px]">
-              <div className="flex justify-between">
-                <div>
-                  <p className="text-gray-500">Order Summary</p>
-                  <h2 className="text-2xl font-bold">₱8,689</h2>
-                  <p className="text-gray-400 text-sm">Total Profit</p>
-                </div>
-                <span className="text-gray-400 text-sm">This week</span>
-              </div>
+            <div className="bg-white rounded-lg mt-12 p-4 shadow h-[200px]">
+  <div className="flex justify-between items-start">
+    <div className="text-left">
+      <p className="text-gray-500">Order Summary</p>
+      <h2 className="text-2xl font-bold">₱8,689</h2>
+      <p className="text-gray-400 text-sm">Total Profit</p>
+    </div>
+    <span className="text-gray-400 text-sm">This week</span>
+  </div>
               <ResponsiveContainer width="100%" height={90}>
                 <AreaChart data={orderSummaryData}>
                   <defs>

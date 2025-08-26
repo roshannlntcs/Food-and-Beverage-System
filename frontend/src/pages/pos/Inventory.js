@@ -10,6 +10,8 @@ import { allItemsFlat } from '../../utils/data';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
 import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
 import AddCategoryModal from '../../components/modals/AddCategoryModal';
+import ShowEntries from '../../components/ShowEntries';
+import Pagination from '../../components/Pagination';
 
 const initialInventoryData = allItemsFlat;
 
@@ -36,19 +38,26 @@ export default function Inventory() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const uniqueCategories = [...new Set(inventory.map(item => item.category))];
+  // pagination state
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // ADDED: global categories state (starts with existing uniqueCategories)
+  const uniqueCategories = [...new Set(inventory.map(item => item.category))];
   const [categories, setCategories] = useState(uniqueCategories);
-  // ADDED: merge to ensure both existing and newly-added categories appear everywhere
   const mergedCategories = Array.from(new Set([...(categories || []), ...uniqueCategories]));
-  // ADDED: control AddCategory modal visibility
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
   const filteredInventory = inventory.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
     (selectedCategory === '' || item.category === selectedCategory) &&
     (selectedStatus === '' || item.status === selectedStatus)
+  );
+
+  // pagination logic
+  const totalPages = Math.ceil(filteredInventory.length / entriesPerPage);
+  const paginatedInventory = filteredInventory.slice(
+    (currentPage - 1) * entriesPerPage,
+    currentPage * entriesPerPage
   );
 
   const filteredLogs = logs.filter(log =>
@@ -90,7 +99,6 @@ export default function Inventory() {
 
     setInventory([...inventory, newItemData]);
 
-    // ADDED: if a brand-new category was typed/selected, keep it globally
     if (newItemData.category && !categories.includes(newItemData.category)) {
       setCategories(prev => [...prev, newItemData.category]);
     }
@@ -174,7 +182,6 @@ export default function Inventory() {
     updated[selectedItemIndex] = updatedItem;
     setInventory(updated);
 
-    // ADDED: ensure edited-in new category is tracked globally
     if (updatedItem.category && !categories.includes(updatedItem.category)) {
       setCategories(prev => [...prev, updatedItem.category]);
     }
@@ -197,13 +204,6 @@ export default function Inventory() {
 
     setShowEditModal(false);
     setIsEditSuccess(true);
-
-    {showSaveModal && (
-      <ItemSaveSuccessModal
-        onClose={() => setShowSaveModal(false)}
-        isEdit={isEditSuccess}
-      />
-    )}
     setShowSaveModal(true);
   };
 
@@ -243,7 +243,6 @@ export default function Inventory() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* ADDED: Add Category button */}
             <button
               onClick={() => setShowAddCategoryModal(true)}
               className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
@@ -271,66 +270,21 @@ export default function Inventory() {
                   <th className="p-3">No.</th>
                   <th className="p-3">Name</th>
                   <th className="p-3">Price</th>
-                  <th className="p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-semibold">Category</span>
-                      <div className="relative inline-block">
-                        <select
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
-                          style={{ width: '24px' }}
-                        >
-                          <option value="">All</option>
-                          {/* ADDED: use mergedCategories so new categories show up immediately */}
-                          {mergedCategories.map((cat, i) => (
-                            <option key={i} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </th>
+                  <th className="p-3">Category</th>
                   <th className="p-3">Allergens</th>
                   <th className="p-3">Add-ons</th>
                   <th className="p-3">Description</th>
                   <th className="p-3">Sizes</th>
                   <th className="p-3 text-center">Stock</th>
-                  <th className="p-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-white font-semibold">Status</span>
-                      <div className="relative inline-block">
-                        <select
-                          value={selectedStatus}
-                          onChange={(e) => setSelectedStatus(e.target.value)}
-                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
-                          style={{ width: '24px' }}
-                        >
-                          <option value="">All</option>
-                          <option value="Available">Available</option>
-                          <option value="Unavailable">Unavailable</option>
-                        </select>
-                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </th>
-
+                  <th className="p-3 text-center">Status</th>
                   <th className="p-3 text-center">Edit</th>
                 </tr>
               </thead>
 
               <tbody>
-                {filteredInventory.map((item, index) => (
+                {paginatedInventory.map((item, index) => (
                   <tr key={index} className="bg-[#fdfdfd] border-b hover:bg-[#f1f1f1]">
-                    <td className="p-3">{index + 1}</td>
+                    <td className="p-3">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="p-3">{item.name}</td>
                     <td className="p-3">₱{item.price.toFixed(2)}</td>
                     <td className="p-3">{item.category}</td>
@@ -364,7 +318,7 @@ export default function Inventory() {
                       <FaPen
                         className="text-red-600 cursor-pointer mx-auto"
                         onClick={() => {
-                          setSelectedItemIndex(index);
+                          setSelectedItemIndex((currentPage - 1) * entriesPerPage + index);
                           setNewItem({
                             name: item.name,
                             price: item.price,
@@ -383,7 +337,7 @@ export default function Inventory() {
                   </tr>
                 ))}
 
-                {filteredInventory.length === 0 && (
+                {paginatedInventory.length === 0 && (
                   <tr>
                     <td colSpan="11" className="text-center p-4 text-gray-500">No items found.</td>
                   </tr>
@@ -393,7 +347,20 @@ export default function Inventory() {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end">
+        {/* footer controls */}
+        <div className="mt-4 flex justify-between items-center">
+          <ShowEntries
+            entriesPerPage={entriesPerPage}
+            setEntriesPerPage={setEntriesPerPage}
+            setCurrentPage={setCurrentPage}
+          />
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            setCurrentPage={setCurrentPage}
+          />
+
           <button
             onClick={() => setShowLogsModal(true)}
             className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full"
@@ -406,7 +373,6 @@ export default function Inventory() {
           <AddItemModal
             newItem={newItem}
             setNewItem={setNewItem}
-            // ADDED: pass mergedCategories so new ones appear immediately
             uniqueCategories={mergedCategories}
             onClose={() => setShowAddModal(false)}
             onSave={handleAddItem}
@@ -417,7 +383,6 @@ export default function Inventory() {
           <EditItemModal
             newItem={newItem}
             setNewItem={setNewItem}
-            // ADDED: pass mergedCategories so new ones appear immediately
             uniqueCategories={mergedCategories}
             onClose={() => setShowEditModal(false)}
             onSave={handleEditItem}
@@ -427,7 +392,6 @@ export default function Inventory() {
         {showCategoryFilter && (
           <CategoryFilterModal
             selectedCategory={selectedCategory}
-            // ADDED: pass mergedCategories so filter sees new ones
             uniqueCategories={mergedCategories}
             onSelect={(cat) => {
               setSelectedCategory(cat === 'All' ? '' : cat);
@@ -457,7 +421,6 @@ export default function Inventory() {
             onClose={() => setShowErrorModal(false)}
           />
         )}
-
         
         {showAddCategoryModal && (
           <AddCategoryModal
@@ -466,24 +429,22 @@ export default function Inventory() {
               const clean = (newCat || '').trim();
               if (!clean) return setShowAddCategoryModal(false);
               if (!categories.includes(clean)) {
-  setCategories(prev => [...prev, clean]);
-  setLogs((prevLogs) => [
-    {
-      datetime: formatDateTime(),
-      action: "Add",
-      admin: adminName,
-      product: "—",
-      field: "Category",
-      stock: "—",
-      oldPrice: "",
-      newPrice: "",
-      category: clean,
-      detail: `Added new category: "${clean}"` 
-    },
-    ...prevLogs,
-  ]);
-
-
+                setCategories(prev => [...prev, clean]);
+                setLogs((prevLogs) => [
+                  {
+                    datetime: formatDateTime(),
+                    action: "Add",
+                    admin: adminName,
+                    product: "—",
+                    field: "Category",
+                    stock: "—",
+                    oldPrice: "",
+                    newPrice: "",
+                    category: clean,
+                    detail: `Added new category: "${clean}"`
+                  },
+                  ...prevLogs,
+                ]);
               }
               setShowAddCategoryModal(false);
             }}

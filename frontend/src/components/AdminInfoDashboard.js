@@ -60,7 +60,7 @@ const AdminInfo = () => {
 
         {/* Notifications dropdown */}
         {notifOpen && (
-          <div className="absolute left-0 top-10 w-64 bg-white border border-gray-200 rounded shadow-lg z-50 text-gray-800">
+          <div className="absolute right-0 top-10 w-64 bg-white border border-gray-200 rounded shadow-lg z-50 text-gray-800">
             <div className="p-3 border-b font-semibold">Notifications</div>
             {notifications.length > 0 ? (
               notifications.map((notif) => (
@@ -105,10 +105,10 @@ const AdminInfo = () => {
         <FaChevronDown className="text-white text-sm" />
       </div>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu (Admin Info) */}
       {dropdownOpen && (
-        <div className="absolute right-0 top-14 w-44 bg-white border border-gray-200 rounded shadow-lg z-50">
-          <div className="px-4 py-2 text-sm font-semibold border-b">{adminName}</div>
+        <div className="absolute right-0 top-14 w-45 bg-white border border-gray-200 rounded shadow-lg z-50 text-gray-800">
+          <div className="p-3 border-b font-semibold">{adminName}</div>
           <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Profile</button>
           <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Settings</button>
           <button
