@@ -96,7 +96,7 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
       </div>
 
       {/* Orders Grid */}
-      <div className="flex-1 overflow-y-2">
+      <div className="flex-1 overflow-y-auto">
         <div
           className="grid auto-rows-min gap-2"
           style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))" }}

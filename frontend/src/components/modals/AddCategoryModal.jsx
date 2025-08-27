@@ -1,13 +1,50 @@
+// src/components/admin/AddCategoryModal.jsx
 import React, { useState } from "react";
+import { useCategories } from "../../contexts/CategoryContext";
 
-export default function AddCategoryModal({ onClose, onAdd }) {
+/**
+ * Admin Add Category modal.
+ * - Uses CategoryContext.addCategory to add the new category object ({key, icon})
+ * - Also calls optional onAdded(cleanName) so parent pages (Inventory) can do logs/extra work
+ */
+export default function AddCategoryModal({ onClose, onAdded }) {
   const [categoryName, setCategoryName] = useState("");
+  const [iconFile, setIconFile] = useState(null);
+  const [iconPreview, setIconPreview] = useState(null);
+
+  const categoriesCtx = useCategories();
+  const addCategory = categoriesCtx?.addCategory;
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setIconFile(file);
+      setIconPreview(URL.createObjectURL(file));
+    }
+  };
 
   const handleSave = () => {
     const cleanName = categoryName.trim();
-    if (cleanName) {
-      onAdd(cleanName);
+    if (!cleanName) return;
+
+    // For now, store the image as a temporary local preview URL (frontend-only)
+    const iconPath = iconPreview || "/assets/default-category.png";
+
+    // Use context addCategory if available
+    if (typeof addCategory === "function") {
+      addCategory({
+        key: cleanName,
+        icon: iconPath,
+      });
     }
+
+    // Call optional parent callback so Inventory can add logs or other actions
+    if (typeof onAdded === "function") {
+      onAdded(cleanName);
+    }
+
+    // close modal
+    if (typeof onClose === "function") onClose();
   };
 
   return (
@@ -20,7 +57,8 @@ export default function AddCategoryModal({ onClose, onAdd }) {
         </div>
 
         {/* Body */}
-        <div className="px-10 py-8 space-y-3">
+        <div className="px-10 py-8 space-y-6">
+          {/* Category Name */}
           <div className="flex items-center gap-4">
             <label className="w-32 text-sm font-semibold">Category Name</label>
             <input
@@ -30,6 +68,26 @@ export default function AddCategoryModal({ onClose, onAdd }) {
               placeholder="Enter category name"
               className="flex-1 border rounded px-3 py-2"
             />
+          </div>
+
+          {/* Category Icon Upload */}
+          <div className="flex items-start gap-4">
+            <label className="w-32 text-sm font-semibold">Category Icon</label>
+            <div className="flex flex-col gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-700"
+              />
+              {iconPreview && (
+                <img
+                  src={iconPreview}
+                  alt="Preview"
+                  className="w-16 h-16 object-cover rounded border"
+                />
+              )}
+            </div>
           </div>
         </div>
 

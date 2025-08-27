@@ -46,10 +46,13 @@ const importAll = (r) =>
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
 
 export default function POSMain() {
-
   const navigate = useNavigate();
+
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("All Menu");
+
+  // No explicit "All Menu" category in state — null means "show everything"
+  const [activeCategory, setActiveCategory] = useState(null);
+
   const [activeTab, setActiveTab] = useState("Menu");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -59,7 +62,7 @@ export default function POSMain() {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
-  const [showOrderSuccess, setShowOrderSuccess] = useState(false)
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
 
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -76,7 +79,6 @@ export default function POSMain() {
 
     if (normalized.length) {
       setTransactions(normalized);
-      // persist normalized shape back to storage (optional)
       localStorage.setItem("transactions", JSON.stringify(normalized));
     }
   }, []);
@@ -85,7 +87,6 @@ export default function POSMain() {
   useEffect(() => {
     const savedOrders = JSON.parse(localStorage.getItem("orders") || "[]");
     if (savedOrders.length) {
-      // normalize if needed
       const normalized = savedOrders.map(o => ({ ...o, orderID: o.orderID || o.id || "" }));
       setOrders(normalized);
     }
@@ -113,16 +114,14 @@ export default function POSMain() {
   const [voidContext, setVoidContext] = useState({ type: null, index: null });
   const [paymentMethod, setPaymentMethod] = useState("");
 
-  const [voidLogs, setVoidLogs] = useState([]);  
+  const [voidLogs, setVoidLogs] = useState([]);
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("voidLogs") || "[]");
 
     const normalized = saved.map(v => ({
       ...v,
-      // fix typo if existed
       voidId: v.voidId || v.oidId || "",
-      // ensure txId field exists (fallback to transactionId or txId)
       txId: v.txId || v.transactionId || v.transactionID || "",
     }));
 
@@ -135,7 +134,7 @@ export default function POSMain() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyContext, setHistoryContext] = useState(null);
 
-  // get user info
+  // user info
   const userName = localStorage.getItem("userName") || "Cashier";
   const schoolId = localStorage.getItem("schoolId") || "";
 
@@ -143,27 +142,29 @@ export default function POSMain() {
 
   // Customer view refs & state
   const customerWinRef = React.useRef(null);
-  const bcRef = React.useRef(null);
-  const [customerConfirmed, setCustomerConfirmed] = useState(false);
+  const [lastPaymentInfo, setLastPaymentInfo] = useState(null);
 
   // Payment modal states
   const [showCashModal, setShowCashModal] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [lastPaymentInfo, setLastPaymentInfo] = useState(null);
 
-  // ID Generators ensuring uniqueness
+  // derive categories from placeholders (exclude any "All Menu" key if present)
+  const categories = useMemo(
+    () => Object.keys(placeholders).filter(c => c && c.toLowerCase() !== "all menu"),
+    []
+  );
 
   // recompute product list
   const filteredProducts = useMemo(() => {
-    const baseList =
-        activeCategory === "All Menu"
-            ? Object.values(placeholders).flat()
-            : placeholders[activeCategory] || [];
+    const baseList = activeCategory && placeholders[activeCategory]
+      ? placeholders[activeCategory]
+      : Object.values(placeholders).flat();
+
     return baseList
-        .filter(i => itemAvailability[i.name])
-        .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [activeCategory, itemAvailability, searchTerm])
+      .filter(i => itemAvailability[i.name])
+      .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [activeCategory, itemAvailability, searchTerm]);
 
   const openEditModal = (item, index) => {
     setModalProduct({
@@ -187,6 +188,8 @@ export default function POSMain() {
     setShowModal(true);
     setEditingCartIndex(null);
     setModalEdited(false);
+
+    try { openCustomerView && openCustomerView(); } catch (e) {}
   };
 
   const applyCartItemChanges = () => {
@@ -226,7 +229,6 @@ export default function POSMain() {
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - discountAmt).toFixed(2);
 
-
   const addToCart = () => {
     const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
     const sizeCost = modalProduct.size.price;
@@ -240,17 +242,11 @@ export default function POSMain() {
 
   // Broadcast helper: send cart to customer window(s)
   const broadcastCart = (payload) => {
-    // BroadcastChannel
-    if (bcRef.current) {
-      try { bcRef.current.postMessage(payload); } catch(e) { /* ignore */ }
-    }
-    // postMessage to the opened customer window as extra reliability (same-origin)
     if (customerWinRef.current && !customerWinRef.current.closed) {
       try {
         customerWinRef.current.postMessage(payload, window.location.origin);
       } catch (e) {}
     }
-    // localStorage fallback (triggers storage event in other windows)
     try { localStorage.setItem('pos_cart', JSON.stringify({ ...payload, _t: Date.now() })); } catch(e) {}
   };
 
@@ -263,7 +259,6 @@ export default function POSMain() {
         'customerView',
         'width=420,height=780,toolbar=no,menubar=no'
       );
-      // give the new window a moment then send an initial state
       setTimeout(() => broadcastCart({ cart, subtotal, tax, total, discountPct }), 300);
     } else {
       customerWinRef.current.focus();
@@ -271,52 +266,64 @@ export default function POSMain() {
     }
   };
 
-  // Ensure BroadcastChannel and message listener for confirmations
-  useEffect(() => {
-    if ('BroadcastChannel' in window) {
-      bcRef.current = new BroadcastChannel('pos-cart');
+  // helper: clear all logs (backup then clear) — will be invoked from ProfileModal
+  const clearAllLogs = (opts = { confirm: true }) => {
+    if (opts.confirm && !window.confirm('Clear ALL orders, transactions, and void logs? This is irreversible. A backup will be downloaded. Continue?')) return;
+
+    try {
+      const backup = {
+        orders: JSON.parse(localStorage.getItem('orders') || '[]'),
+        transactions: JSON.parse(localStorage.getItem('transactions') || '[]'),
+        voidLogs: JSON.parse(localStorage.getItem('voidLogs') || '[]'),
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pos_backup_' + new Date().toISOString().replace(/[:.]/g,'-') + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Backup failed', e);
     }
 
-    const msgHandler = (ev) => {
-      // accept only same-origin for security
-      try {
-        if (ev.origin && ev.origin !== window.location.origin) return;
-      } catch (e) {
-        // ev.origin may be undefined in BroadcastChannel events - ignore
-      }
+    try {
+      localStorage.setItem('orders', '[]');
+      localStorage.setItem('transactions', '[]');
+      localStorage.setItem('voidLogs', '[]');
 
-      const data = ev.data;
-      if (!data) return;
+      setOrders([]);
+      setTransactions([]);
+      setVoidLogs([]);
 
-      if (data.type === 'customer_confirm') {
-        setCustomerConfirmed(true);
-      } else if (data.type === 'customer_unconfirm') {
-        setCustomerConfirmed(false);
-      }
-    };
+      setShowHistoryModal(false);
+      setShowVoidDetailModal(false);
+      setShowReceiptModal(false);
 
-    window.addEventListener('message', msgHandler);
+      alert('Orders, transactions, and void logs cleared. Backup (if created) was downloaded.');
+    } catch (e) {
+      console.error('Failed to clear logs', e);
+      alert('Failed to clear logs. See console for details.');
+    }
+  };
 
-    return () => {
-      if (bcRef.current) bcRef.current.close();
-      window.removeEventListener('message', msgHandler);
-    };
-  }, []);
-
-  // ensure broadcast on every cart change and reset confirmation
+  // ensure broadcast on every cart change
   useEffect(() => {
-    // any cart edit invalidates previous confirmation
-    setCustomerConfirmed(false);
     broadcastCart({ cart, subtotal, tax, total, discountPct });
   }, [cart, subtotal, tax, total, discountPct]);
 
-  // PAYMENT FLOW
-  // Called when user clicks "Proceed to Payment" in CartPanel
-  const initiatePayment = () => {
-    if (!customerConfirmed) {
-      alert("Waiting for customer confirmation.");
-      return;
+  // When user switches away from Menu/Items, clear selected category so sidebar isn't stale
+  useEffect(() => {
+    if (!(activeTab === "Menu" || activeTab === "Items")) {
+      setActiveCategory(null);
     }
+  }, [activeTab]);
+
+  // PAYMENT FLOW
+  const initiatePayment = () => {
     if (!paymentMethod) {
       alert("Please choose a payment method first.");
       return;
@@ -335,13 +342,11 @@ export default function POSMain() {
 
   // Finalizes transaction: persists transaction & order and clears cart
   const finalizeTransaction = (paymentInfo = {}) => {
-    // paymentInfo: { method: "Cash"|"Card"|"QRS", tendered?, change?, cardNumberMasked?, authCode?, reference?, payload? }
     if (cart.length === 0) {
       alert("Cart is empty.");
       return;
     }
 
-    // recompute to be safe
     const subtotalCalc = cart.reduce((sum, item) => {
       const base = item.price ?? 0;
       const sizeUp = item.size?.price ?? 0;
@@ -388,25 +393,28 @@ export default function POSMain() {
       date: new Date().toLocaleString(),
     };
 
+    // Save orders (append)
     const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const updatedOrders = [newOrder, ...existingOrders];
+    const updatedOrders = [...existingOrders, newOrder];
     localStorage.setItem("orders", JSON.stringify(updatedOrders));
     setOrders(updatedOrders);
 
-    // Clear cart & reset relevant UI
     setCart([]);
     setPaymentMethod("");
     setShowOrderSuccess(true);
     setLastPaymentInfo(paymentInfo);
-    setCustomerConfirmed(false);
-
-    // set selected transaction for immediate receipt print if needed
     setSelectedTransaction(newTransaction);
 
-    // close modals
     setShowCashModal(false);
     setShowCardModal(false);
     setShowQRModal(false);
+
+    try {
+      if (customerWinRef.current && !customerWinRef.current.closed) {
+        customerWinRef.current.close();
+      }
+    } catch (e) {}
+    customerWinRef.current = null;
   };
 
   const triggerVoid = (type, idx = null) => {
@@ -451,7 +459,6 @@ export default function POSMain() {
       };
     });
 
-    // write txs to storage and state
     localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
     setTransactions(updatedTransactions);
 
@@ -461,7 +468,6 @@ export default function POSMain() {
       if (order.transactionID !== tx.transactionID) return order;
 
       if (type === "transaction") {
-        // Full transaction void -> mark order items voided and set status to "cancelled"
         return {
           ...order,
           voided: true,
@@ -469,7 +475,6 @@ export default function POSMain() {
           items: order.items.map(it => ({ ...it, voided: true }))
         };
       } else {
-        // Item-level void
         const txItem = tx.items[index];
         const updatedItems = order.items.map(it => {
           const isMatch = it.name === txItem.name
@@ -479,10 +484,9 @@ export default function POSMain() {
           return isMatch ? { ...it, voided: true } : it;
         });
 
-        // If all order items are now voided, mark order cancelled
         const allVoided = updatedItems.length > 0 && updatedItems.every(i => i.voided);
-        return { 
-          ...order, 
+        return {
+          ...order,
           items: updatedItems,
           ...(allVoided ? { status: "cancelled", voided: true } : {})
         };
@@ -501,7 +505,6 @@ export default function POSMain() {
     const newVoidedDetailed =
       type === "transaction" ? tx.items.map(it => ({ ...it })) : [...(existing?.voidedItemsDetailed || []), newVoidedItem].filter(Boolean);
 
-    // dedupe
     const uniqueDetailedItems = Array.from(
       new Map(newVoidedDetailed.map(it => {
         const key = `${it.name}-${it.size?.label || "N/A"}-${it.notes || ""}-${(it.selectedAddons || []).map(a => a.label).join(",")}`;
@@ -530,27 +533,22 @@ export default function POSMain() {
     localStorage.setItem("voidLogs", JSON.stringify(updatedLogs));
     setVoidLogs(updatedLogs);
 
-    // --- Refresh currently-open modal(s) if they reference this tx/order ---
-    // If a Transaction Detail modal is open, refresh its tx object
+    // refresh modals referencing tx/order
     if (historyContext?.type === "detail" && historyContext.tx?.id === tx.id) {
       const refreshedTx = updatedTransactions.find(t => t.id === tx.id);
       setHistoryContext({ type: "detail", tx: refreshedTx });
     }
-
-    // If an Order Detail modal is open, refresh its order object
     if (historyContext?.type === "orderDetail" && historyContext.order?.transactionID === tx.transactionID) {
       const refreshedOrder = updatedOrders.find(o => o.transactionID === tx.transactionID);
       setHistoryContext({ type: "orderDetail", order: refreshedOrder });
     }
 
-    // --- Reset UI state ---
     setShowVoidPassword(false);
     setShowHistoryModal(false);
     setVoidContext(null);
     setVoidPasswordInput("");
     setVoidReason("");
   };
-
 
   useEffect(() => {
     if (activeTab === "Discount") {
@@ -562,71 +560,13 @@ export default function POSMain() {
   const updateOrderStatus = (orderID, newStatus) => {
     setOrders(prev =>
       prev.map(o =>
-        o.orderID === orderID
-          ? { ...o, status: newStatus }
-          : o
+        o.orderID === orderID ? { ...o, status: newStatus } : o
       )
     );
   };
 
-  //
-  // --- Minimal in-app QR payload scanner & storage listener (for tests) ---
-  //
-
-  // manual scan helper: read payload from localStorage key 'pos_qr_payload'
-  // NOTE: For this to work automatically, ensure your QR modal writes the JSON payload
-  // into localStorage under the key 'pos_qr_payload' when generating the QR payload.
-  // Example to add inside QRSPaymentModal (where payload is created):
-  //   localStorage.setItem('pos_qr_payload', JSON.stringify(payload));
-  //
-  const scanQRPayloadFromLocalStorage = (autoConfirm = false) => {
-    const raw = localStorage.getItem('pos_qr_payload');
-    if (!raw) {
-      alert("No QR payload found in localStorage (key: pos_qr_payload).");
-      return null;
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      alert("Invalid QR payload in localStorage.");
-      return null;
-    }
-
-    // By default, prompt cashier to confirm simulated scan action
-    if (!autoConfirm) {
-      const ok = window.confirm(`QR payload found (ref: ${parsed.txRef || parsed.reference || "N/A"}). Simulate 'scanned+paid' and finalize payment?`);
-      if (!ok) return null;
-    }
-
-    // finalize payment with QRS method and include payload
-    finalizeTransaction({ method: "QRS", reference: parsed.txRef || parsed.reference, payload: parsed });
-    return parsed;
-  };
-
-  // Listen for storage events from other windows (customer view or tests)
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'pos_qr_payload' && e.newValue) {
-        // auto prompt when another window writes the payload
-        try {
-          const parsed = JSON.parse(e.newValue);
-          const proceed = window.confirm(`QR payload written by another window (ref: ${parsed.txRef || parsed.reference || "N/A"}). Finalize payment?`);
-          if (proceed) {
-            finalizeTransaction({ method: "QRS", reference: parsed.txRef || parsed.reference, payload: parsed });
-          }
-        } catch (err) {
-          // ignore parse errors
-        }
-      }
-    };
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
-  }, [cart, paymentMethod, discountPct]);
-
-  //
-  // --- End scanner & listeners
-  //
+  // categories enabled only when on Menu or Items
+  const categoriesEnabled = activeTab === "Menu" || activeTab === "Items";
 
   return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
@@ -644,25 +584,30 @@ export default function POSMain() {
         <div className="flex flex-1 overflow-hidden">
           {/* CATEGORY SIDEBAR */}
           <Sidebar
-            activeCategory={activeCategory}
-            onCategorySelect={setActiveCategory}
-            clearSearch={() => setSearchTerm("")}
-          />
+  activeCategory={activeCategory}
+  onCategorySelect={(cat) => {
+    if (!categoriesEnabled) return;
+    setActiveCategory(prev => (prev === cat ? null : cat));
+  }}
+  clearSearch={() => setSearchTerm("")}
+  enabled={categoriesEnabled}
+/>
+
           {/* CONTENT */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* TABS */}
             <TabsPanel
               activeTab={activeTab}
               onTabSelect={(key) => {
-                 // If they clicked “Discount,” just open the modal
                  if (key === "Discount") {
                   setShowDiscountModal(true);
-                  return;}
-                  // Otherwise, switch tabs as normal
-                  setActiveTab(key);
-                  setSearchTerm("");
-                  }}
+                  return;
+                 }
+                 setActiveTab(key);
+                 setSearchTerm("");
+              }}
             />
+
             {/* TAB CONTENT */}
             <div className="flex-1 flex overflow-hidden">
               {/* MENU */}
@@ -671,6 +616,7 @@ export default function POSMain() {
                   <ProductGrid products={filteredProducts} onSelect={openProductModal} />
                 </div>
               )}
+
               {/* ORDERS */}
               {activeTab === "KVS" && (
                 <OrdersPanel
@@ -678,40 +624,38 @@ export default function POSMain() {
                   onSelectOrder={(order) => setHistoryContext({ type: "orderDetail", order })}
                 />
               )}
-              {/* ─── Order Details Modal ─── */}
+
+              {/* Order Detail Modal */}
               {historyContext?.type === "orderDetail" && (
                 <OrderDetailModal
                   historyContext={historyContext}
                   setHistoryContext={setHistoryContext}
-                  orders={orders}          // <-- add this
+                  orders={orders}
                   onStatusChange={(orderID, status) =>
-                    setOrders(prev =>
-                      prev.map(o => o.orderID === orderID ? { ...o, status } : o)
-                    )
+                    setOrders(prev => prev.map(o => o.orderID === orderID ? { ...o, status } : o))
                   }
                 />
               )}
-              {/* TRANSACTIONS TAB */}
+
+              {/* TRANSACTIONS */}
               {activeTab === "Logs" && (
                 <TransactionsPanel
                   transactions={transactions}
                   voidLogs={voidLogs}
-                  onTransactionSelect={(tx) =>
-                    setHistoryContext({ type: "detail", txId: tx.id })
-                  }
-                  // optionally, if you need clicks on void logs:
-                  onVoidSelect={(vl) => { setSelectedVoidLog(vl);
-                    setShowVoidDetailModal(true); }}
+                  onTransactionSelect={(tx) => setHistoryContext({ type: "detail", txId: tx.id })}
+                  onVoidSelect={(vl) => { setSelectedVoidLog(vl); setShowVoidDetailModal(true); }}
                 />
               )}
-              {/* ─── Transaction Detail Popup ─── */}
+
+              {/* Transaction Detail Popup */}
               {historyContext?.type === "detail" && (
                 <TransactionDetailModal
                   historyContext={historyContext}
                   setHistoryContext={setHistoryContext}
-                  transactions={transactions}   // <-- add this
+                  transactions={transactions}
                 />
               )}
+
               {/* Items Availability */}
               {activeTab === "Items" && (
                 <ItemsTab
@@ -726,8 +670,8 @@ export default function POSMain() {
           </div>
         </div>
       </div>
-      
-      {/* ─── Order Details Pane ─── */}
+
+      {/* ORDER DETAILS PANE */}
       <CartPanel
         cart={cart}
         subtotal={subtotal}
@@ -739,26 +683,13 @@ export default function POSMain() {
         setPaymentMethod={setPaymentMethod}
         openEditModal={openEditModal}
         removeCartItem={removeCartItem}
-        // start payment flow
         initiatePayment={initiatePayment}
         setShowHistoryModal={setShowHistoryModal}
         transactions={transactions}
-        customerConfirmed={customerConfirmed}
         openCustomerView={openCustomerView}
       />
 
-      {/* Small floating 'Scan QR payload' helper (useful for tests / scanning QR payload) */}
-      <div className="fixed left-4 bottom-6 z-50">
-        <button
-          onClick={() => scanQRPayloadFromLocalStorage(false)}
-          className="px-3 py-2 rounded shadow bg-indigo-600 text-white text-sm hover:bg-indigo-700"
-          title="Read QR payload from localStorage (key: pos_qr_payload) and simulate payment"
-        >
-          Scan QR payload
-        </button>
-      </div>
-
-      {/* ─── History & Void Modal (z-50) ─── */}
+      {/* History & Void Modal */}
       {showHistoryModal && (
         <HistoryModal
           transactions={transactions}
@@ -768,48 +699,34 @@ export default function POSMain() {
         />
       )}
 
-
-      {/* ─── Receipt Modal ─── */}
+      {/* Receipt Modal */}
       {showReceiptModal && selectedTransaction && (
         <ReceiptModal
           transaction={selectedTransaction}
-          onClose={() => {
-            setShowReceiptModal(false);
-            setSelectedTransaction(null);
-          }}
+          onClose={() => { setShowReceiptModal(false); setSelectedTransaction(null); }}
           shopDetails={shopDetails}
         />
       )}
 
-      {/* ─── Void Password Modal (as before) ─── */}
+      {/* Void Password Modal */}
       <VoidPasswordModal
         isOpen={showVoidPassword}
         passwordValue={voidPasswordInput}
         onPasswordChange={setVoidPasswordInput}
-        onClose={() => {
-          setShowVoidPassword(false);
-          setVoidPasswordInput("");
-        }}
+        onClose={() => { setShowVoidPassword(false); setVoidPasswordInput(""); }}
         onConfirm={(passwordEntered, reasonEntered) => {
-          if (passwordEntered !== basePassword) {
-            alert("Wrong password");
-            return;
-         }
+          if (passwordEntered !== basePassword) { alert("Wrong password"); return; }
           confirmVoid(reasonEntered);
         }}
       />
 
-      {/* ─── Void Detail Modal ─── */}
+      {/* Void Detail Modal */}
       {showVoidDetailModal && selectedVoidLog && (
         <VoidDetailModal
           voidLog={selectedVoidLog}
-          onClose={() => {
-            setShowVoidDetailModal(false);
-            setSelectedVoidLog(null);
-          }}
+          onClose={() => { setShowVoidDetailModal(false); setSelectedVoidLog(null); }}
         />
       )}
-
 
       {/* ITEM MODAL */}
       <ItemDetailModal
@@ -821,28 +738,17 @@ export default function POSMain() {
           const addonsCost = addons.reduce((s,a) => s + a.price, 0);
           const sizeCost   = size.price;
           const price      = (modalProduct.price + addonsCost + sizeCost) * quantity;
-          setCart(prev => [
-            ...prev,
-            { ...modalProduct, quantity, size, selectedAddons: addons, notes, totalPrice: price }
-          ]);
+          setCart(prev => [...prev, { ...modalProduct, quantity, size, selectedAddons: addons, notes, totalPrice: price }]);
           setModalEdited(false);
         }}
         onApply={({ quantity, size, addons, notes }, idx) => {
           const addonsCost = addons.reduce((s,a) => s + a.price, 0);
           const sizeCost   = size.price;
           const price      = (modalProduct.price + addonsCost + sizeCost) * quantity;
-          setCart(prev =>
-            prev.map((item,i) =>
-              i === idx
-            ? { ...item, quantity, size, selectedAddons: addons, notes, totalPrice: price }
-            : item
-          )
-          );
+          setCart(prev => prev.map((item,i) => i === idx ? { ...item, quantity, size, selectedAddons: addons, notes, totalPrice: price } : item));
           setModalEdited(false);
         }}
-        onRemove={idx => {
-          setCart(prev => prev.filter((_,i) => i !== idx));
-        }}
+        onRemove={idx => setCart(prev => prev.filter((_,i) => i !== idx))}
       />
 
       {/* Discount Modal */}
@@ -859,53 +765,18 @@ export default function POSMain() {
       />
 
       {/* Payment Modals */}
-      <CashPaymentModal
-        isOpen={showCashModal}
-        total={total}
-        onClose={() => setShowCashModal(false)}
-        onSuccess={(paymentInfo) => {
-          // paymentInfo: { method: "Cash", tendered, change }
-          finalizeTransaction(paymentInfo);
-        }}
-      />
+      <CashPaymentModal isOpen={showCashModal} total={total} onClose={() => setShowCashModal(false)} onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)} />
+      <CardPaymentModal isOpen={showCardModal} total={total} onClose={() => setShowCardModal(false)} onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)} onFailure={(info) => alert("Card payment failed: " + (info?.reason || "Unknown"))} />
+      <QRSPaymentModal isOpen={showQRModal} total={total} onClose={() => setShowQRModal(false)} onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)} />
 
-      <CardPaymentModal
-        isOpen={showCardModal}
-        total={total}
-        onClose={() => setShowCardModal(false)}
-        onSuccess={(paymentInfo) => {
-          // paymentInfo: { method: "Card", cardNumberMasked, authCode }
-          finalizeTransaction(paymentInfo);
-        }}
-        onFailure={(info) => {
-          alert("Card payment failed: " + (info?.reason || "Unknown"));
-        }}
-      />
-
-      <QRSPaymentModal
-        isOpen={showQRModal}
-        total={total}
-        onClose={() => setShowQRModal(false)}
-        onSuccess={(paymentInfo) => {
-          // paymentInfo: { method: "QRS", reference, payload? }
-          finalizeTransaction(paymentInfo);
-        }}
-      />
-
-      {/* ─── Order Success Modal ─── */}
+      {/* Order Success Modal */}
       <OrderSuccessModal
         show={showOrderSuccess}
-        paymentSummary={lastPaymentInfo} // <-- pass payment summary (tendered/change/authCode/reference/payload)
+        paymentSummary={lastPaymentInfo}
         onClose={() => setShowOrderSuccess(false)}
         onPrintReceipt={() => {
-          // prefer explicit selectedTransaction, fallback to transactions[0]
           const tx = selectedTransaction || transactions[0];
-          if (tx) {
-            setSelectedTransaction(tx);
-            setShowReceiptModal(true);
-          } else {
-            alert("No transaction available to print.");
-          }
+          if (tx) { setSelectedTransaction(tx); setShowReceiptModal(true); } else { alert("No transaction available to print."); }
           setShowOrderSuccess(false);
         }}
       />
@@ -916,6 +787,7 @@ export default function POSMain() {
         userName={userName}
         schoolId={schoolId}
         onClose={() => setShowProfileModal(false)}
+        onClearLogs={clearAllLogs}
       />
     </div>
   );

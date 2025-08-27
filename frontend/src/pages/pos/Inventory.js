@@ -1,3 +1,4 @@
+// src/pages/admin/Inventory.js
 import React, { useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import { FaSearch, FaPen } from 'react-icons/fa';
@@ -12,6 +13,7 @@ import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
 import AddCategoryModal from '../../components/modals/AddCategoryModal';
 import ShowEntries from '../../components/ShowEntries';
 import Pagination from '../../components/Pagination';
+import { useCategories } from '../../contexts/CategoryContext';
 
 const initialInventoryData = allItemsFlat;
 
@@ -42,9 +44,36 @@ export default function Inventory() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const uniqueCategories = [...new Set(inventory.map(item => item.category))];
-  const [categories, setCategories] = useState(uniqueCategories);
-  const mergedCategories = Array.from(new Set([...(categories || []), ...uniqueCategories]));
+  // derive categories from inventory items (existing)
+  const uniqueCategories = [...new Set(inventory.map(item => item.category))].filter(Boolean);
+
+  // Use shared category context (so admin + POS share categories)
+  // The provider must wrap the app (index.js) — defensive fallback to avoid crashes
+  const categoriesCtx = useCategories() || {};
+  const ctxCategoriesRaw = categoriesCtx.categories || [];
+  const addCategory = categoriesCtx.addCategory || (() => {});
+
+  // ctxCategoriesRaw entries may be strings OR objects like { key, icon }
+  // map them to strings (keys)
+  const ctxCategoryKeys = ctxCategoriesRaw
+    .map(c => (typeof c === 'string' ? c : (c && c.key ? c.key : '')))
+    .filter(Boolean);
+
+  // Merge context categories and inventory-derived categories into a deduped array of strings.
+  // Deduplicate case-insensitively but preserve first-seen casing (context first, then inventory)
+  const mergedCategoryKeys = (() => {
+    const seen = new Map(); // lower -> original
+    // prefer context order first so admin-defined categories keep precedence
+    [...ctxCategoryKeys, ...uniqueCategories].forEach(k => {
+      const str = (k || '').toString().trim();
+      if (!str) return;
+      const lower = str.toLowerCase();
+      if (!seen.has(lower)) seen.set(lower, str);
+    });
+    return Array.from(seen.values());
+  })();
+
+  // control AddCategory modal visibility
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
   const filteredInventory = inventory.filter(item =>
@@ -54,7 +83,7 @@ export default function Inventory() {
   );
 
   // pagination logic
-  const totalPages = Math.ceil(filteredInventory.length / entriesPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / entriesPerPage));
   const paginatedInventory = filteredInventory.slice(
     (currentPage - 1) * entriesPerPage,
     currentPage * entriesPerPage
@@ -97,24 +126,35 @@ export default function Inventory() {
       sizes: newItem.sizes || [],
     };
 
-    setInventory([...inventory, newItemData]);
+    setInventory(prev => [...prev, newItemData]);
 
-    if (newItemData.category && !categories.includes(newItemData.category)) {
-      setCategories(prev => [...prev, newItemData.category]);
+    // If this category is brand-new (not present in mergedCategoryKeys), add to context so POS receives it
+    const newCatLower = (newItemData.category || '').toLowerCase();
+    const exists = mergedCategoryKeys.some(k => k.toLowerCase() === newCatLower);
+    if (newItemData.category && !exists) {
+      // add with a default icon placeholder — you can change the default path as needed
+      try {
+        addCategory({ key: newItemData.category, icon: '/assets/default-category.png' });
+      } catch (e) {
+        // addCategory may be a no-op when provider missing — ignore
+      }
     }
 
-    setLogs([...logs, {
-      datetime: formatDateTime(),
-      action: "Add",
-      admin: adminName,
-      product: newItemData.name,
-      field: "New Product",
-      stock: `${newItemData.quantity} pcs`,
-      oldPrice: "",
-      newPrice: `₱${newItemData.price}`,
-      category: newItemData.category,
-      detail: `Added new item: ${newItemData.name}`
-    }]);
+    setLogs(prev => [
+      ...prev,
+      {
+        datetime: formatDateTime(),
+        action: "Add",
+        admin: adminName,
+        product: newItemData.name,
+        field: "New Product",
+        stock: `${newItemData.quantity} pcs`,
+        oldPrice: "",
+        newPrice: `₱${newItemData.price}`,
+        category: newItemData.category,
+        detail: `Added new item: ${newItemData.name}`
+      }
+    ]);
 
     setShowAddModal(false);
     setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available', sizes: [] });
@@ -182,12 +222,17 @@ export default function Inventory() {
     updated[selectedItemIndex] = updatedItem;
     setInventory(updated);
 
-    if (updatedItem.category && !categories.includes(updatedItem.category)) {
-      setCategories(prev => [...prev, updatedItem.category]);
+    // if edited category is new, add to context
+    const editCatLower = (updatedItem.category || '').toLowerCase();
+    const existsEdit = mergedCategoryKeys.some(k => k.toLowerCase() === editCatLower);
+    if (updatedItem.category && !existsEdit) {
+      try {
+        addCategory({ key: updatedItem.category, icon: '/assets/default-category.png' });
+      } catch (e) {}
     }
 
-    setLogs([
-      ...logs,
+    setLogs(prev => [
+      ...prev,
       {
         datetime: formatDateTime(),
         action: "Update",
@@ -205,6 +250,32 @@ export default function Inventory() {
     setShowEditModal(false);
     setIsEditSuccess(true);
     setShowSaveModal(true);
+  };
+
+  // called when admin AddCategoryModal reports new category; we also add to context
+  const handleAdminAddCategory = (newCatRaw) => {
+    const clean = (newCatRaw || '').trim();
+    if (!clean) return;
+    // add to context (with default icon)
+    try {
+      addCategory({ key: clean, icon: '/assets/default-category.png' });
+    } catch (e) {}
+    // add a log entry as before
+    setLogs(prevLogs => [
+      {
+        datetime: formatDateTime(),
+        action: "Add",
+        admin: adminName,
+        product: "—",
+        field: "Category",
+        stock: "—",
+        oldPrice: "",
+        newPrice: "",
+        category: clean,
+        detail: `Added new category: "${clean}"`
+      },
+      ...prevLogs,
+    ]);
   };
 
   return (
@@ -270,7 +341,18 @@ export default function Inventory() {
                   <th className="p-3">No.</th>
                   <th className="p-3">Name</th>
                   <th className="p-3">Price</th>
-                  <th className="p-3">Category</th>
+                  <th className="p-3 relative">
+  <div className="flex items-center gap-1">
+    Category
+    <button
+      onClick={() => setShowCategoryFilter(true)}
+      className="text-white hover:text-yellow-300 focus:outline-none"
+    >
+      ▼
+    </button>
+  </div>
+</th>
+
                   <th className="p-3">Allergens</th>
                   <th className="p-3">Add-ons</th>
                   <th className="p-3">Description</th>
@@ -351,7 +433,7 @@ export default function Inventory() {
         <div className="mt-4 flex justify-between items-center">
           <ShowEntries
             entriesPerPage={entriesPerPage}
-            setEntriesPerPage={setEntriesPerPage}
+            setEntriesPerPage={(n) => { setEntriesPerPage(n); setCurrentPage(1); }}
             setCurrentPage={setCurrentPage}
           />
 
@@ -373,7 +455,7 @@ export default function Inventory() {
           <AddItemModal
             newItem={newItem}
             setNewItem={setNewItem}
-            uniqueCategories={mergedCategories}
+            uniqueCategories={mergedCategoryKeys}
             onClose={() => setShowAddModal(false)}
             onSave={handleAddItem}
           />
@@ -383,7 +465,7 @@ export default function Inventory() {
           <EditItemModal
             newItem={newItem}
             setNewItem={setNewItem}
-            uniqueCategories={mergedCategories}
+            uniqueCategories={mergedCategoryKeys}
             onClose={() => setShowEditModal(false)}
             onSave={handleEditItem}
           />
@@ -392,7 +474,7 @@ export default function Inventory() {
         {showCategoryFilter && (
           <CategoryFilterModal
             selectedCategory={selectedCategory}
-            uniqueCategories={mergedCategories}
+            uniqueCategories={mergedCategoryKeys}
             onSelect={(cat) => {
               setSelectedCategory(cat === 'All' ? '' : cat);
               setShowCategoryFilter(false);
@@ -425,27 +507,14 @@ export default function Inventory() {
         {showAddCategoryModal && (
           <AddCategoryModal
             onClose={() => setShowAddCategoryModal(false)}
+            // AddCategoryModal (modals/AddCategoryModal) calls the onAdd string callback.
             onAdd={(newCat) => {
               const clean = (newCat || '').trim();
               if (!clean) return setShowAddCategoryModal(false);
-              if (!categories.includes(clean)) {
-                setCategories(prev => [...prev, clean]);
-                setLogs((prevLogs) => [
-                  {
-                    datetime: formatDateTime(),
-                    action: "Add",
-                    admin: adminName,
-                    product: "—",
-                    field: "Category",
-                    stock: "—",
-                    oldPrice: "",
-                    newPrice: "",
-                    category: clean,
-                    detail: `Added new category: "${clean}"`
-                  },
-                  ...prevLogs,
-                ]);
-              }
+
+              // Add to shared context (so POS and other admin pages see it)
+              handleAdminAddCategory(clean);
+
               setShowAddCategoryModal(false);
             }}
           />
