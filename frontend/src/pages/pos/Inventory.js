@@ -59,20 +59,28 @@ export default function Inventory() {
     .map(c => (typeof c === 'string' ? c : (c && c.key ? c.key : '')))
     .filter(Boolean);
 
-  // Merge context categories and inventory-derived categories into a deduped array of strings.
-  // Deduplicate case-insensitively but preserve first-seen casing (context first, then inventory)
-  const mergedCategoryKeys = (() => {
-    const seen = new Map(); // lower -> original
-    // prefer context order first so admin-defined categories keep precedence
-    [...ctxCategoryKeys, ...uniqueCategories].forEach(k => {
-      const str = (k || '').toString().trim();
-      if (!str) return;
-      const lower = str.toLowerCase();
-      if (!seen.has(lower)) seen.set(lower, str);
-    });
-    return Array.from(seen.values());
-  })();
+  // Merge context categories and inventory-derived categories into a deduped array of strings
+// Context categories take precedence over inventory-derived categories
+const mergedCategoryKeys = (() => {
+  const seen = new Map(); // lowercased key -> original casing
 
+  // Add context categories first (objects or strings)
+  ctxCategoriesRaw.forEach(c => {
+    const key = typeof c === 'string' ? c.trim() : c?.key?.trim();
+    if (!key) return;
+    const lower = key.toLowerCase();
+    if (!seen.has(lower)) seen.set(lower, key);
+  });
+
+  // Add inventory-derived categories (strings)
+  uniqueCategories.forEach(c => {
+    const key = c.trim();
+    const lower = key.toLowerCase();
+    if (!seen.has(lower)) seen.set(lower, key);
+  });
+
+  return Array.from(seen.values());
+})();
   // control AddCategory modal visibility
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
@@ -128,17 +136,6 @@ export default function Inventory() {
 
     setInventory(prev => [...prev, newItemData]);
 
-    // If this category is brand-new (not present in mergedCategoryKeys), add to context so POS receives it
-    const newCatLower = (newItemData.category || '').toLowerCase();
-    const exists = mergedCategoryKeys.some(k => k.toLowerCase() === newCatLower);
-    if (newItemData.category && !exists) {
-      // add with a default icon placeholder — you can change the default path as needed
-      try {
-        addCategory({ key: newItemData.category, icon: '/assets/default-category.png' });
-      } catch (e) {
-        // addCategory may be a no-op when provider missing — ignore
-      }
-    }
 
     setLogs(prev => [
       ...prev,
@@ -253,30 +250,33 @@ export default function Inventory() {
   };
 
   // called when admin AddCategoryModal reports new category; we also add to context
-  const handleAdminAddCategory = (newCatRaw) => {
-    const clean = (newCatRaw || '').trim();
-    if (!clean) return;
-    // add to context (with default icon)
-    try {
-      addCategory({ key: clean, icon: '/assets/default-category.png' });
-    } catch (e) {}
-    // add a log entry as before
-    setLogs(prevLogs => [
-      {
-        datetime: formatDateTime(),
-        action: "Add",
-        admin: adminName,
-        product: "—",
-        field: "Category",
-        stock: "—",
-        oldPrice: "",
-        newPrice: "",
-        category: clean,
-        detail: `Added new category: "${clean}"`
-      },
-      ...prevLogs,
-    ]);
-  };
+ const handleAdminAddCategory = (newCatRaw) => {
+  const clean = (newCatRaw || '').trim();
+  if (!clean) return;
+
+  // Add to context (so POS and other admin pages see it)
+  try {
+    addCategory({ key: clean, icon: '/assets/default-category.png' });
+  } catch (e) {}
+
+  // Add a log entry for the new category
+  setLogs(prevLogs => [
+    ...prevLogs,
+    {
+      datetime: formatDateTime(),
+      action: "Add",
+      admin: adminName,
+      product: "—",
+      field: "Category",
+      stock: "—",
+      oldPrice: "",
+      newPrice: "",
+      category: clean,          // show the newly added category
+       detail: `added new category: "${clean}"`   // detail text
+    }
+  ]);
+};
+  
 
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
@@ -337,31 +337,66 @@ export default function Inventory() {
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full table-auto border-collapse">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
-                <tr className="text-left">
-                  <th className="p-3">No.</th>
-                  <th className="p-3">Name</th>
-                  <th className="p-3">Price</th>
-                  <th className="p-3 relative">
-  <div className="flex items-center gap-1">
-    Category
-    <button
-      onClick={() => setShowCategoryFilter(true)}
-      className="text-white hover:text-yellow-300 focus:outline-none"
-    >
-      ▼
-    </button>
-  </div>
-</th>
+  <tr className="text-left">
+    <th className="p-3">No.</th>
+    <th className="p-3">Name</th>
+    <th className="p-3">Price</th>
+    <th className="p-3">
+      <div className="flex items-center gap-2">
+        <span className="text-white font-semibold">Category</span>
+        <div className="relative inline-block">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+            style={{ width: '24px' }}
+          >
+            <option value="">All</option>
+            {mergedCategoryKeys.map((cat, i) => (
+              <option key={i} value={cat}>{cat}</option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </th>
+    <th className="p-3">Allergens</th>
+    <th className="p-3">Add-ons</th>
+    <th className="p-3">Description</th>
+    <th className="p-3">Sizes</th>
+    <th className="p-3 text-center">Stock</th>
+    <th className="p-3 text-center">
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-white font-semibold">Status</span>
+        <div className="relative inline-block">
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+            style={{ width: '24px' }}
+          >
+            <option value="">All</option>
+            <option value="Available">Available</option>
+            <option value="Unavailable">Unavailable</option>
+          </select>
+          <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    </th>
+    <th className="p-3 text-center">Edit</th>
+  </tr>
+</thead>
 
-                  <th className="p-3">Allergens</th>
-                  <th className="p-3">Add-ons</th>
-                  <th className="p-3">Description</th>
-                  <th className="p-3">Sizes</th>
-                  <th className="p-3 text-center">Stock</th>
-                  <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-center">Edit</th>
-                </tr>
-              </thead>
+
+
 
               <tbody>
                 {paginatedInventory.map((item, index) => (
@@ -504,21 +539,40 @@ export default function Inventory() {
           />
         )}
         
-        {showAddCategoryModal && (
-          <AddCategoryModal
-            onClose={() => setShowAddCategoryModal(false)}
-            // AddCategoryModal (modals/AddCategoryModal) calls the onAdd string callback.
-            onAdd={(newCat) => {
-              const clean = (newCat || '').trim();
-              if (!clean) return setShowAddCategoryModal(false);
+       {showAddCategoryModal && (
+  <AddCategoryModal
+    onClose={() => setShowAddCategoryModal(false)}
+    onAdded={(newCat, iconPath) => {
+      const clean = (newCat || "").trim();
+      if (!clean) return setShowAddCategoryModal(false);
 
-              // Add to shared context (so POS and other admin pages see it)
-              handleAdminAddCategory(clean);
+      // Add to context once
+      try {
+        addCategory({ key: clean, icon: iconPath || "/assets/default-category.png" });
+      } catch (e) {}
 
-              setShowAddCategoryModal(false);
-            }}
-          />
-        )}
+      // Add log entry
+      setLogs((prevLogs) => [
+        ...prevLogs,
+        {
+          datetime: formatDateTime(),
+          action: "Add",
+          admin: adminName,
+          product: "—",
+          field: "Category",
+          stock: "—",
+          oldPrice: "",
+          newPrice: "",
+          category: clean,
+          detail: `Added new category: "${clean}"`
+        }
+      ]);
+
+      setShowAddCategoryModal(false);
+    }}
+  />
+)}
+
       </div>
     </div>
   );

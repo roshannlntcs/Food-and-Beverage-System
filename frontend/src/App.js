@@ -19,7 +19,7 @@ import Inventory from './pages/pos/Inventory';
 import POSMonitoring from './pages/pos/POSMonitoring';
 import SupplierRecords from './pages/pos/SupplierRecords';
 import VoidLogs from './pages/pos/VoidLogs';
-import SuperAdmin from './pages/pos/SuperAdmin'; // adjust path if needed
+import SuperAdmin from './pages/pos/SuperAdmin'; 
 import SalesReport from "./pages/pos/SalesReport"; // <-- Import it
 
 function App() {
