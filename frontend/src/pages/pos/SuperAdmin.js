@@ -7,13 +7,12 @@ import Pagination from "../../components/Pagination";
 import ResetConfirmationModal from "../../components/ResetConfirmationModal";
 
 const dummyUsers = [
-  { id: 1, username: "johnpaulavillaverde", avatar: "https://i.pravatar.cc/150?img=1", recentLogin: "5 minutes ago", type: "Admin", action: "Viewed void logs" },
+  { id: 1, username: "johnpaulavillaverde", avatar: "https://i.pravatar.cc/150?img=1", recentLogin: "5 minutes ago", type: "Manager", action: "Viewed void logs" },
   { id: 2, username: "japitselffishh", avatar: "https://i.pravatar.cc/150?img=2", recentLogin: "1 hour ago", type: "Admin", action: "Edited an item in inventory" },
   { id: 3, username: "blessmychojamil", avatar: "https://i.pravatar.cc/150?img=3", recentLogin: "3 hours ago", type: "Cashier", action: "Void transaction #13526" },
   { id: 4, username: "dianamairieee", avatar: "https://i.pravatar.cc/150?img=4", recentLogin: "1 day ago", type: "Admin", action: "Added supplier in supplier records" },
   { id: 5, username: "mjlastimosa", avatar: "https://i.pravatar.cc/150?img=5", recentLogin: "2 days ago", type: "Cashier", action: "Placed order (#64984487)" },
-  { id: 6, username: "annawhite", avatar: "https://i.pravatar.cc/150?img=6", recentLogin: "10 minutes ago", type: "Admin", action: "Updated sales report" },
-  { id: 7, username: "michael_smith", avatar: "https://i.pravatar.cc/150?img=7", recentLogin: "4 hours ago", type: "Cashier", action: "Processed refund (#789654)" },
+  { id: 6, username: "genesisjohn", avatar: "https://i.pravatar.cc/150?img=6", recentLogin: "2 days ago", type: "Cashier", action: "Placed order (#64984487)" },
 ];
 
 const resetWarnings = {
@@ -24,17 +23,22 @@ const resetWarnings = {
 
 const SuperAdmin = () => {
   const [users] = useState(dummyUsers);
-  const [entriesPerPage, setEntriesPerPage] = useState(4);
+  const [entriesPerPage, setEntriesPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
-  const [activeReset, setActiveReset] = useState(null); // "transactions" | "voidLogs" | "salesReport" | null
+  const [activeReset, setActiveReset] = useState(null);
 
-  // Pagination calculations
+  // User type filter
+  const [filterType, setFilterType] = useState("All");
+
+  // Pagination
   const totalPages = Math.ceil(users.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
-  const paginatedUsers = users.slice(startIndex, startIndex + entriesPerPage);
+  const filteredUsers =
+    filterType === "All" ? users : users.filter((u) => u.type === filterType);
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + entriesPerPage);
 
   const openModal = (type) => {
     setActiveReset(type);
@@ -47,111 +51,115 @@ const SuperAdmin = () => {
   };
 
   const handleConfirmReset = () => {
-    // Placeholder: implement your reset logic here based on activeReset
     alert(`Resetting ${activeReset}`);
-
-    // Close modal after confirming
     closeModal();
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f9f6ee]">
+    <div className="flex min-h-screen bg-[#f8f5f0]">
+      {/* Sidebar */}
       <Sidebar />
 
+      {/* Main Content */}
       <div className="ml-20 p-8 flex-1">
+        {/* Header */}
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">System Admin</h1>
+          <h1 className="text-3xl font-bold">System Administrator</h1>
           <AdminInfo />
         </div>
 
-        {/* Reset Buttons */}
-        <div className="flex justify-center gap-10 mb-12 flex-wrap">
-          {["transactions", "voidLogs", "salesReport"].map((type) => (
-            <div
-              key={type}
-              className="bg-yellow-100 p-8 rounded-lg shadow-md w-96 min-w-[360px] flex flex-col items-center"
-            >
-              <h2 className="font-semibold mb-2 uppercase">{`RESET ${type === "voidLogs" ? "VOID LOGS" : type === "salesReport" ? "SALES REPORT" : "TRANSACTIONS"}`}</h2>
-              <p className="text-sm mb-6 text-center">
-                {`Reset all the ${
-                  type === "voidLogs"
-                    ? "void logs"
-                    : type === "salesReport"
-                    ? "sales report"
-                    : "transactions"
-                } to default`}
-              </p>
-              <button
-                onClick={() => openModal(type)}
-                className="bg-gray-300 rounded-full px-10 py-3 hover:bg-gray-400 font-semibold"
-              >
-                RESET
-              </button>
-            </div>
-          ))}
+        {/* Top controls: Reset + Add/Upload buttons */}
+        <div className="flex justify-between items-center mb-6">
+          {/* Reset dropdown */}
+          <select
+            className="px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) openModal(e.target.value);
+            }}
+          >
+            <option value="" disabled>
+              Reset All
+            </option>
+            <option value="transactions">Transactions</option>
+            <option value="voidLogs">Void Logs</option>
+            <option value="salesReport">Sales Report</option>
+          </select>
+
+          <div className="flex gap-3">
+            <button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-5 py-2 rounded-md">
+              + Add User
+            </button>
+            <button className="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2 rounded-md">
+              Upload CSV
+            </button>
+          </div>
         </div>
 
         {/* Users Table */}
         <section>
-          <h2 className="font-semibold mb-4 flex items-center gap-2 text-lg">
-            <FaUsers /> Users
-          </h2>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="font-semibold flex items-center gap-2 text-lg">
+              <FaUsers /> Users
+            </h2>
 
-          <div className="border rounded shadow bg-white">
-            <div className="overflow-y-auto max-h-[260px]">
-              <table className="min-w-full border-collapse">
-                <thead className="bg-white border-b border-gray-300 sticky top-0 z-10">
-                  <tr>
-                    <th scope="col" className="py-3 px-4 text-left">USERNAME</th>
-                    <th scope="col" className="py-3 px-4 text-left">RECENT LOGIN</th>
-                    <th scope="col" className="py-3 px-4 text-left">TYPE</th>
-                    <th scope="col" className="py-3 px-4 text-left">ACTIONS</th>
-                    <th scope="col" className="py-3 px-4 w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedUsers.map((user) => (
-                    <tr key={user.id} className="border-b border-gray-200 hover:bg-yellow-50">
-                      <td className="py-3 px-4 flex items-center gap-2 whitespace-nowrap">
-                        <img
-                          src={user.avatar}
-                          alt={user.username}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                        <span className="truncate max-w-xs">{user.username}</span>
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">{user.recentLogin}</td>
-                      <td className="py-3 px-4 whitespace-nowrap">{user.type}</td>
-                      <td className="py-3 px-4">{user.action}</td>
-                      <td className="py-3 px-4 text-center cursor-pointer text-gray-500 hover:text-black">
-                        <FaEllipsisV />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Filter dropdown */}
+            <select
+              className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-sm text-gray-700"
+              value={filterType}
+              onChange={(e) => {
+                setFilterType(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="All">All</option>
+              <option value="Admin">Admin</option>
+              <option value="Cashier">Cashier</option>
+              <option value="Manager">Manager</option>
+            </select>
           </div>
 
-          {/* Show entries & Pagination in one row */}
-          <div className="flex items-center mt-3 relative">
-            {/* Left: Show Entries */}
-            <div className="absolute left-0">
-              <ShowEntries
-                entriesPerPage={entriesPerPage}
-                setEntriesPerPage={setEntriesPerPage}
-                setCurrentPage={setCurrentPage}
-              />
-            </div>
+          <div className="bg-white rounded-lg shadow">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr className="text-left border-b">
+                  <th className="py-3 px-4">USERNAME</th>
+                  <th className="py-3 px-4">RECENT LOGIN</th>
+                  <th className="py-3 px-4">TYPE</th>
+                  <th className="py-3 px-4">ACTIONS</th>
+                  <th className="py-3 px-4 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedUsers.map((user) => (
+                  <tr key={user.id} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4 flex items-center gap-2">
+                      <img
+                        src={user.avatar}
+                        alt={user.username}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      <span className="truncate">{user.username}</span>
+                    </td>
+                    <td className="py-3 px-4 whitespace-nowrap">{user.recentLogin}</td>
+                    <td className="py-3 px-4">{user.type}</td>
+                    <td className="py-3 px-4">{user.action}</td>
+                    <td className="py-3 px-4 text-center cursor-pointer text-gray-500 hover:text-black">
+                      <FaEllipsisV />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            {/* Center: Pagination */}
-            <div className="flex-1 flex justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                setCurrentPage={setCurrentPage}
-              />
-            </div>
+          {/* Pagination */}
+          <div className="flex items-center justify-center mt-4">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredUsers.length / entriesPerPage)}
+              setCurrentPage={setCurrentPage}
+            />
           </div>
         </section>
       </div>

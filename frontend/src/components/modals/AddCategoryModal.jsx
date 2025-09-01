@@ -1,19 +1,10 @@
 // src/components/admin/AddCategoryModal.jsx
 import React, { useState } from "react";
-import { useCategories } from "../../contexts/CategoryContext";
 
-/**
- * Admin Add Category modal.
- * - Uses CategoryContext.addCategory to add the new category object ({key, icon})
- * - Also calls optional onAdded(cleanName) so parent pages (Inventory) can do logs/extra work
- */
 export default function AddCategoryModal({ onClose, onAdded }) {
   const [categoryName, setCategoryName] = useState("");
   const [iconFile, setIconFile] = useState(null);
   const [iconPreview, setIconPreview] = useState(null);
-
-  const categoriesCtx = useCategories();
-  const addCategory = categoriesCtx?.addCategory;
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -27,30 +18,17 @@ export default function AddCategoryModal({ onClose, onAdded }) {
     const cleanName = categoryName.trim();
     if (!cleanName) return;
 
-    // For now, store the image as a temporary local preview URL (frontend-only)
-    const iconPath = iconPreview || "/assets/default-category.png";
-
-    // Use context addCategory if available
-    if (typeof addCategory === "function") {
-      addCategory({
-        key: cleanName,
-        icon: iconPath,
-      });
-    }
-
-    // Call optional parent callback so Inventory can add logs or other actions
+    // Pass the name to parent only
     if (typeof onAdded === "function") {
-      onAdded(cleanName);
+      onAdded(cleanName, iconPreview || "/assets/default-category.png");
     }
 
-    // close modal
     if (typeof onClose === "function") onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white w-[500px] rounded-2xl shadow-lg overflow-hidden">
-        
         {/* Header */}
         <div className="bg-[#8B0000] text-white text-center py-5 rounded-t-2xl">
           <h2 className="text-lg font-bold">Add New Category</h2>
@@ -58,7 +36,6 @@ export default function AddCategoryModal({ onClose, onAdded }) {
 
         {/* Body */}
         <div className="px-10 py-8 space-y-6">
-          {/* Category Name */}
           <div className="flex items-center gap-4">
             <label className="w-32 text-sm font-semibold">Category Name</label>
             <input
@@ -70,7 +47,6 @@ export default function AddCategoryModal({ onClose, onAdded }) {
             />
           </div>
 
-          {/* Category Icon Upload */}
           <div className="flex items-start gap-4">
             <label className="w-32 text-sm font-semibold">Category Icon</label>
             <div className="flex flex-col gap-3">
@@ -91,7 +67,7 @@ export default function AddCategoryModal({ onClose, onAdded }) {
           </div>
         </div>
 
-        {/* Footer Buttons */}
+        {/* Footer */}
         <div className="flex justify-end gap-3 px-10 pb-6">
           <button
             onClick={onClose}
