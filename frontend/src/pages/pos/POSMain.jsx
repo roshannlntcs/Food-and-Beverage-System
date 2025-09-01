@@ -1,24 +1,24 @@
 // src/pages/pos/POSMain.jsx
-// ─── React & Router ────
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
-// ─── Layout Components ───
+// Layout Components
 import Header from "../../components/Header";
 import Sidebar from "../../components/POSSidebar";
 import TabsPanel from "../../components/TabsPanel";
 import ProductGrid from "../../components/ProductGrid";
 import CartPanel from "../../components/CartPanel";
 
-// ─── Tab Panels ───
+// Tab Panels
 import OrdersPanel from "../../components/OrdersTab";
 import TransactionsPanel from "../../components/TransactionsTab";
 import ItemsTab from "../../components/ItemsTab";
 
-// ─── Modals ───
+// Modals
 import ItemDetailModal from "../../components/modals/ItemDetailModal";
 import DiscountModal from "../../components/modals/DiscountModal";
 import VoidPasswordModal from "../../components/modals/VoidPasswordModal";
+import VoidReasonModal from "../../components/modals/VoidReasonModal";
 import ReceiptModal from "../../components/modals/ReceiptModal";
 import OrderSuccessModal from "../../components/modals/OrderSuccessModal";
 import HistoryModal from "../../components/modals/HistoryModal";
@@ -27,12 +27,12 @@ import TransactionDetailModal from "../../components/modals/TransactionDetailMod
 import OrderDetailModal from "../../components/modals/OrderDetailModal";
 import VoidDetailModal from "../../components/modals/VoidDetailModal";
 
-// ─── Payment Modals (new) ───
+// Payment Modals
 import CashPaymentModal from "../../components/modals/CashPaymentModal";
 import CardPaymentModal from "../../components/modals/CardPaymentModal";
 import QRSPaymentModal from "../../components/modals/QRSPaymentModal";
 
-// ─── Utilities ──
+// Utilities
 import { placeholders, shopDetails } from "../../utils/data";
 import {
   generateOrderID,
@@ -40,7 +40,6 @@ import {
   generateVoidID
 } from "../../utils/id";
 
-// ─── Assets ────
 const importAll = (r) =>
   r.keys().reduce((acc, k) => ({ ...acc, [k.replace("./", "")]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
@@ -49,16 +48,12 @@ export default function POSMain() {
   const navigate = useNavigate();
 
   const [showProfileModal, setShowProfileModal] = useState(false);
-
-  // No explicit "All Menu" category in state — null means "show everything"
   const [activeCategory, setActiveCategory] = useState(null);
-
   const [activeTab, setActiveTab] = useState("Menu");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [products, setProducts] = useState([]);
-  const lockTabs = ["Orders", "Transactions", "Discount"];
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
@@ -70,20 +65,13 @@ export default function POSMain() {
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
-
-    // Normalize: ensure each tx has a transactionID (fallback to id)
-    const normalized = saved.map(t => ({
-      ...t,
-      transactionID: t.transactionID || t.id || "",
-    }));
-
+    const normalized = saved.map(t => ({ ...t, transactionID: t.transactionID || t.id || "" }));
     if (normalized.length) {
       setTransactions(normalized);
       localStorage.setItem("transactions", JSON.stringify(normalized));
     }
   }, []);
 
-  // load orders
   useEffect(() => {
     const savedOrders = JSON.parse(localStorage.getItem("orders") || "[]");
     if (savedOrders.length) {
@@ -104,27 +92,26 @@ export default function POSMain() {
   const [showModal, setShowModal] = useState(false);
   const [modalProduct, setModalProduct] = useState(null);
 
-  const [showVoidPassword, setShowVoidPassword] = useState(false);
-  const [voidPasswordInput, setVoidPasswordInput] = useState("");
-  const [voidReason, setVoidReason] = useState("");
+  // VOID workflow states (new flow)
+  const [showFirstAuth, setShowFirstAuth] = useState(false); // first manager password prompt
+  const [showReasonModal, setShowReasonModal] = useState(false); // shows details + reason input
+  const [showFinalAuth, setShowFinalAuth] = useState(false); // final manager password prompt
+  const [pendingVoidReason, setPendingVoidReason] = useState("");
+  const [voidContext, setVoidContext] = useState({ type: null, index: null, tx: null }); // { type: 'transaction' | 'item', index, tx }
 
-  const [showVoidDetailModal, setShowVoidDetailModal] = useState(false);
+  const [showVoidDetailModal, setShowVoidDetailModal] = useState(false); // existing detail viewer (history)
   const [selectedVoidLog, setSelectedVoidLog] = useState(null);
 
-  const [voidContext, setVoidContext] = useState({ type: null, index: null });
   const [paymentMethod, setPaymentMethod] = useState("");
-
   const [voidLogs, setVoidLogs] = useState([]);
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("voidLogs") || "[]");
-
     const normalized = saved.map(v => ({
       ...v,
       voidId: v.voidId || v.oidId || "",
       txId: v.txId || v.transactionId || v.transactionID || "",
     }));
-
     if (normalized.length) {
       setVoidLogs(normalized);
       localStorage.setItem("voidLogs", JSON.stringify(normalized));
@@ -137,19 +124,19 @@ export default function POSMain() {
   // user info
   const userName = localStorage.getItem("userName") || "Cashier";
   const schoolId = localStorage.getItem("schoolId") || "";
-
   const basePassword = "123456";
 
   // Customer view refs & state
   const customerWinRef = React.useRef(null);
   const [lastPaymentInfo, setLastPaymentInfo] = useState(null);
+  const [customerViewOpened, setCustomerViewOpened] = useState(false); // only auto-open first click per transaction
 
   // Payment modal states
   const [showCashModal, setShowCashModal] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
 
-  // derive categories from placeholders (exclude any "All Menu" key if present)
+  // derive categories from placeholders (exclude "All Menu")
   const categories = useMemo(
     () => Object.keys(placeholders).filter(c => c && c.toLowerCase() !== "all menu"),
     []
@@ -182,14 +169,20 @@ export default function POSMain() {
     setCart(prev => prev.filter((_, i) => i !== index));
   };
 
-  // open item modal
+  // open product details/modal (when clicking item in ProductGrid)
   const openProductModal = (item) => {
     setModalProduct({ ...item, size: item.sizes[0], selectedAddons: [], quantity: 1, notes: "" });
     setShowModal(true);
     setEditingCartIndex(null);
     setModalEdited(false);
 
-    try { openCustomerView && openCustomerView(); } catch (e) {}
+    // Auto-open customer view only the first time for this transaction
+    try {
+      if (!customerViewOpened) {
+        openCustomerView();
+        setCustomerViewOpened(true);
+      }
+    } catch (e) {}
   };
 
   const applyCartItemChanges = () => {
@@ -229,6 +222,7 @@ export default function POSMain() {
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - discountAmt).toFixed(2);
 
+  // add to cart from modal
   const addToCart = () => {
     const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
     const sizeCost = modalProduct.size.price;
@@ -240,7 +234,7 @@ export default function POSMain() {
     setShowModal(false);
   };
 
-  // Broadcast helper: send cart to customer window(s)
+  // Broadcast helper
   const broadcastCart = (payload) => {
     if (customerWinRef.current && !customerWinRef.current.closed) {
       try {
@@ -250,7 +244,7 @@ export default function POSMain() {
     try { localStorage.setItem('pos_cart', JSON.stringify({ ...payload, _t: Date.now() })); } catch(e) {}
   };
 
-  // open or focus the customer view window
+  // open/focus customer view
   const openCustomerView = () => {
     const url = window.location.origin + '/customer-view';
     if (!customerWinRef.current || customerWinRef.current.closed) {
@@ -266,7 +260,7 @@ export default function POSMain() {
     }
   };
 
-  // helper: clear all logs (backup then clear) — will be invoked from ProfileModal
+  // clear logs helper
   const clearAllLogs = (opts = { confirm: true }) => {
     if (opts.confirm && !window.confirm('Clear ALL orders, transactions, and void logs? This is irreversible. A backup will be downloaded. Continue?')) return;
 
@@ -315,37 +309,35 @@ export default function POSMain() {
     broadcastCart({ cart, subtotal, tax, total, discountPct });
   }, [cart, subtotal, tax, total, discountPct]);
 
-  // When user switches away from Menu/Items, clear selected category so sidebar isn't stale
+  // Reset active category when moving away from Menu/Items
   useEffect(() => {
     if (!(activeTab === "Menu" || activeTab === "Items")) {
       setActiveCategory(null);
     }
   }, [activeTab]);
 
-  // PAYMENT FLOW
+  // Reset customerViewOpened when cart becomes empty
+  useEffect(() => {
+    if (cart.length === 0) {
+      setCustomerViewOpened(false);
+    }
+  }, [cart.length]);
+
+  // PAYMENT FLOW (unchanged)
   const initiatePayment = () => {
     if (!paymentMethod) {
       alert("Please choose a payment method first.");
       return;
     }
-
-    if (paymentMethod === "Cash") {
-      setShowCashModal(true);
-    } else if (paymentMethod === "Card") {
-      setShowCardModal(true);
-    } else if (paymentMethod === "QRS") {
-      setShowQRModal(true);
-    } else {
-      alert("Unknown payment method.");
-    }
+    if (paymentMethod === "Cash") setShowCashModal(true);
+    else if (paymentMethod === "Card") setShowCardModal(true);
+    else if (paymentMethod === "QRS") setShowQRModal(true);
+    else alert("Unknown payment method.");
   };
 
-  // Finalizes transaction: persists transaction & order and clears cart
+  // finalize transaction (unchanged except reset customerViewOpened)
   const finalizeTransaction = (paymentInfo = {}) => {
-    if (cart.length === 0) {
-      alert("Cart is empty.");
-      return;
-    }
+    if (cart.length === 0) { alert("Cart is empty."); return; }
 
     const subtotalCalc = cart.reduce((sum, item) => {
       const base = item.price ?? 0;
@@ -378,7 +370,7 @@ export default function POSMain() {
       voided: false,
     };
 
-    // Save transactions (prepend)
+    // persist transactions
     const existing = JSON.parse(localStorage.getItem("transactions") || "[]");
     const updatedTransactions = [newTransaction, ...existing];
     localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
@@ -393,7 +385,7 @@ export default function POSMain() {
       date: new Date().toLocaleString(),
     };
 
-    // Save orders (append)
+    // persist orders
     const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]");
     const updatedOrders = [...existingOrders, newOrder];
     localStorage.setItem("orders", JSON.stringify(updatedOrders));
@@ -409,22 +401,78 @@ export default function POSMain() {
     setShowCardModal(false);
     setShowQRModal(false);
 
-    try {
-      if (customerWinRef.current && !customerWinRef.current.closed) {
-        customerWinRef.current.close();
-      }
-    } catch (e) {}
+    try { if (customerWinRef.current && !customerWinRef.current.closed) customerWinRef.current.close(); } catch(e){}
     customerWinRef.current = null;
+
+    // Reset the auto-open flag so next transaction can auto-popup again
+    setCustomerViewOpened(false);
   };
 
-  const triggerVoid = (type, idx = null) => {
-    setVoidContext({ type, index: idx });
-    setShowVoidPassword(true);
+  // --- VOID FLOW IMPLEMENTATION ---
+
+  // Called to start void flow. `type` = 'transaction' or 'item'.
+  // We expect the caller to pass the transaction object as `tx` when voiding (if available).
+  const triggerVoid = (type, indexOrTx = null) => {
+    // normalize incoming params:
+    // If an object with .id is passed, treat as tx
+    if (indexOrTx && typeof indexOrTx === 'object' && indexOrTx.id) {
+      setVoidContext({ type, tx: indexOrTx, index: null });
+    } else {
+      // maybe caller passed index only — try to derive tx from historyContext or selectedTransaction
+      const txFromHistory = historyContext?.tx || selectedTransaction || null;
+      setVoidContext({ type, tx: txFromHistory, index: typeof indexOrTx === 'number' ? indexOrTx : null });
+    }
+    // show first-level manager auth
+    setShowFirstAuth(true);
+    setShowReasonModal(false);
+    setShowFinalAuth(false);
+    setPendingVoidReason("");
   };
 
+  // first-level auth confirm
+  const onFirstAuthConfirm = (passwordEntered) => {
+    if (passwordEntered !== basePassword) {
+      alert("Wrong manager password.");
+      return;
+    }
+    // proceed to reason/details modal
+    setShowFirstAuth(false);
+    setShowReasonModal(true);
+  };
+
+  // when user submits reason in reason modal -> show final auth
+  const onReasonSubmit = (reason) => {
+    setPendingVoidReason(reason);
+    setShowReasonModal(false);
+    setShowFinalAuth(true);
+  };
+
+  // final auth confirm
+  const onFinalAuthConfirm = (passwordEntered) => {
+    if (passwordEntered !== basePassword) {
+      alert("Wrong manager password.");
+      return;
+    }
+    // run actual confirmVoid with pending reason
+    confirmVoid(pendingVoidReason);
+    // reset flags
+    setShowFinalAuth(false);
+    setPendingVoidReason("");
+  };
+
+  // confirmVoid actually performs the void operation and logging (same as your existing logic,
+  // but now accepts a reason string)
   const confirmVoid = (reason = "No reason provided") => {
-    const { type, tx, index } = voidContext;
-    if (!tx) return;
+    const { type, tx, index } = voidContext || {};
+    if (!tx) {
+      alert("No transaction selected for void.");
+      setShowFirstAuth(false);
+      setShowReasonModal(false);
+      setShowFinalAuth(false);
+      setVoidContext({ type: null, index: null, tx: null });
+      setPendingVoidReason("");
+      return;
+    }
 
     // --- Update Transactions (in-memory + localStorage) ---
     const currentTxs = JSON.parse(localStorage.getItem("transactions") || "[]");
@@ -516,7 +564,7 @@ export default function POSMain() {
 
     const newLog = {
       voidId: existing?.voidId || generateVoidID(),
-      txId: tx.id,
+      txId: existing?.txId || tx.id,
       transactionId: tx.transactionID,
       cashier: userName,
       manager: "Admin",
@@ -543,11 +591,13 @@ export default function POSMain() {
       setHistoryContext({ type: "orderDetail", order: refreshedOrder });
     }
 
-    setShowVoidPassword(false);
+    // reset flow state
+    setShowFirstAuth(false);
+    setShowReasonModal(false);
+    setShowFinalAuth(false);
+    setVoidContext({ type: null, index: null, tx: null });
+    setPendingVoidReason("");
     setShowHistoryModal(false);
-    setVoidContext(null);
-    setVoidPasswordInput("");
-    setVoidReason("");
   };
 
   useEffect(() => {
@@ -558,14 +608,9 @@ export default function POSMain() {
   }, [activeTab]);
 
   const updateOrderStatus = (orderID, newStatus) => {
-    setOrders(prev =>
-      prev.map(o =>
-        o.orderID === orderID ? { ...o, status: newStatus } : o
-      )
-    );
+    setOrders(prev => prev.map(o => o.orderID === orderID ? { ...o, status: newStatus } : o));
   };
 
-  // categories enabled only when on Menu or Items
   const categoriesEnabled = activeTab === "Menu" || activeTab === "Items";
 
   return (
@@ -584,14 +629,14 @@ export default function POSMain() {
         <div className="flex flex-1 overflow-hidden">
           {/* CATEGORY SIDEBAR */}
           <Sidebar
-  activeCategory={activeCategory}
-  onCategorySelect={(cat) => {
-    if (!categoriesEnabled) return;
-    setActiveCategory(prev => (prev === cat ? null : cat));
-  }}
-  clearSearch={() => setSearchTerm("")}
-  enabled={categoriesEnabled}
-/>
+            activeCategory={activeCategory}
+            onCategorySelect={(cat) => {
+              if (!categoriesEnabled) return;
+              setActiveCategory(prev => (prev === cat ? null : cat));
+            }}
+            clearSearch={() => setSearchTerm("")}
+            enabled={categoriesEnabled}
+          />
 
           {/* CONTENT */}
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -617,7 +662,7 @@ export default function POSMain() {
                 </div>
               )}
 
-              {/* ORDERS */}
+              {/* KVS / Orders */}
               {activeTab === "KVS" && (
                 <OrdersPanel
                   orders={orders}
@@ -687,6 +732,8 @@ export default function POSMain() {
         setShowHistoryModal={setShowHistoryModal}
         transactions={transactions}
         openCustomerView={openCustomerView}
+        // expose triggerVoid so other components can start void flow (if they want)
+        triggerVoid={(type, idxOrTx) => triggerVoid(type, idxOrTx)}
       />
 
       {/* History & Void Modal */}
@@ -695,7 +742,8 @@ export default function POSMain() {
           transactions={transactions}
           setShowHistoryModal={setShowHistoryModal}
           setVoidContext={setVoidContext}
-          setShowVoidPassword={setShowVoidPassword}
+          setShowFirstAuth={() => setShowFirstAuth(true)}
+          setShowVoidPassword={() => setShowFirstAuth(true)}
         />
       )}
 
@@ -708,19 +756,29 @@ export default function POSMain() {
         />
       )}
 
-      {/* Void Password Modal */}
+      {/* First-level Manager Password Modal */}
       <VoidPasswordModal
-        isOpen={showVoidPassword}
-        passwordValue={voidPasswordInput}
-        onPasswordChange={setVoidPasswordInput}
-        onClose={() => { setShowVoidPassword(false); setVoidPasswordInput(""); }}
-        onConfirm={(passwordEntered, reasonEntered) => {
-          if (passwordEntered !== basePassword) { alert("Wrong password"); return; }
-          confirmVoid(reasonEntered);
-        }}
+        isOpen={showFirstAuth}
+        onClose={() => { setShowFirstAuth(false); }}
+        onConfirm={(passwordEntered) => onFirstAuthConfirm(passwordEntered)}
       />
 
-      {/* Void Detail Modal */}
+      {/* Reason + Detail Modal */}
+      <VoidReasonModal
+        isOpen={showReasonModal}
+        onClose={() => { setShowReasonModal(false); }}
+        voidContext={voidContext}
+        onSubmit={(reason) => onReasonSubmit(reason)}
+      />
+
+      {/* Final-level Manager Password Modal */}
+      <VoidPasswordModal
+        isOpen={showFinalAuth}
+        onClose={() => { setShowFinalAuth(false); }}
+        onConfirm={(passwordEntered) => onFinalAuthConfirm(passwordEntered)}
+      />
+
+      {/* Void Detail Modal (existing viewer) */}
       {showVoidDetailModal && selectedVoidLog && (
         <VoidDetailModal
           voidLog={selectedVoidLog}
