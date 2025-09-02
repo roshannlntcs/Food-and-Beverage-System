@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
 import { FaUsers, FaEllipsisV } from "react-icons/fa";
 import ShowEntries from "../../components/ShowEntries";
 import Pagination from "../../components/Pagination";
 import ResetConfirmationModal from "../../components/ResetConfirmationModal";
+import Papa from "papaparse"; 
 
 const dummyUsers = [
   { id: 1, username: "johnpaulavillaverde", avatar: "https://i.pravatar.cc/150?img=1", recentLogin: "5 minutes ago", type: "Manager", action: "Viewed void logs" },
@@ -22,7 +23,7 @@ const resetWarnings = {
 };
 
 const SuperAdmin = () => {
-  const [users] = useState(dummyUsers);
+  const [users, setUsers] = useState(dummyUsers);
   const [entriesPerPage, setEntriesPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -33,11 +34,37 @@ const SuperAdmin = () => {
   // User type filter
   const [filterType, setFilterType] = useState("All");
 
+  // File input ref
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  Papa.parse(file, {
+    header: true, // must have "id" and "username" headers
+    skipEmptyLines: true,
+    complete: (results) => {
+      const parsedUsers = results.data.map((row, index) => ({
+        id: row.id || index + 1, // fallback if id is missing
+        username: row.username || "Unknown",
+        avatar: "https://i.pravatar.cc/150", // default
+        recentLogin: "N/A", // default
+        type: "Cashier", // default
+        action: "CSV Import", // default
+      }));
+
+      // ✅ Replace entire list, not append
+      setUsers(parsedUsers);
+    },
+  });
+};
+
   // Pagination
-  const totalPages = Math.ceil(users.length / entriesPerPage);
-  const startIndex = (currentPage - 1) * entriesPerPage;
   const filteredUsers =
     filterType === "All" ? users : users.filter((u) => u.type === filterType);
+  const totalPages = Math.ceil(filteredUsers.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
   const paginatedUsers = filteredUsers.slice(startIndex, startIndex + entriesPerPage);
 
   const openModal = (type) => {
@@ -51,7 +78,18 @@ const SuperAdmin = () => {
   };
 
   const handleConfirmReset = () => {
-    alert(`Resetting ${activeReset}`);
+    if (activeReset === "transactions") {
+      localStorage.removeItem("transactions");
+      window.dispatchEvent(new Event("storage"));
+    }
+    if (activeReset === "voidLogs") {
+      localStorage.removeItem("voidLogs");
+      window.dispatchEvent(new Event("storage"));
+    }
+    if (activeReset === "salesReport") {
+      localStorage.removeItem("salesReport");
+      window.dispatchEvent(new Event("storage"));
+    }
     closeModal();
   };
 
@@ -81,18 +119,29 @@ const SuperAdmin = () => {
             <option value="" disabled>
               Reset All
             </option>
-            <option value="transactions">Transactions</option>
-            <option value="voidLogs">Void Logs</option>
-            <option value="salesReport">Sales Report</option>
+            <option value="transactions">Reset Transactions</option>
+            <option value="voidLogs">Reset Void Logs</option>
+            <option value="salesReport">Reset Sales Report</option>
           </select>
 
           <div className="flex gap-3">
             <button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-5 py-2 rounded-md">
               + Add User
             </button>
-            <button className="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2 rounded-md">
+            <button
+              onClick={() => fileInputRef.current.click()}
+              className="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2 rounded-md"
+            >
               Upload CSV
             </button>
+            {/* Hidden file input */}
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+            />
           </div>
         </div>
 
