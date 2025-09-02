@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUserCircle, FaCashRegister } from "react-icons/fa";
+import { FaCashRegister } from "react-icons/fa";
 
 export default function RoleSelection() {
   const navigate = useNavigate();
@@ -39,14 +39,18 @@ export default function RoleSelection() {
       <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[500px] text-center">
         {/* Hello, [Name] (centered at top, bigger font) */}
         {fullName && (
-          <h1 className="text-2xl font-bold text-gray-700 mb-6">
+          <h1 className="text-2xl font-semibold text-gray-700 mb-6">
             Hello, <span className="text-yellow-500">{fullName}</span>!
           </h1>
         )}
 
-        {/* Profile Picture Icon */}
+        {/* Profile Picture (Lebron.png) */}
         <div className="flex justify-center mb-6">
-          <FaUserCircle className="text-gray-400" size={80} />
+          <img
+            src="/lebron.png"
+            alt="Profile"
+            className="w-24 h-24 rounded-full object-cover border-4 border-gray-300 shadow-md"
+          />
         </div>
 
         {/* Subtitle smaller */}
@@ -56,25 +60,29 @@ export default function RoleSelection() {
 
         {/* Roles */}
         <div className="flex justify-center gap-12 mb-6">
+          {/* Admin */}
           <div
             onClick={() => setSelectedRole("admin")}
-            className={`cursor-pointer w-28 h-28 flex flex-col items-center justify-center rounded-xl transition-all duration-300 ${
+            className={`group cursor-pointer w-28 h-28 flex flex-col items-center justify-center rounded-xl transition-all duration-300 ${
               selectedRole === "admin"
                 ? "text-[#FFC72C]"
                 : "text-gray-700 hover:text-[#FFC72C]"
             }`}
           >
             <i
-              className={`fas fa-wrench text-3xl mb-2 ${
-                selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-500"
+              className={`fas fa-wrench text-3xl mb-2 transition-colors duration-300 ${
+                selectedRole === "admin"
+                  ? "text-[#FFC72C]"
+                  : "text-gray-500 group-hover:text-[#FFC72C]"
               }`}
             />
             <span className="font-medium">ADMIN</span>
           </div>
 
+          {/* Cashier */}
           <div
             onClick={() => setSelectedRole("cashier")}
-            className={`cursor-pointer w-28 h-28 flex flex-col items-center justify-center rounded-xl transition-all duration-300 ${
+            className={`group cursor-pointer w-28 h-28 flex flex-col items-center justify-center rounded-xl transition-all duration-300 ${
               selectedRole === "cashier"
                 ? "text-[#FFC72C]"
                 : "text-gray-700 hover:text-[#FFC72C]"
@@ -82,8 +90,10 @@ export default function RoleSelection() {
           >
             <FaCashRegister
               size={30}
-              className={`mb-2 ${
-                selectedRole === "cashier" ? "text-[#FFC72C]" : "text-gray-500"
+              className={`mb-2 transition-colors duration-300 ${
+                selectedRole === "cashier"
+                  ? "text-[#FFC72C]"
+                  : "text-gray-500 group-hover:text-[#FFC72C]"
               }`}
             />
             <span className="font-medium">CASHIER</span>
