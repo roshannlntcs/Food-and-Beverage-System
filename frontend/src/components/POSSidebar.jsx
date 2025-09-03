@@ -19,7 +19,7 @@ export default function Sidebar({
         const enabledClasses = isActive
           ? "bg-[#F6EBCE] font-semibold shadow"
           : "bg-white shadow-md hover:scale-105";
-        const disabledClasses = "bg-white/50 cursor-not-allowed opacity-60";
+        const disabledClasses = "bg-white/100 cursor-not-allowed";
 
         return (
           <button
