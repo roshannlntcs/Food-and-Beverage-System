@@ -1,35 +1,41 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
-import { FaUsers, FaEllipsisV } from "react-icons/fa";
-import ShowEntries from "../../components/ShowEntries";
+import { FaUsers } from "react-icons/fa";
 import Pagination from "../../components/Pagination";
 import ResetConfirmationModal from "../../components/ResetConfirmationModal";
-import Papa from "papaparse"; 
-
-const dummyUsers = [
-  { id: 1, username: "johnpaulavillaverde", avatar: "https://i.pravatar.cc/150?img=1", recentLogin: "5 minutes ago", type: "Manager", action: "Viewed void logs" },
-  { id: 2, username: "japitselffishh", avatar: "https://i.pravatar.cc/150?img=2", recentLogin: "1 hour ago", type: "Admin", action: "Edited an item in inventory" },
-  { id: 3, username: "blessmychojamil", avatar: "https://i.pravatar.cc/150?img=3", recentLogin: "3 hours ago", type: "Cashier", action: "Void transaction #13526" },
-  { id: 4, username: "dianamairieee", avatar: "https://i.pravatar.cc/150?img=4", recentLogin: "1 day ago", type: "Admin", action: "Added supplier in supplier records" },
-  { id: 5, username: "mjlastimosa", avatar: "https://i.pravatar.cc/150?img=5", recentLogin: "2 days ago", type: "Cashier", action: "Placed order (#64984487)" },
-  { id: 6, username: "genesisjohn", avatar: "https://i.pravatar.cc/150?img=6", recentLogin: "2 days ago", type: "Cashier", action: "Placed order (#64984487)" },
-];
+import MessageModal from "../../components/modals/MessageModal"; 
+import Papa from "papaparse";
 
 const resetWarnings = {
-  transactions: "Are you sure you want to reset all transactions? This action cannot be undone.",
-  voidLogs: "Are you sure you want to reset all void logs? This action cannot be undone.",
-  salesReport: "Are you sure you want to reset all sales records? This action cannot be undone.",
+  transactions:
+    "Are you sure you want to reset all transactions? This action cannot be undone.",
+  voidLogs:
+    "Are you sure you want to reset all void logs? This action cannot be undone.",
+  salesReport:
+    "Are you sure you want to reset all sales records? This action cannot be undone.",
+  users:
+    "Are you sure you want to reset all users? This will remove all except the SuperAdmin.",
+  all:
+    "Are you sure you want to reset EVERYTHING (Users, Transactions, Void Logs, Sales Report)? This action cannot be undone.",
 };
 
 const SuperAdmin = () => {
-  const [users, setUsers] = useState(dummyUsers);
+  const [users, setUsers] = useState([]);
   const [entriesPerPage, setEntriesPerPage] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Modal state
+  // Reset Confirmation modal
   const [modalOpen, setModalOpen] = useState(false);
   const [activeReset, setActiveReset] = useState(null);
+
+  // CSV message modal (error/success)
+  const [messageModal, setMessageModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "success",
+  });
 
   // User type filter
   const [filterType, setFilterType] = useState("All");
@@ -37,36 +43,115 @@ const SuperAdmin = () => {
   // File input ref
   const fileInputRef = useRef(null);
 
+  // ✅ Load all users (CSV + Admin) from localStorage
+  useEffect(() => {
+    let storedUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
+
+    // Ensure Admin is always in the list
+    if (!storedUsers.find((u) => u.id_number === "admin")) {
+      storedUsers.unshift({
+        id_number: "admin",
+        name: "Administrator",
+        password: "admin123",
+        type: "SuperAdmin",
+        recentLogin: "Never",
+      });
+    }
+
+    setUsers(storedUsers);
+  }, []);
+
+  // ✅ Handle CSV Upload
   const handleFileUpload = (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
+    const file = event.target.files[0];
+    if (!file) return;
 
-  Papa.parse(file, {
-    header: true, // must have "id" and "username" headers
-    skipEmptyLines: true,
-    complete: (results) => {
-      const parsedUsers = results.data.map((row, index) => ({
-        id: row.id || index + 1, // fallback if id is missing
-        username: row.username || "Unknown",
-        avatar: "https://i.pravatar.cc/150", // default
-        recentLogin: "N/A", // default
-        type: "Cashier", // default
-        action: "CSV Import", // default
-      }));
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const firstRow = results.data[0];
+        if (
+          !firstRow ||
+          !firstRow.id_number ||
+          !firstRow.name ||
+          !firstRow.password
+        ) {
+          setMessageModal({
+            isOpen: true,
+            title: "Invalid CSV",
+            message:
+              "CSV must have headers: id_number, name, password. Please upload a valid file.",
+            type: "error",
+          });
+          return;
+        }
 
-      // ✅ Replace entire list, not append
-      setUsers(parsedUsers);
-    },
-  });
-};
+        let parsedUsers = results.data.map((row) => ({
+          id_number: row.id_number,
+          name: row.name,
+          password: row.password,
+          type: "Student",
+          recentLogin: "Never",
+        }));
 
-  // Pagination
+        let existingUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
+
+        // Merge: keep recentLogin if already exists
+        parsedUsers.forEach((newUser) => {
+          const existing = existingUsers.find(
+            (u) => u.id_number === newUser.id_number
+          );
+          if (existing) {
+            newUser.recentLogin = existing.recentLogin;
+          }
+        });
+
+        // Merge without duplicates
+        const merged = [
+          ...existingUsers.filter(
+            (u) => !parsedUsers.find((p) => p.id_number === u.id_number)
+          ),
+          ...parsedUsers,
+        ];
+
+        // Ensure Admin stays
+        if (!merged.find((u) => u.id_number === "admin")) {
+          merged.unshift({
+            id_number: "admin",
+            name: "Administrator",
+            password: "admin123",
+            type: "SuperAdmin",
+            recentLogin: "Never",
+          });
+        }
+
+        localStorage.setItem("userCSV", JSON.stringify(merged));
+        setUsers(merged);
+
+        setMessageModal({
+          isOpen: true,
+          title: "Upload Successful",
+          message: "CSV uploaded successfully.",
+          type: "success",
+        });
+      },
+    });
+  };
+
+  // ✅ Filtering + Pagination
   const filteredUsers =
-    filterType === "All" ? users : users.filter((u) => u.type === filterType);
+    filterType === "All"
+      ? users
+      : users.filter((u) => u.type === filterType);
   const totalPages = Math.ceil(filteredUsers.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + entriesPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    startIndex,
+    startIndex + entriesPerPage
+  );
 
+  // ✅ Reset logic
   const openModal = (type) => {
     setActiveReset(type);
     setModalOpen(true);
@@ -80,17 +165,51 @@ const SuperAdmin = () => {
   const handleConfirmReset = () => {
     if (activeReset === "transactions") {
       localStorage.removeItem("transactions");
-      window.dispatchEvent(new Event("storage"));
     }
     if (activeReset === "voidLogs") {
       localStorage.removeItem("voidLogs");
-      window.dispatchEvent(new Event("storage"));
     }
     if (activeReset === "salesReport") {
       localStorage.removeItem("salesReport");
-      window.dispatchEvent(new Event("storage"));
     }
+    if (activeReset === "users") {
+      const adminOnly = [
+        {
+          id_number: "admin",
+          name: "Administrator",
+          password: "admin123",
+          type: "SuperAdmin",
+          recentLogin: "Never",
+        },
+      ];
+      localStorage.setItem("userCSV", JSON.stringify(adminOnly));
+      setUsers(adminOnly);
+    }
+    if (activeReset === "all") {
+      localStorage.clear();
+      const adminOnly = [
+        {
+          id_number: "admin",
+          name: "Administrator",
+          password: "admin123",
+          type: "SuperAdmin",
+          recentLogin: "Never",
+        },
+      ];
+      localStorage.setItem("userCSV", JSON.stringify(adminOnly));
+      setUsers(adminOnly);
+    }
+    window.dispatchEvent(new Event("storage"));
     closeModal();
+
+    setMessageModal({
+      isOpen: true,
+      title: "Reset Successful",
+      message: `${
+        activeReset === "all" ? "System data" : activeReset
+      } has been reset.`,
+      type: "success",
+    });
   };
 
   return (
@@ -106,7 +225,7 @@ const SuperAdmin = () => {
           <AdminInfo />
         </div>
 
-        {/* Top controls: Reset + Add/Upload buttons */}
+        {/* Top controls */}
         <div className="flex justify-between items-center mb-6">
           {/* Reset dropdown */}
           <select
@@ -117,11 +236,13 @@ const SuperAdmin = () => {
             }}
           >
             <option value="" disabled>
-              Reset All
+              Reset Options
             </option>
             <option value="transactions">Reset Transactions</option>
             <option value="voidLogs">Reset Void Logs</option>
             <option value="salesReport">Reset Sales Report</option>
+            <option value="users">Reset Users</option>
+            <option value="all">Reset All</option>
           </select>
 
           <div className="flex gap-3">
@@ -149,7 +270,7 @@ const SuperAdmin = () => {
         <section>
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-semibold flex items-center gap-2 text-lg">
-              <FaUsers /> Users
+              <FaUsers /> All Users
             </h2>
 
             {/* Filter dropdown */}
@@ -162,9 +283,9 @@ const SuperAdmin = () => {
               }}
             >
               <option value="All">All</option>
-              <option value="Admin">Admin</option>
+              <option value="SuperAdmin">SuperAdmin</option>
               <option value="Cashier">Cashier</option>
-              <option value="Manager">Manager</option>
+              <option value="Student">Student</option>
             </select>
           </div>
 
@@ -172,30 +293,21 @@ const SuperAdmin = () => {
             <table className="min-w-full border-collapse">
               <thead>
                 <tr className="text-left border-b">
-                  <th className="py-3 px-4">USERNAME</th>
+                  <th className="py-3 px-4">SCHOOL ID</th>
+                  <th className="py-3 px-4">NAME</th>
                   <th className="py-3 px-4">RECENT LOGIN</th>
                   <th className="py-3 px-4">TYPE</th>
-                  <th className="py-3 px-4">ACTIONS</th>
-                  <th className="py-3 px-4 w-8"></th>
                 </tr>
               </thead>
               <tbody>
-                {paginatedUsers.map((user) => (
-                  <tr key={user.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 flex items-center gap-2">
-                      <img
-                        src={user.avatar}
-                        alt={user.username}
-                        className="w-8 h-8 rounded-full object-cover"
-                      />
-                      <span className="truncate">{user.username}</span>
+                {paginatedUsers.map((user, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4">{user.id_number}</td>
+                    <td className="py-3 px-4">{user.name}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      {user.recentLogin || "Never"}
                     </td>
-                    <td className="py-3 px-4 whitespace-nowrap">{user.recentLogin}</td>
                     <td className="py-3 px-4">{user.type}</td>
-                    <td className="py-3 px-4">{user.action}</td>
-                    <td className="py-3 px-4 text-center cursor-pointer text-gray-500 hover:text-black">
-                      <FaEllipsisV />
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -206,7 +318,7 @@ const SuperAdmin = () => {
           <div className="flex items-center justify-center mt-4">
             <Pagination
               currentPage={currentPage}
-              totalPages={Math.ceil(filteredUsers.length / entriesPerPage)}
+              totalPages={totalPages}
               setCurrentPage={setCurrentPage}
             />
           </div>
@@ -219,6 +331,20 @@ const SuperAdmin = () => {
         onClose={closeModal}
         onConfirm={handleConfirmReset}
         warningText={activeReset ? resetWarnings[activeReset] : ""}
+      />
+
+      {/* Message Modal (CSV + Reset feedback) */}
+      <MessageModal
+        isOpen={messageModal.isOpen}
+        onClose={() =>
+          setMessageModal((prev) => ({
+            ...prev,
+            isOpen: false,
+          }))
+        }
+        title={messageModal.title}
+        message={messageModal.message}
+        type={messageModal.type}
       />
     </div>
   );

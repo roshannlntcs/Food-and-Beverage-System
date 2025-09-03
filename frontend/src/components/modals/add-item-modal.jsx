@@ -113,7 +113,7 @@ export default function AddItemModal({
         <label className="block font-semibold">Sizes</label>
         <input
           type="text"
-          placeholder="e.g. Regular (₱0), Large (₱20)"
+          placeholder="e.g Large(₱20)"
           value={Array.isArray(newItem.sizes)
             ? newItem.sizes.map(s =>
                 typeof s === 'string'
@@ -138,7 +138,7 @@ export default function AddItemModal({
         <label className="block font-semibold">Add-ons</label>
         <input
           type="text"
-          placeholder="e.g. Cheese (₱10), Bacon (₱15)"
+          placeholder="e.g. Cheese (₱10)"
           value={Array.isArray(newItem.addons) ? newItem.addons.join(', ') : newItem.addons}
           onChange={(e) => setNewItem({
             ...newItem,
