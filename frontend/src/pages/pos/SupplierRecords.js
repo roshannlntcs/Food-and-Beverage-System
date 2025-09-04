@@ -94,9 +94,15 @@ Status: ${supplier.status}`,
     ]);
   };
 
-  const filteredSuppliers = suppliers.filter((supplier) =>
-    supplier.name.toLowerCase().includes(search.toLowerCase())
+  const filteredSuppliers = suppliers.filter((supplier) => {
+  const searchTerm = search.toLowerCase();
+  return (
+    supplier.name.toLowerCase().includes(searchTerm) ||
+    supplier.contactPerson.toLowerCase().includes(searchTerm) ||
+    supplier.phone.toLowerCase().includes(searchTerm) ||
+     supplier.email.toLowerCase().includes(searchTerm)
   );
+});
 
   const indexOfLastEntry = currentPage * entriesPerPage;
   const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
