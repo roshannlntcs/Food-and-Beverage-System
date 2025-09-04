@@ -88,20 +88,16 @@ const handleFileUpload = (event) => {
   const reader = new FileReader();
 
   reader.onload = (e) => {
-    let csvText;
-    try {
-      const decoder = new TextDecoder("utf-8", { fatal: true });
-      csvText = decoder.decode(e.target.result);
-    } catch (err) {
-      const fallbackDecoder = new TextDecoder("latin1");
-      csvText = fallbackDecoder.decode(e.target.result);
-    }
+    // 🔹 Always decode using latin1
+    const decoder = new TextDecoder("latin1");
+    const csvText = decoder.decode(e.target.result);
 
     // 🔹 Step 1: hash file content
     const newFileHash = hashString(csvText);
 
     // 🔹 Step 2: check stored file hashes
-    let uploadedFiles = JSON.parse(localStorage.getItem("uploadedFileHashes")) || [];
+    let uploadedFiles =
+      JSON.parse(localStorage.getItem("uploadedFileHashes")) || [];
     if (uploadedFiles.includes(newFileHash)) {
       setMessageModal({
         isOpen: true,
@@ -147,16 +143,18 @@ const handleFileUpload = (event) => {
 
         let existingUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
 
-        // 🔹 Step 3: remove duplicate users by id_number
+        // 🔹 Remove duplicates by ID
         parsedUsers = parsedUsers.filter(
-          (newUser) => !existingUsers.some((u) => u.id_number === newUser.id_number)
+          (newUser) =>
+            !existingUsers.some((u) => u.id_number === newUser.id_number)
         );
 
         if (parsedUsers.length === 0) {
           setMessageModal({
             isOpen: true,
             title: "No New Users",
-            message: "This file contains only duplicate users. Nothing was added.",
+            message:
+              "This file contains only duplicate users. Nothing was added.",
             type: "error",
           });
           return;
@@ -164,7 +162,7 @@ const handleFileUpload = (event) => {
 
         const merged = [...existingUsers, ...parsedUsers];
 
-        // Keep SuperAdmin
+        // ✅ Ensure SuperAdmin is preserved
         if (!merged.find((u) => u.id_number === "admin")) {
           merged.unshift({
             id_number: "admin",
@@ -177,11 +175,14 @@ const handleFileUpload = (event) => {
           });
         }
 
-        // 🔹 Step 4: save file hash to prevent future duplicate uploads
+        // 🔹 Save hash
         uploadedFiles.push(newFileHash);
-        localStorage.setItem("uploadedFileHashes", JSON.stringify(uploadedFiles));
+        localStorage.setItem(
+          "uploadedFileHashes",
+          JSON.stringify(uploadedFiles)
+        );
 
-        // Save users
+        // 🔹 Save users
         localStorage.setItem("userCSV", JSON.stringify(merged));
         setUsers(merged);
 
@@ -197,6 +198,7 @@ const handleFileUpload = (event) => {
 
   reader.readAsArrayBuffer(file);
 };
+
 
 
   // ✅ Filtering + Pagination (now by section)
@@ -224,58 +226,60 @@ const handleFileUpload = (event) => {
   };
 
   const handleConfirmReset = () => {
-    if (activeReset === "transactions") {
-      localStorage.removeItem("transactions");
-    }
-    if (activeReset === "voidLogs") {
-      localStorage.removeItem("voidLogs");
-    }
-    if (activeReset === "salesReport") {
-      localStorage.removeItem("salesReport");
-    }
-    if (activeReset === "users") {
-      const adminOnly = [
-        {
-          id_number: "admin",
-          name: "Administrator",
-          password: "admin123",
-          program: "-",
-          section: "-",
-          type: "SuperAdmin",
-          recentLogin: "Never",
-        },
-      ];
-      localStorage.setItem("userCSV", JSON.stringify(adminOnly));
-      setUsers(adminOnly);
-    }
-    if (activeReset === "all") {
-      localStorage.clear();
-      const adminOnly = [
-        {
-          id_number: "admin",
-          name: "Administrator",
-          password: "admin123",
-          program: "-",
-          section: "-",
-          type: "SuperAdmin",
-          recentLogin: "Never",
-        },
-      ];
-      localStorage.setItem("userCSV", JSON.stringify(adminOnly));
-      setUsers(adminOnly);
-    }
-    window.dispatchEvent(new Event("storage"));
-    closeModal();
+  if (activeReset === "transactions") {
+    localStorage.removeItem("transactions");
+  }
+  if (activeReset === "voidLogs") {
+    localStorage.removeItem("voidLogs");
+  }
+  if (activeReset === "salesReport") {
+    localStorage.removeItem("salesReport");
+  }
+  if (activeReset === "users") {
+    const adminOnly = [
+      {
+        id_number: "admin",
+        name: "Administrator",
+        password: "admin123",
+        program: "-",
+        section: "-",
+        type: "SuperAdmin",
+        recentLogin: "Never",
+      },
+    ];
+    localStorage.setItem("userCSV", JSON.stringify(adminOnly));
+    localStorage.removeItem("uploadedFileHashes"); // 🔹 clear file hashes too
+    setUsers(adminOnly);
+  }
+  if (activeReset === "all") {
+    localStorage.clear();
+    const adminOnly = [
+      {
+        id_number: "admin",
+        name: "Administrator",
+        password: "admin123",
+        program: "-",
+        section: "-",
+        type: "SuperAdmin",
+        recentLogin: "Never",
+      },
+    ];
+    localStorage.setItem("userCSV", JSON.stringify(adminOnly));
+    setUsers(adminOnly);
+  }
+  window.dispatchEvent(new Event("storage"));
+  closeModal();
 
-    setMessageModal({
-      isOpen: true,
-      title: "Reset Successful",
-      message: `${
-        activeReset === "all" ? "System data" : activeReset
-      } has been reset.`,
-      type: "success",
-    });
-  };
+  setMessageModal({
+    isOpen: true,
+    title: "Reset Successful",
+    message: `${
+      activeReset === "all" ? "System data" : activeReset
+    } has been reset.`,
+    type: "success",
+  });
+};
+
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
