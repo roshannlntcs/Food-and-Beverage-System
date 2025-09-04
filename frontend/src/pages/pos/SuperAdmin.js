@@ -311,23 +311,23 @@ const handleFileUpload = (event) => {
           </select>
 
           <div className="flex gap-3">
-            <button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-5 py-2 rounded-md text-sm">
-              + Add User
-            </button>
-            <button
-              onClick={() => fileInputRef.current.click()}
-              className="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2 rounded-md text-sm"
-            >
-              Upload CSV
-            </button>
-            <input
-              type="file"
-              accept=".csv"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </div>
+          <button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-5 py-1 rounded-full text-sm">
+            + Add User
+          </button>
+          <button
+            onClick={() => fileInputRef.current.click()}
+            className="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2 rounded-full text-sm"
+          >
+            Upload CSV
+          </button>
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+        </div>
         </div>
 
         {/* Users Table */}
