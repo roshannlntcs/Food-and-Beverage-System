@@ -4,7 +4,7 @@ import AdminInfo from "../../components/AdminInfo";
 import { FaUsers } from "react-icons/fa";
 import Pagination from "../../components/Pagination";
 import ResetConfirmationModal from "../../components/ResetConfirmationModal";
-import MessageModal from "../../components/modals/MessageModal"; 
+import MessageModal from "../../components/modals/MessageModal";
 import Papa from "papaparse";
 
 const resetWarnings = {
@@ -22,14 +22,12 @@ const resetWarnings = {
 
 const SuperAdmin = () => {
   const [users, setUsers] = useState([]);
-  const [entriesPerPage, setEntriesPerPage] = useState(5);
+  const [entriesPerPage, setEntriesPerPage] = useState(8);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Reset Confirmation modal
   const [modalOpen, setModalOpen] = useState(false);
   const [activeReset, setActiveReset] = useState(null);
 
-  // CSV message modal (error/success)
   const [messageModal, setMessageModal] = useState({
     isOpen: false,
     title: "",
@@ -37,22 +35,23 @@ const SuperAdmin = () => {
     type: "success",
   });
 
-  // User type filter
-  const [filterType, setFilterType] = useState("All");
+  // ✅ NEW: for dynamic section dropdown
+  const [sections, setSections] = useState([]);
+  const [filterSection, setFilterSection] = useState("All");
 
-  // File input ref
   const fileInputRef = useRef(null);
 
-  // ✅ Load all users (CSV + Admin) from localStorage
+  // ✅ Load stored users + ensure SuperAdmin exists
   useEffect(() => {
     let storedUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
 
-    // Ensure Admin is always in the list
     if (!storedUsers.find((u) => u.id_number === "admin")) {
       storedUsers.unshift({
         id_number: "admin",
         name: "Administrator",
         password: "admin123",
+        program: "-",
+        section: "-",
         type: "SuperAdmin",
         recentLogin: "Never",
       });
@@ -61,71 +60,128 @@ const SuperAdmin = () => {
     setUsers(storedUsers);
   }, []);
 
-  // ✅ Handle CSV Upload
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  // ✅ Extract unique sections whenever users update
+  useEffect(() => {
+    const uniqueSections = [
+      ...new Set(users.map((u) => u.section).filter((s) => s && s !== "-")),
+    ];
+    setSections(uniqueSections);
+  }, [users]);
 
-    Papa.parse(file, {
+  // ✅ Handle CSV Upload (UTF-8 + trim fix)
+  // Utility: create a simple hash from text
+const hashString = (str) => {
+  let hash = 0, i, chr;
+  if (str.length === 0) return hash;
+  for (i = 0; i < str.length; i++) {
+    chr = str.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
+};
+
+const handleFileUpload = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = (e) => {
+    let csvText;
+    try {
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      csvText = decoder.decode(e.target.result);
+    } catch (err) {
+      const fallbackDecoder = new TextDecoder("latin1");
+      csvText = fallbackDecoder.decode(e.target.result);
+    }
+
+    // 🔹 Step 1: hash file content
+    const newFileHash = hashString(csvText);
+
+    // 🔹 Step 2: check stored file hashes
+    let uploadedFiles = JSON.parse(localStorage.getItem("uploadedFileHashes")) || [];
+    if (uploadedFiles.includes(newFileHash)) {
+      setMessageModal({
+        isOpen: true,
+        title: "Duplicate File",
+        message: "This CSV file has already been uploaded.",
+        type: "error",
+      });
+      return;
+    }
+
+    Papa.parse(csvText, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
         const firstRow = results.data[0];
         if (
           !firstRow ||
-          !firstRow.id_number ||
-          !firstRow.name ||
-          !firstRow.password
+          !firstRow["Student ID No."] ||
+          !firstRow["Full Name"] ||
+          !firstRow["Default Password"] ||
+          !firstRow["Program"] ||
+          !firstRow["Section"]
         ) {
           setMessageModal({
             isOpen: true,
             title: "Invalid CSV",
             message:
-              "CSV must have headers: id_number, name, password. Please upload a valid file.",
+              "CSV must have headers: Student ID No., Full Name, Default Password, Program, Section. Please upload a valid file.",
             type: "error",
           });
           return;
         }
 
         let parsedUsers = results.data.map((row) => ({
-          id_number: row.id_number,
-          name: row.name,
-          password: row.password,
+          id_number: row["Student ID No."].trim(),
+          name: row["Full Name"].trim(),
+          password: row["Default Password"].trim(),
+          program: row["Program"].trim(),
+          section: row["Section"].trim(),
           type: "Student",
           recentLogin: "Never",
         }));
 
         let existingUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
 
-        // Merge: keep recentLogin if already exists
-        parsedUsers.forEach((newUser) => {
-          const existing = existingUsers.find(
-            (u) => u.id_number === newUser.id_number
-          );
-          if (existing) {
-            newUser.recentLogin = existing.recentLogin;
-          }
-        });
+        // 🔹 Step 3: remove duplicate users by id_number
+        parsedUsers = parsedUsers.filter(
+          (newUser) => !existingUsers.some((u) => u.id_number === newUser.id_number)
+        );
 
-        // Merge without duplicates
-        const merged = [
-          ...existingUsers.filter(
-            (u) => !parsedUsers.find((p) => p.id_number === u.id_number)
-          ),
-          ...parsedUsers,
-        ];
+        if (parsedUsers.length === 0) {
+          setMessageModal({
+            isOpen: true,
+            title: "No New Users",
+            message: "This file contains only duplicate users. Nothing was added.",
+            type: "error",
+          });
+          return;
+        }
 
-        // Ensure Admin stays
+        const merged = [...existingUsers, ...parsedUsers];
+
+        // Keep SuperAdmin
         if (!merged.find((u) => u.id_number === "admin")) {
           merged.unshift({
             id_number: "admin",
             name: "Administrator",
             password: "admin123",
+            program: "-",
+            section: "-",
             type: "SuperAdmin",
             recentLogin: "Never",
           });
         }
 
+        // 🔹 Step 4: save file hash to prevent future duplicate uploads
+        uploadedFiles.push(newFileHash);
+        localStorage.setItem("uploadedFileHashes", JSON.stringify(uploadedFiles));
+
+        // Save users
         localStorage.setItem("userCSV", JSON.stringify(merged));
         setUsers(merged);
 
@@ -139,11 +195,16 @@ const SuperAdmin = () => {
     });
   };
 
-  // ✅ Filtering + Pagination
+  reader.readAsArrayBuffer(file);
+};
+
+
+  // ✅ Filtering + Pagination (now by section)
   const filteredUsers =
-    filterType === "All"
+    filterSection === "All"
       ? users
-      : users.filter((u) => u.type === filterType);
+      : users.filter((u) => u.section === filterSection);
+
   const totalPages = Math.ceil(filteredUsers.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
   const paginatedUsers = filteredUsers.slice(
@@ -178,6 +239,8 @@ const SuperAdmin = () => {
           id_number: "admin",
           name: "Administrator",
           password: "admin123",
+          program: "-",
+          section: "-",
           type: "SuperAdmin",
           recentLogin: "Never",
         },
@@ -192,6 +255,8 @@ const SuperAdmin = () => {
           id_number: "admin",
           name: "Administrator",
           password: "admin123",
+          program: "-",
+          section: "-",
           type: "SuperAdmin",
           recentLogin: "Never",
         },
@@ -226,7 +291,7 @@ const SuperAdmin = () => {
         </div>
 
         {/* Top controls */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-12">
           {/* Reset dropdown */}
           <select
             className="px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
@@ -255,7 +320,6 @@ const SuperAdmin = () => {
             >
               Upload CSV
             </button>
-            {/* Hidden file input */}
             <input
               type="file"
               accept=".csv"
@@ -268,24 +332,26 @@ const SuperAdmin = () => {
 
         {/* Users Table */}
         <section>
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold flex items-center gap-2 text-lg">
               <FaUsers /> All Users
             </h2>
 
-            {/* Filter dropdown */}
+            {/* ✅ Dynamic Section Filter */}
             <select
               className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-sm text-gray-700"
-              value={filterType}
+              value={filterSection}
               onChange={(e) => {
-                setFilterType(e.target.value);
+                setFilterSection(e.target.value);
                 setCurrentPage(1);
               }}
             >
-              <option value="All">All</option>
-              <option value="SuperAdmin">SuperAdmin</option>
-              <option value="Cashier">Cashier</option>
-              <option value="Student">Student</option>
+              <option value="All">All Sections</option>
+              {sections.map((sec, idx) => (
+                <option key={idx} value={sec}>
+                  {sec}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -295,6 +361,8 @@ const SuperAdmin = () => {
                 <tr className="text-left border-b">
                   <th className="py-3 px-4">SCHOOL ID</th>
                   <th className="py-3 px-4">NAME</th>
+                  <th className="py-3 px-4">PROGRAM</th>
+                  <th className="py-3 px-4">SECTION</th>
                   <th className="py-3 px-4">RECENT LOGIN</th>
                   <th className="py-3 px-4">TYPE</th>
                 </tr>
@@ -304,6 +372,8 @@ const SuperAdmin = () => {
                   <tr key={index} className="border-b hover:bg-gray-50">
                     <td className="py-3 px-4">{user.id_number}</td>
                     <td className="py-3 px-4">{user.name}</td>
+                    <td className="py-3 px-4">{user.program || "-"}</td>
+                    <td className="py-3 px-4">{user.section || "-"}</td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       {user.recentLogin || "Never"}
                     </td>
@@ -333,7 +403,7 @@ const SuperAdmin = () => {
         warningText={activeReset ? resetWarnings[activeReset] : ""}
       />
 
-      {/* Message Modal (CSV + Reset feedback) */}
+      {/* Message Modal */}
       <MessageModal
         isOpen={messageModal.isOpen}
         onClose={() =>
