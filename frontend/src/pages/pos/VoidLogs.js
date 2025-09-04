@@ -42,21 +42,21 @@ const VoidLogs = () => {
             <input
               type="text"
               placeholder="Search Transaction ID"
-              className="outline-none w-full"
+              className="outline-none w-full text-sm"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
             />
-            <FaSearch className="text-gray-500" />
+            <FaSearch className="text-gray-500 text-sm" />
           </div>
         </div>
 
         {/* Table */}
         <div className="border rounded-md overflow-hidden bg-white">
           <div className="max-h-[500px] overflow-y-auto">
-            <table className="w-full table-auto border-collapse">
+            <table className="w-full table-auto border-collapse text-sm">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left">
                   <th className="p-3">Date & Time</th>

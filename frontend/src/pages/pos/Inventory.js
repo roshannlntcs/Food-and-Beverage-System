@@ -293,11 +293,11 @@ const mergedCategoryKeys = (() => {
               <input
                 type="text"
                 placeholder="Search"
-                className="outline-none w-full"
+                className="outline-none w-full text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <FaSearch className="text-gray-500" />
+              <FaSearch className="text-gray-500 text-sm" />
             </div>
 
             {selectedCategory && (
@@ -316,7 +316,7 @@ const mergedCategoryKeys = (() => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAddCategoryModal(true)}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-sm font-semibold border border-yellow-500 rounded-full"
             >
               + Add Category
             </button>
@@ -326,7 +326,7 @@ const mergedCategoryKeys = (() => {
                 setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' });
                 setShowAddModal(true);
               }}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-sm font-semibold border border-yellow-500 rounded-full"
             >
               + Add Item
             </button>
@@ -335,7 +335,7 @@ const mergedCategoryKeys = (() => {
 
         <div className="border rounded-md overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
-            <table className="w-full table-auto border-collapse">
+            <table className="w-full table-auto border-collapse text-sm">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
   <tr className="text-left">
     <th className="p-3">No.</th>
@@ -376,7 +376,7 @@ const mergedCategoryKeys = (() => {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+             className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-0.5 rounded text-xs font-medium border-none cursor-pointer"
             style={{ width: '24px' }}
           >
             <option value="">All</option>
@@ -480,7 +480,7 @@ const mergedCategoryKeys = (() => {
 
           <button
             onClick={() => setShowLogsModal(true)}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full"
+            className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full text-sm"
           >
             View Logs
           </button>

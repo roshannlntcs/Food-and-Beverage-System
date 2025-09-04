@@ -60,14 +60,14 @@ const POSMonitoring = () => {
             <input
               type="text"
               placeholder="Search Transaction, Cashier or Payment"
-              className="outline-none w-full"
+              className="outline-none w-full text-sm"
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
             />
-            <FaSearch className="text-gray-500" />
+            <FaSearch className="text-gray-500 text-sm" />
           </div>
 
           <input
@@ -77,14 +77,14 @@ const POSMonitoring = () => {
               setFilterDate(e.target.value);
               setCurrentPage(1);
             }}
-            className="border rounded px-3 py-2 text-gray-700 shadow-sm"
+            className="border rounded px-3 py-2 text-gray-700 shadow-sm text-sm"
           />
         </div>
 
         {/* Table */}
         <div className="border rounded-md overflow-hidden bg-white">
           <div className="max-h-[500px] overflow-y-auto">
-            <table className="w-full table-auto border-collapse">
+            <table className="w-full table-auto border-collapse text-sm">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left">
                   <th className="p-3 w-[40px]">No.</th>
@@ -159,7 +159,7 @@ const POSMonitoring = () => {
 
           <button
             onClick={() => window.location.assign("/pos/sales-report")}
-            className="px-6 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shadow border border-yellow-500 rounded-full"
+            className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shadow border border-yellow-500 rounded-full text-sm"
           >
             View Sales Reports
           </button>
