@@ -65,7 +65,18 @@ export default function POSMain() {
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
-    const normalized = saved.map(t => ({ ...t, transactionID: t.transactionID || t.id || "" }));
+    // normalize older transactions so discountType / couponCode appear if present under different keys
+    const normalized = saved.map(t => ({
+      ...t,
+      transactionID: t.transactionID || t.id || "",
+      discountType: t.discountType || t.discount || t.discount_label || "",
+      couponCode:
+        t.couponCode ||
+        t.coupon ||
+        (t.paymentDetails && (t.paymentDetails.coupon || t.paymentDetails.code)) ||
+        t.couponCodeApplied ||
+        "",
+    }));
     if (normalized.length) {
       setTransactions(normalized);
       localStorage.setItem("transactions", JSON.stringify(normalized));
@@ -85,12 +96,9 @@ export default function POSMain() {
 
   const [itemAvailability, setItemAvailability] = useState({});
   const [showDiscountModal, setShowDiscountModal] = useState(false);
-
-  // discount states
-  const [discountType, setDiscountType] = useState(""); // "senior" | "pwd" | "student" or ""
-  const [couponCode, setCouponCode] = useState(""); // e.g. "SAVE10"
+  const [discountType, setDiscountType] = useState("");
+  const [couponCode, setCouponCode] = useState("");
   const [discountPct, setDiscountPct] = useState(0);
-
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalProduct, setModalProduct] = useState(null);
@@ -232,7 +240,7 @@ export default function POSMain() {
     const price = (modalProduct.price + addonsCost + sizeCost) * modalProduct.quantity;
     setCart((p) => [
       ...p,
-      { ...modalProduct, addons: modalProduct.selectedAddons, totalPrice: price }
+      { ...modalProduct, quantity: modalProduct.quantity, size: modalProduct.size, selectedAddons: modalProduct.selectedAddons, notes: modalProduct.notes, totalPrice: price }
     ]);
     setShowModal(false);
   };
@@ -256,10 +264,10 @@ export default function POSMain() {
         'customerView',
         'width=420,height=780,toolbar=no,menubar=no'
       );
-      setTimeout(() => broadcastCart({ cart, subtotal, tax, total, discountPct, discountType, couponCode }), 300);
+      setTimeout(() => broadcastCart({ cart, subtotal, tax, total, discountPct }), 300);
     } else {
       customerWinRef.current.focus();
-      broadcastCart({ cart, subtotal, tax, total, discountPct, discountType, couponCode });
+      broadcastCart({ cart, subtotal, tax, total, discountPct });
     }
   };
 
@@ -309,8 +317,8 @@ export default function POSMain() {
 
   // ensure broadcast on every cart change
   useEffect(() => {
-    broadcastCart({ cart, subtotal, tax, total, discountPct, discountType, couponCode });
-  }, [cart, subtotal, tax, total, discountPct, discountType, couponCode]);
+    broadcastCart({ cart, subtotal, tax, total, discountPct });
+  }, [cart, subtotal, tax, total, discountPct]);
 
   // Reset active category when moving away from Menu/Items
   useEffect(() => {
@@ -338,14 +346,7 @@ export default function POSMain() {
     else alert("Unknown payment method.");
   };
 
-  // labels for discount types
-  const DISCOUNT_LABELS = {
-    senior: "Senior Citizen (20%)",
-    pwd: "PWD (20%)",
-    student: "Student (5%)"
-  };
-
-  // finalize transaction (persist discountType + couponCode + discountLabel)
+  // finalize transaction — now includes discountType & couponCode in transaction and paymentDetails
   const finalizeTransaction = (paymentInfo = {}) => {
     if (cart.length === 0) { alert("Cart is empty."); return; }
 
@@ -363,10 +364,17 @@ export default function POSMain() {
     const orderID = generateOrderID();
     const transactionID = generateTransactionID();
 
-    // derive human label (if discountType known)
-    const discountLabel = discountType ? (DISCOUNT_LABELS[discountType] || discountType) : null;
-    const couponSaved = couponCode ? String(couponCode).trim().toUpperCase() : null;
+    // Normalize payment info
+    let tendered, change;
+    if (paymentInfo.method === "Cash") {
+      tendered = paymentInfo.tendered;
+      change = paymentInfo.change;
+    } else {
+      tendered = totalCalc;
+      change = 0;
+    }
 
+    // include discountType and couponCode that are current in POSMain state
     const newTransaction = {
       id: transactionID,
       transactionID,
@@ -374,14 +382,15 @@ export default function POSMain() {
       items: cart.map((item) => ({ ...item, voided: false })),
       subtotal: subtotalCalc,
       discountPct,
-      discountType: discountType || null,
-      discountLabel: discountLabel || null,
-      couponCode: couponSaved,
       discountAmt: computedDiscountAmt,
+      discountType: discountType || "",    // persisted
+      couponCode: couponCode || "",        // persisted
       tax: taxCalc,
       total: totalCalc,
       method: paymentInfo.method || paymentMethod || "N/A",
-      paymentDetails: paymentInfo,
+      paymentDetails: { ...paymentInfo, tendered, change, coupon: couponCode || paymentInfo?.coupon || null },
+      tendered,
+      change,
       cashier: userName || "N/A",
       date: new Date().toLocaleString(),
       voided: false,
@@ -400,6 +409,8 @@ export default function POSMain() {
       items: cart.map(item => ({ ...item, voided: false })),
       status: "pending",
       date: new Date().toLocaleString(),
+      discountType: discountType || "",
+      couponCode: couponCode || ""
     };
 
     // persist orders
@@ -408,11 +419,23 @@ export default function POSMain() {
     localStorage.setItem("orders", JSON.stringify(updatedOrders));
     setOrders(updatedOrders);
 
-    // clear cart + reset discount state for next transaction
+    // Build a normalized payment summary to show in Order Success
+    const paymentSummary = {
+      method: paymentInfo.method || paymentMethod || "N/A",
+      tendered,
+      change,
+      total: totalCalc,
+      // preserve other useful fields if present
+      ...(paymentInfo.cardNumberMasked ? { cardNumberMasked: paymentInfo.cardNumberMasked } : {}),
+      ...(paymentInfo.authCode ? { authCode: paymentInfo.authCode } : {}),
+      ...(paymentInfo.reference ? { reference: paymentInfo.reference } : {}),
+      ...(paymentInfo.payload ? { payload: paymentInfo.payload } : {})
+    };
+
     setCart([]);
     setPaymentMethod("");
     setShowOrderSuccess(true);
-    setLastPaymentInfo(paymentInfo);
+    setLastPaymentInfo(paymentSummary); // normalized and always contains tendered/change
     setSelectedTransaction(newTransaction);
 
     setShowCashModal(false);
@@ -424,11 +447,6 @@ export default function POSMain() {
 
     // Reset the auto-open flag so next transaction can auto-popup again
     setCustomerViewOpened(false);
-
-    // Reset discount selection for next transaction
-    setDiscountPct(0);
-    setDiscountType("");
-    setCouponCode("");
   };
 
   // --- VOID FLOW IMPLEMENTATION ---
@@ -741,25 +759,25 @@ export default function POSMain() {
 
       {/* ORDER DETAILS PANE */}
       <CartPanel
-      cart={cart}
-      subtotal={subtotal}
-      discountPct={discountPct}
-      discountAmt={discountAmt}
-      discountType={discountType}
-      couponCode={couponCode}
-      discountLabel={discountType ? DISCOUNT_LABELS[discountType] : null}
-      tax={tax}
-      total={total}
-      paymentMethod={paymentMethod}
-      setPaymentMethod={setPaymentMethod}
-      openEditModal={openEditModal}
-      removeCartItem={removeCartItem}
-      initiatePayment={initiatePayment}
-      setShowHistoryModal={setShowHistoryModal}
-      transactions={transactions}
-      openCustomerView={openCustomerView}
-      triggerVoid={(type, idxOrTx) => triggerVoid(type, idxOrTx)}
-    />
+        cart={cart}
+        subtotal={subtotal}
+        discountPct={discountPct}
+        discountAmt={discountAmt}
+        discountType={discountType}   // PASSING discountType now
+        couponCode={couponCode}       // PASSING couponCode now
+        tax={tax}
+        total={total}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        openEditModal={openEditModal}
+        removeCartItem={removeCartItem}
+        initiatePayment={initiatePayment}
+        setShowHistoryModal={setShowHistoryModal}
+        transactions={transactions}
+        openCustomerView={openCustomerView}
+        // expose triggerVoid so other components can start void flow (if they want)
+        triggerVoid={(type, idxOrTx) => triggerVoid(type, idxOrTx)}
+      />
 
       {/* History & Void Modal */}
       {showHistoryModal && (

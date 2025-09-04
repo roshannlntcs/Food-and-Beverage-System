@@ -20,15 +20,38 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [showFilter]);
 
+  // --- Date helper: normalize to YYYY-MM-DD ---
+  const normalizeDate = (d) => {
+    const dateObj = new Date(d);
+    if (isNaN(dateObj)) return "";
+    return dateObj.toISOString().split("T")[0];
+  };
+
   // Filter logic
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
-      if (dateFrom && new Date(o.date) < new Date(dateFrom)) return false;
-      if (dateTo   && new Date(o.date) > new Date(dateTo))   return false;
+      const orderDate = normalizeDate(o.date);
+      if (!orderDate) return false;
+
+      if (dateFrom && dateTo && dateFrom === dateTo) {
+        // exact same date filter
+        if (orderDate !== dateFrom) return false;
+      } else {
+        if (dateFrom && orderDate < dateFrom) return false;
+        if (dateTo   && orderDate > dateTo)   return false;
+      }
+
       if (status && o.status !== status) return false;
       return true;
     });
   }, [orders, dateFrom, dateTo, status]);
+
+  // Reset filters
+  const resetFilters = () => {
+    setDateFrom("");
+    setDateTo("");
+    setStatus("");
+  };
 
   return (
     <div className="flex-1 p-4 flex flex-col h-full relative">
@@ -45,49 +68,47 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
             <img src={images["filter.png"]} alt="Filter" className="w-6 h-6" />
           </button>
           {showFilter && (
-            <div className="absolute right-5 mt-1 w-58 bg-white border-2 border-[#800000] rounded shadow-lg p-4 z-10">
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium">From</label>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={e => setDateFrom(e.target.value)}
-                    className="w-full border rounded p-1 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium">To</label>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={e => setDateTo(e.target.value)}
-                    className="w-full border rounded p-1 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium">Status</label>
-                  <select
-                    value={status}
-                    onChange={e => setStatus(e.target.value)}
-                    className="w-full border rounded p-1 text-sm"
-                  >
-                    <option value="">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="complete">Complete</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-                <button
-                  onClick={() => {
-                    setDateFrom("");
-                    setDateTo("");
-                    setStatus("");
-                  }}
-                  className="w-full text-sm text-blue-600 hover:underline"
+            <div className="absolute right-5 mt-1 w-60 bg-white border rounded shadow-lg p-4 z-10 text-sm space-y-3">
+              <div>
+                <label className="block text-xs font-medium">From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="w-full border rounded p-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium">To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="w-full border rounded p-1 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium">Status</label>
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value)}
+                  className="w-full border rounded p-1 text-sm"
                 >
-                  Reset
+                  <option value="">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="complete">Complete</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              {/* Reset Filters */}
+              <div className="pt-2">
+                <button
+                  onClick={resetFilters}
+                  className="w-full px-3 py-2 rounded-lg border text-center text-sm hover:bg-gray-100"
+                >
+                  Reset Filters
                 </button>
               </div>
             </div>
@@ -108,54 +129,49 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
           )}
 
           {filteredOrders.map(order => (
-           <button
-           key={order.orderID}
-           onClick={() => onSelectOrder(order)}
-           className={`
-          p-3 rounded-lg shadow flex flex-col items-start text-left
-          hover:scale-105 transition-transform duration-150 cursor-pointer
-         bg-white
-             ${order.status === "pending"   ? "border-2 border-yellow-300" : ""}
-             ${order.status === "ongoing"   ? "border-2 border-blue-300"   : ""}
-             ${order.status === "complete"  ? "border-2 border-green-300"  : ""}
-             ${order.status === "cancelled" ? "border-2 border-red-300"    : ""}
-           `}
-           /* ${order.status === "pending"   ? "bg-yellow-50" : ""} 
-              ${order.status === "ongoing"   ? "bg-blue-50"   : ""}
-              ${order.status === "complete"  ? "bg-green-50"  : ""}
-              ${order.status === "cancelled" ? "bg-red-50"    : ""} */
-         >
-           <img
-    src={images[`order_log_${order.status}.png`] || images["order_log.png"]}
-    alt={order.status}
-    className="self-center w-20 h-20 mb-2 object-cover"
-  />
+            <button
+              key={order.orderID}
+              onClick={() => onSelectOrder(order)}
+              className={`
+                p-3 rounded-lg shadow flex flex-col items-start text-left
+                hover:scale-105 transition-transform duration-150 cursor-pointer bg-white
+                ${order.status === "pending"   ? "border-2 border-yellow-300" : ""}
+                ${order.status === "ongoing"   ? "border-2 border-blue-300"   : ""}
+                ${order.status === "complete"  ? "border-2 border-green-300"  : ""}
+                ${order.status === "cancelled" ? "border-2 border-red-300"    : ""}
+              `}
+            >
+              <img
+                src={images[`order_log_${order.status}.png`] || images["order_log.png"]}
+                alt={order.status}
+                className="self-center w-20 h-20 mb-2 object-cover"
+              />
 
-  {/* 2) Left-aligned IDs */}
-  <div className="w-full">
-    <div className="font-semibold text-base truncate">
-      {order.orderID}
-    </div>
-    <div className="text-xs text-gray-600 truncate">
-      Tx: {order.transactionID}
-    </div>
-  </div>
-         
-           {/* 3) Centered status pill */}
-  <span
-    className={`self-center mt-2 inline-block px-11 py-1 text-xs font-medium rounded-full
-      ${
-        order.status === "pending"    ? "bg-yellow-100 text-yellow-800" :
-        order.status === "ongoing"    ? "bg-blue-100   text-blue-800" :
-        order.status === "complete"   ? "bg-green-100  text-green-800" :
-        order.status === "cancelled"  ? "bg-red-100    text-red-800" :
-        "bg-gray-100    text-gray-600"
-      }
-    `}
-  >
-             {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-           </span>
-         </button>
+              {/* IDs */}
+              <div className="w-full">
+                <div className="font-semibold text-base truncate">
+                  {order.orderID}
+                </div>
+                <div className="text-xs text-gray-600 truncate">
+                  Tx: {order.transactionID}
+                </div>
+              </div>
+
+              {/* Status pill */}
+              <span
+                className={`self-center mt-2 inline-block px-11 py-1 text-xs font-medium rounded-full
+                  ${
+                    order.status === "pending"    ? "bg-yellow-100 text-yellow-800" :
+                    order.status === "ongoing"    ? "bg-blue-100   text-blue-800" :
+                    order.status === "complete"   ? "bg-green-100  text-green-800" :
+                    order.status === "cancelled"  ? "bg-red-100    text-red-800" :
+                    "bg-gray-100    text-gray-600"
+                  }
+                `}
+              >
+                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              </span>
+            </button>
           ))}
         </div>
       </div>

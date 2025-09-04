@@ -151,7 +151,7 @@ export default function CashPaymentModal({ isOpen, total = 0, onClose, onSuccess
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden max-h-[90vh]">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden max-h-[100vh]">
         {/* header */}
         <div className="flex justify-between items-center px-5 py-3 bg-gradient-to-r from-yellow-400 to-yellow-300">
           <div className="flex items-center space-x-3">
@@ -217,7 +217,7 @@ export default function CashPaymentModal({ isOpen, total = 0, onClose, onSuccess
         </div>
 
         {/* drawer visual (bottom) */}
-        <div className="relative h-28 bg-transparent">
+        <div className="relative h-4 bg-transparent">
           <div className={`absolute bottom-0 left-0 right-0 flex justify-center items-end transition-transform duration-400 ${drawerOpen ? "translate-y-0" : "translate-y-full"}`}>
             <div className="w-[90%] max-w-[420px] h-20 bg-gray-800 rounded-t-lg shadow-inner relative overflow-visible">
               <div className="absolute -top-6 left-4 w-14 h-7 bg-yellow-400 rounded-sm flex items-center justify-center text-xs font-bold">PAID</div>

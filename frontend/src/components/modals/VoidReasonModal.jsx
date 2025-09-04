@@ -96,9 +96,9 @@ const couponCode = getCoupon(displayTx);
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[1000] p-4 overflow-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[1000] p-4 overflow-hidden">
       {/* Modal container */}
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[100vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b flex-shrink-0">
           <h2 className="text-lg font-bold text-red-800">Void Reason & Details</h2>
@@ -114,7 +114,7 @@ const couponCode = getCoupon(displayTx);
         {/* Body */}
         <div className="px-6 py-3 flex-1 flex flex-col gap-3 overflow-hidden">
           {/* Top meta (non-scrollable) */}
-          <div className="space-y-3 flex-shrink-0">
+          <div className="space-y-1 flex-shrink-0">
             <div className="flex items-center justify-between text-sm text-gray-700">
               <div>
                 <div className="text-xs text-gray-500">Action</div>
@@ -159,7 +159,7 @@ const couponCode = getCoupon(displayTx);
 
                   {/* row 2, col 2 (center) */}
                   <div className="min-w-0 flex flex-col items-center text-center">
-                    <div className="text-xs text-gray-500">Tax</div>
+                    <div className="text-xs text-gray-500">VAT (12%)</div>
                     <div className="font-medium truncate">₱{(displayTx.tax || 0).toFixed(2)}</div>
                   </div>
 
@@ -213,7 +213,7 @@ const couponCode = getCoupon(displayTx);
             </div>
 
             <div className="border rounded flex-1 flex overflow-hidden">
-              <div className="px-3 py-2 overflow-auto w-full">
+              <div className="px-3 py-1 overflow-auto w-full">
                 {itemsToShow && itemsToShow.length ? (
                   itemsToShow.map((it, idx) => {
                     // mark target when item-void

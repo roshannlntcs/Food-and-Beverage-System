@@ -9,10 +9,13 @@ export default function ItemsTab({
   setItemAvailability
 }) {
   const filteredItems = Object.entries(placeholders)
-    .flatMap(([cat, list]) =>
-      activeCategory === "All Menu" ? list : list.filter(i => cat === activeCategory)
-    )
-    .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  .flatMap(([cat, list]) => {
+    if (!activeCategory || activeCategory === "All Menu") {
+      return list; // show all items if no category or "All Menu"
+    }
+    return list.filter(i => cat === activeCategory);
+  })
+  .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="flex-1 pt-2 px-6 pb-6 flex flex-col">
@@ -28,7 +31,7 @@ export default function ItemsTab({
           {filteredItems.map((item, i) => (
             <div
               key={i}
-              className="bg-white p-2 rounded-lg shadow flex flex-col justify-between hover:scale-105 transition-transform duration-150 cursor-pointer"
+              className="bg-white p-4 rounded-lg shadow flex flex-col justify-between hover:scale-105 transition-transform duration-150 cursor-pointer"
             >
               <img
                 src={images[item.image] || images["react.svg"]}

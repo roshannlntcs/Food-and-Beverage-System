@@ -8,13 +8,27 @@ export default function OrderSuccessModal({ show, paymentSummary, onClose, onPri
   if (!paymentSummary) {
     summaryRows.push(["Method", "N/A"]);
   } else {
-    summaryRows.push(["Method", paymentSummary.method || "N/A"]);
-    if (paymentSummary.tendered !== undefined) summaryRows.push(["Tendered", `₱${Number(paymentSummary.tendered).toFixed(2)}`]);
-    if (paymentSummary.change !== undefined) summaryRows.push(["Change", `₱${Number(paymentSummary.change).toFixed(2)}`]);
+    const method = paymentSummary.method || "N/A";
+    summaryRows.push(["Method", method]);
+
+    // Determine tendered: prefer explicit, otherwise if Card/QRS assume exact amount from total
+    let tenderedVal = paymentSummary.tendered;
+    if ((tenderedVal === undefined || tenderedVal === null) && (method === "Card" || method === "QRS")) {
+      tenderedVal = paymentSummary.total !== undefined ? Number(paymentSummary.total) : undefined;
+    }
+
+    if (tenderedVal !== undefined && tenderedVal !== null) {
+      summaryRows.push(["Tendered", `₱${Number(tenderedVal).toFixed(2)}`]);
+    }
+
+    if (paymentSummary.change !== undefined && paymentSummary.change !== null) {
+      summaryRows.push(["Change", `₱${Number(paymentSummary.change).toFixed(2)}`]);
+    }
+
     if (paymentSummary.cardNumberMasked) summaryRows.push(["Card", paymentSummary.cardNumberMasked]);
     if (paymentSummary.authCode) summaryRows.push(["Auth", paymentSummary.authCode]);
     if (paymentSummary.reference) summaryRows.push(["Reference", paymentSummary.reference]);
-    // NOTE: payload display removed per request
+    // payload intentionally omitted for brevity
   }
 
   return (

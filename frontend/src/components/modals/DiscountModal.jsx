@@ -23,8 +23,8 @@ export default function DiscountModal({
   // Compute final pct
   const computePct = () => {
     let pct = 0;
-    if (discountType === "senior" || discountType === "pwd") pct += 20;
-    else if (discountType === "student") pct += 5;
+    if (discountType === "Senior" || discountType === "PWD") pct += 20;
+    else if (discountType === "Student") pct += 5;
 
     const code = couponCode.trim().toUpperCase();
     if (code === "SAVE10") pct += 10;
@@ -39,9 +39,9 @@ export default function DiscountModal({
         <h2 className="text-xl font-bold mb-4">Apply Discount</h2>
         <div className="space-y-2 mb-4">
           {[
-            { key: "senior", label: "Senior Citizen (20%)" },
-            { key: "pwd",    label: "PWD (20%)" },
-            { key: "student",label: "Student (5%)" }
+            { key: "Senior", label: "Senior Citizen (20%)" },
+            { key: "PWD",    label: "PWD (20%)" },
+            { key: "Student",label: "Student (5%)" }
           ].map((opt) => (
             <label key={opt.key} className="flex items-center">
               <input
