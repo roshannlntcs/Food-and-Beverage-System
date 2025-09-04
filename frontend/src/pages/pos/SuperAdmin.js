@@ -294,7 +294,7 @@ const handleFileUpload = (event) => {
         <div className="flex justify-between items-center mb-12">
           {/* Reset dropdown */}
           <select
-            className="px-2 py-1 border border-gray-300 rounded-md bg-gray-100 text-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 w-40"
+            className="px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700 text-xs focus:outline-none focus:ring-2 focus:ring-gray-400"
             defaultValue=""
             onChange={(e) => {
               if (e.target.value) openModal(e.target.value);
@@ -309,14 +309,14 @@ const handleFileUpload = (event) => {
             <option value="users">Reset Users</option>
             <option value="all">Reset All</option>
           </select>
-            
+
           <div className="flex gap-3">
-            <button className="bg-yellow-400 hover:bg-yellow-500 text-black px-5 py-0 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full text-sm">
+            <button className="bg-yellow-400 hover:bg-yellow-500 text-black font-medium px-5 py-2 rounded-md text-sm">
               + Add User
             </button>
             <button
               onClick={() => fileInputRef.current.click()}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full text-sm"
+              className="bg-black hover:bg-gray-800 text-white font-medium px-5 py-2 rounded-md text-sm"
             >
               Upload CSV
             </button>
@@ -332,15 +332,15 @@ const handleFileUpload = (event) => {
 
         {/* Users Table */}
         <section>
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="font-semibold flex items-center gap-2 text-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold flex items-center gap-2 text-base">
               <FaUsers /> Users
             </h2>
 
             {/* ✅ Dynamic Section Filter */}
             <select
               className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-xs text-gray-700"
-              value={filterType}
+              value={filterSection}
               onChange={(e) => {
                 setFilterSection(e.target.value);
                 setCurrentPage(1);
