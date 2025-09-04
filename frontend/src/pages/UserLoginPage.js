@@ -1,6 +1,7 @@
+// UserLoginPage.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaIdCard, FaLock } from "react-icons/fa"; // icons
+import { FaIdCard, FaLock } from "react-icons/fa";
 
 export default function UserLoginPage() {
   const navigate = useNavigate();
@@ -9,23 +10,62 @@ export default function UserLoginPage() {
   const [error, setError] = useState("");
 
   const handleLogin = () => {
-    // Dummy admin account
-    const dummyId = "admin";
-    const dummyPassword = "admin123";
-
     if (schoolId.trim() === "" || password.trim() === "") {
       setError("Please enter both School ID and Password.");
       return;
     }
 
-    if (schoolId.trim() !== dummyId || password.trim() !== dummyPassword) {
+    // ✅ Dummy Admin
+    const dummyId = "admin";
+    const dummyPassword = "admin123";
+
+    if (schoolId.trim() === dummyId && password.trim() === dummyPassword) {
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("fullName", "Administrator");
+      localStorage.setItem("schoolId", dummyId);
+
+      // Update recent login for SuperAdmin
+      let users = JSON.parse(localStorage.getItem("userCSV")) || [];
+      const now = new Date().toLocaleString();
+
+      const adminIndex = users.findIndex((u) => u.id_number === dummyId);
+      if (adminIndex !== -1) {
+        users[adminIndex].recentLogin = now;
+      } else {
+        users.push({
+          id_number: dummyId,
+          name: "Administrator",
+          password: dummyPassword,
+          type: "SuperAdmin",
+          recentLogin: now,
+        });
+      }
+      localStorage.setItem("userCSV", JSON.stringify(users));
+
+      navigate("/roles");
+      return;
+    }
+
+    // ✅ CSV Users
+    let storedUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
+    const foundUserIndex = storedUsers.findIndex(
+      (u) => u.id_number === schoolId.trim() && u.password === password.trim()
+    );
+
+    if (foundUserIndex === -1) {
       setError("Invalid School ID or Password.");
       return;
     }
 
-    // Store login status
+    const foundUser = storedUsers[foundUserIndex];
     localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("fullName", "Administrator"); // for RoleSelection greeting
+    localStorage.setItem("fullName", foundUser.name);
+    localStorage.setItem("schoolId", foundUser.id_number);
+
+    // Update recent login
+    storedUsers[foundUserIndex].recentLogin = new Date().toLocaleString();
+    localStorage.setItem("userCSV", JSON.stringify(storedUsers));
+
     navigate("/roles");
   };
 

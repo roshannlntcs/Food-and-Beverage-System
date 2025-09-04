@@ -7,13 +7,14 @@ export default function CartPanel({
   subtotal,
   discountPct,
   discountAmt,
+  discountType,   // NEW
+  couponCode,     // NEW
   tax,
   total,
   paymentMethod,
   setPaymentMethod,
   openEditModal,
   removeCartItem,
-  // processTransaction was the old prop - now we call initiatePayment
   initiatePayment,
   setShowHistoryModal,
   transactions,
@@ -23,7 +24,6 @@ export default function CartPanel({
   const { showToast } = useToast();
 
   const handleSelectPayment = (method) => {
-    // if cart is empty, show a centered toast inside cart panel
     if (!cart || cart.length === 0) {
       showToast({ message: "Cart is empty.", type: "warning", ttl: 2000, anchorId: "cartpanel-toasts" });
       return;
@@ -45,43 +45,35 @@ export default function CartPanel({
 
   return (
     <div className="w-80 bg-[#F6F3EA] border-l border-gray-200 p-6 flex flex-col overflow-hidden shadow relative">
-      {/* toast anchor (portal target) - centered in the panel */}
-      <div id="cartpanel-toasts" aria-live="polite" aria-atomic="true"
-           className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none" />
+      {/* toast anchor */}
+      <div
+        id="cartpanel-toasts"
+        aria-live="polite"
+        aria-atomic="true"
+        className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none"
+      />
 
       <div className="flex-1 flex flex-col h-full">
-        {/* Title + right-side icon buttons */}
+        {/* Header */}
         <div className="mb-4 flex justify-between items-center">
           <h3 className="text-xl font-bold">Order Details</h3>
 
           <div className="flex items-center space-x-2">
-            {/* Customer View icon button (left of History) */}
             <button
               onClick={() => openCustomerView && openCustomerView()}
               className="p-1 rounded hover:bg-gray-200 transition-colors"
               title="Open Customer View"
-              aria-label="Open Customer View"
             >
-              <img
-                src={images["cusview.png"]}
-                alt="Customer View"
-                className="w-5 h-5"
-              />
+              <img src={images["cusview.png"]} alt="Customer View" className="w-5 h-5" />
             </button>
 
-            {/* History icon button */}
             <button
               onClick={() => transactions.length && setShowHistoryModal(true)}
               disabled={!transactions.length}
               className={`p-1 rounded ${transactions.length ? "hover:bg-gray-200" : "opacity-50 cursor-not-allowed"}`}
-              title="History"
-              aria-label="History & Void Logs"
+              title="History & Void Logs"
             >
-              <img
-                src={images["history.png"]}
-                alt="History & Void"
-                className="w-5 h-5"
-              />
+              <img src={images["history.png"]} alt="History & Void" className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -89,17 +81,12 @@ export default function CartPanel({
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto mb-4 space-y-2">
           {cart.length === 0 ? (
-            <div className="text-gray-400 text-sm" role="status" aria-live="polite">No items added.</div>
+            <div className="text-gray-400 text-sm">No items added.</div>
           ) : (
             cart.map((item, i) => (
               <div key={i} className="relative group">
-                {/* Sliding content */}
                 <div
-                  className="
-                    bg-white rounded p-2
-                    transform transition-transform duration-200
-                    group-hover:-translate-x-8
-                  "
+                  className="bg-white rounded p-2 transform transition-transform duration-200 group-hover:-translate-x-8"
                   onClick={() => openEditModal(item, i)}
                   role="button"
                   tabIndex={0}
@@ -113,15 +100,10 @@ export default function CartPanel({
                         className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
                       />
                       <div className="flex flex-col flex-1 min-w-0">
-                        <div className="text-xs font-medium truncate">
-                          {item.name}
-                        </div>
-                        <div className="text-[10px] text-gray-700 truncate">
-                          Size: {item.size.label}
-                        </div>
+                        <div className="text-xs font-medium truncate">{item.name}</div>
+                        <div className="text-[10px] text-gray-700 truncate">Size: {item.size.label}</div>
                         <div className="text-[10px] text-gray-700">
-                          {item.quantity} × ₱
-                          {(item.totalPrice / item.quantity).toFixed(2)}
+                          {item.quantity} × ₱{(item.totalPrice / item.quantity).toFixed(2)}
                         </div>
                         {item.addons.length > 0 && (
                           <div className="text-[10px] text-gray-700 truncate">
@@ -129,14 +111,12 @@ export default function CartPanel({
                           </div>
                         )}
                         {item.notes && (
-                          <div className="text-[10px] italic text-gray-600 truncate">
-                            “{item.notes}”
-                          </div>
+                          <div className="text-[10px] italic text-gray-600 truncate">“{item.notes}”</div>
                         )}
                       </div>
                     </div>
                     {/* Right: line total */}
-                    <div className="flex flex-col items-end justify-between h-full ml-2">
+                    <div className="flex flex-col items-end ml-2">
                       <div className="text-xs font-semibold whitespace-nowrap">
                         ₱{item.totalPrice.toFixed(2)}
                       </div>
@@ -144,22 +124,13 @@ export default function CartPanel({
                   </div>
                 </div>
 
-                {/* Reveal-on-hover Trash button */}
+                {/* Remove button */}
                 <button
                   onClick={() => removeCartItem(i)}
-                  className="
-                    absolute inset-y-0 right-0 flex items-center justify-center
-                    w-8 bg-red-100 rounded-r
-                    opacity-0 group-hover:opacity-100
-                    transition-opacity duration-200
-                  "
+                  className="absolute inset-y-0 right-0 flex items-center justify-center w-8 bg-red-100 rounded-r opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                   title="Remove item"
                 >
-                  <img
-                    src={images["remove_item.png"]}
-                    alt="Remove"
-                    className="w-5 h-5 rounded-sm object-cover flex-shrink-0"
-                  />
+                  <img src={images["remove_item.png"]} alt="Remove" className="w-5 h-5" />
                 </button>
               </div>
             ))
@@ -167,29 +138,55 @@ export default function CartPanel({
         </div>
 
         {/* Totals */}
-        <div className="bg-white p-3 rounded-lg mb-4 space-y-1 text-sm">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span>₱{subtotal.toFixed(2)}</span>
-          </div>
-          {discountPct > 0 && (
-            <div className="flex justify-between">
-              <span>Discount ({discountPct}%)</span>
-              <span>₱{discountAmt.toFixed(2)}</span>
-            </div>
-          )}
-          <div className="flex justify-between">
-            <span>Tax (12%)</span>
-            <span>₱{tax.toFixed(2)}</span>
-          </div>
-          <hr className="border-t border-gray-300 my-1" />
-          <div className="flex justify-between font-semibold">
-            <span>Total</span>
-            <span>₱{total.toFixed(2)}</span>
-          </div>
-        </div>
+{/* Totals */}
+<div className="bg-white p-3 rounded-lg mb-4 space-y-1 text-sm">
+  <div className="flex justify-between">
+    <span>Subtotal</span>
+    <span>₱{subtotal.toFixed(2)}</span>
+  </div>
 
-        {/* Payment Method Buttons */}
+  {discountPct > 0 && (
+    <>
+      <div className="flex justify-between">
+        <span>
+          Discount
+          {discountType && (
+            <>
+              :{" "}
+              {discountType === "senior" && "Senior Citizen"}
+              {discountType === "pwd" && "PWD"}
+              {discountType === "student" && "Student"}
+            </>
+          )}{" "}
+          ({discountPct}%)
+        </span>
+        <span>-₱{discountAmt.toFixed(2)}</span>
+      </div>
+
+      {couponCode && (
+        <div className="flex justify-between text-gray-700">
+          <span>Coupon Code:</span>
+          <span>{couponCode}</span>
+        </div>
+      )}
+    </>
+  )}
+
+  <div className="flex justify-between">
+    <span>VAT (12%)</span>
+    <span>₱{tax.toFixed(2)}</span>
+  </div>
+
+  <hr className="border-t border-gray-300 my-1" />
+
+  <div className="flex justify-between font-semibold">
+    <span>Total</span>
+    <span>₱{total.toFixed(2)}</span>
+  </div>
+</div>
+
+
+        {/* Payment Methods */}
         <div className="space-y-3 relative">
           <div className="flex justify-around">
             {[
@@ -208,11 +205,7 @@ export default function CartPanel({
                 title={method.key}
                 aria-pressed={paymentMethod === method.key}
               >
-                <img
-                  src={images[method.icon]}
-                  alt={method.key}
-                  className="w-6 h-6"
-                />
+                <img src={images[method.icon]} alt={method.key} className="w-6 h-6" />
                 <span className="text-[10px]">{method.key}</span>
               </button>
             ))}

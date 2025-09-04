@@ -25,7 +25,7 @@ export default function EditItemModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      {/* ✅ Match AddItemModal size */}
+      {/* Compact size same as AddItemModal */}
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-[#8B0000] text-white text-center py-2 rounded-t-lg text-lg font-semibold">
@@ -35,10 +35,10 @@ export default function EditItemModal({
         {/* Form */}
         <div
           className="p-4 grid grid-cols-2 gap-2 
-        [&_input]:px-2 [&_input]:py-1 [&_input]:text-sm [&_input]:border [&_input]:border-gray-300 [&_input]:rounded [&_input]:focus:border-gray-500 [&_input]:focus:ring-1 [&_input]:focus:ring-gray-400
-        [&_textarea]:px-2 [&_textarea]:py-1 [&_textarea]:text-sm [&_textarea]:border [&_textarea]:border-gray-300 [&_textarea]:rounded [&_textarea]:focus:border-gray-500 [&_textarea]:focus:ring-1 [&_textarea]:focus:ring-gray-400
-        [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm [&_select]:border [&_select]:border-gray-300 [&_select]:rounded [&_select]:focus:border-gray-500 [&_select]:focus:ring-1 [&_select]:focus:ring-gray-400
-        [&_label]:text-base [&_label]:font-semibold [&_label]:mb-1"
+          [&_input]:px-2 [&_input]:py-1 [&_input]:text-sm [&_input]:border [&_input]:border-gray-300 [&_input]:rounded [&_input]:focus:border-gray-500 [&_input]:focus:ring-1 [&_input]:focus:ring-gray-400
+          [&_textarea]:px-2 [&_textarea]:py-1 [&_textarea]:text-sm [&_textarea]:border [&_textarea]:border-gray-300 [&_textarea]:rounded [&_textarea]:focus:border-gray-500 [&_textarea]:focus:ring-1 [&_textarea]:focus:ring-gray-400
+          [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm [&_select]:border [&_select]:border-gray-300 [&_select]:rounded [&_select]:focus:border-gray-500 [&_select]:focus:ring-1 [&_select]:focus:ring-gray-400
+          [&_label]:text-base [&_label]:font-semibold [&_label]:mb-1"
         >
           {/* Name */}
           <div>
@@ -106,8 +106,8 @@ export default function EditItemModal({
             />
           </div>
 
-          {/* Sizes */}
-          <div className="col-span-2">
+          {/* Sizes + Status on same row */}
+          <div>
             <label className="block font-semibold">Sizes</label>
             <input
               type="text"
@@ -135,7 +135,20 @@ export default function EditItemModal({
             />
           </div>
 
-          {/* Add-ons */}
+          <div>
+            <label className="block font-semibold">Status</label>
+            <select
+              value={newItem.status || "Available"}
+              onChange={(e) =>
+                setNewItem({ ...newItem, status: e.target.value })
+              }
+            >
+              <option value="Available">Available</option>
+              <option value="Not Available">Not Available</option>
+            </select>
+          </div>
+
+          {/* Add-ons + Allergen on same row */}
           <div>
             <label className="block font-semibold">Add-ons</label>
             <input
@@ -143,19 +156,27 @@ export default function EditItemModal({
               placeholder="e.g. Cheese (₱10), Bacon (₱15)"
               value={
                 Array.isArray(newItem.addons)
-                  ? newItem.addons.join(", ")
-                  : newItem.addons
+                  ? newItem.addons
+                      .map((a) =>
+                        typeof a === "string"
+                          ? a
+                          : `${a.label}${a.price ? ` (₱${a.price})` : ""}`
+                      )
+                      .join(", ")
+                  : ""
               }
-              onChange={(e) =>
-                setNewItem({
-                  ...newItem,
-                  addons: e.target.value.split(",").map((a) => a.trim()),
-                })
-              }
+              onChange={(e) => {
+                const parsedAddons = e.target.value.split(",").map((str) => {
+                  const match = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                  return match
+                    ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                    : { label: str.trim(), price: 0 };
+                });
+                setNewItem({ ...newItem, addons: parsedAddons });
+              }}
             />
           </div>
 
-          {/* Allergen */}
           <div>
             <label className="block font-semibold">Allergen</label>
             <input

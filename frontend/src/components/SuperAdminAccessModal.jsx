@@ -5,19 +5,19 @@ const SuperAdminAccessModal = ({ onClose, onConfirm }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-[#bfb8b8] bg-opacity-70 z-[100]">
-      <div className="bg-white rounded-lg p-6 w-[800px] shadow-lg">
+      <div className="bg-white rounded-lg p-4 w-[500px] shadow-md">
         {/* Icon */}
-        <div className="flex w-full justify-center mb-3">
-          <div className="bg-red-800 rounded-full w-10 h-10 flex items-center justify-center">
-            <span className="text-white text-lg font-bold">!</span>
+        <div className="flex w-full justify-center mb-2">
+          <div className="bg-red-800 rounded-full w-8 h-8 flex items-center justify-center">
+            <span className="text-white text-sm font-bold">!</span>
           </div>
         </div>
 
         {/* Title */}
-        <h2 className="text-lg font-semibold text-center">System Admin Access</h2>
+        <h2 className="text-base font-semibold text-center">System Admin Access</h2>
 
         {/* Description */}
-        <p className="text-sm text-gray-600 mt-2 text-center leading-relaxed">
+        <p className="text-xs text-gray-600 mt-2 text-center leading-snug">
           <strong>Note:</strong> A system admin is a user who has complete
           access to all control. A System Administrator can add users, delete
           all transactions, logs and reset all data. Are you sure you want to
@@ -25,32 +25,32 @@ const SuperAdminAccessModal = ({ onClose, onConfirm }) => {
         </p>
 
         {/* Toggle + Buttons in one row */}
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex items-center justify-between mt-4">
           {/* Toggle Switch */}
           <div
-            className="flex items-center gap-3 cursor-pointer select-none"
+            className="flex items-center gap-2 cursor-pointer select-none"
             onClick={() => setEnabled(!enabled)}
           >
             <div
-              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+              className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors duration-300 ${
                 enabled ? "bg-green-600" : "bg-gray-300"
               }`}
             >
               <div
-                className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
-                  enabled ? "translate-x-6" : "translate-x-0"
+                className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                  enabled ? "translate-x-4" : "translate-x-0"
                 }`}
               />
             </div>
-            <span className="text-sm">Switch to System Admin Access</span>
+            <span className="text-xs">Switch to System Admin Access</span>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button
               onClick={onConfirm}
               disabled={!enabled}
-              className={`px-5 py-1.5 rounded-full font-medium transition-colors ${
+              className={`px-4 py-1 rounded-full text-xs font-medium transition-colors ${
                 enabled
                   ? "bg-yellow-500 hover:bg-yellow-600 text-black"
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -60,7 +60,7 @@ const SuperAdminAccessModal = ({ onClose, onConfirm }) => {
             </button>
             <button
               onClick={onClose}
-              className="px-5 py-1.5 rounded-full font-medium bg-black text-white hover:bg-gray-800"
+              className="px-4 py-1 rounded-full text-xs font-medium bg-black text-white hover:bg-gray-800"
             >
               Close
             </button>

@@ -21,37 +21,39 @@ const SuperAdminPasswordModal = ({ onClose, onConfirm }) => {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[101]">
-      <div className="bg-white rounded-lg p-6 w-[400px] shadow-lg">
+      <div className="bg-white rounded-lg p-4 w-[300px] shadow-md">
         <div className="flex flex-col items-center">
-          {/* Red icon */}
-        
-          <h2 className="text-lg font-semibold">System Admin Password</h2>
-          <p className="text-sm text-gray-600 mt-2 text-center">
+          {/* Title */}
+          <h2 className="text-sm font-semibold">System Admin Password</h2>
+          <p className="text-xs text-gray-600 mt-1 text-center leading-snug">
             Please enter the System admin password to continue.
           </p>
 
+          {/* Input */}
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={handleKeyDown}  // <-- Added this
-            className="border rounded px-3 py-2 mt-4 w-full"
+            onKeyDown={handleKeyDown}
+            className="border rounded px-2 py-1 mt-3 w-full text-sm"
             placeholder="Enter password"
             autoFocus
           />
 
-          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          {/* Error */}
+          {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
 
-          <div className="flex gap-3 mt-6">
+          {/* Buttons */}
+          <div className="flex gap-2 mt-4">
             <button
               onClick={handleSave}
-              className="px-4 py-2 rounded-full bg-yellow-500 hover:bg-yellow-600 text-white"
+              className="px-3 py-1.5 rounded-full bg-yellow-500 hover:bg-yellow-600 text-white text-xs"
             >
               Enter
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-full bg-black text-white hover:bg-gray-800"
+              className="px-3 py-1.5 rounded-full bg-black text-white hover:bg-gray-800 text-xs"
             >
               Close
             </button>
