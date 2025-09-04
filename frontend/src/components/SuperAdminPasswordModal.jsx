@@ -47,7 +47,7 @@ const SuperAdminPasswordModal = ({ onClose, onConfirm }) => {
               onClick={handleSave}
               className="px-4 py-2 rounded-full bg-yellow-500 hover:bg-yellow-600 text-white"
             >
-              Save
+              Enter
             </button>
             <button
               onClick={onClose}
