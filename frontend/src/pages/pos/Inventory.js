@@ -1,5 +1,5 @@
 // src/pages/admin/Inventory.js
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Sidebar from '../../components/Sidebar';
 import { FaSearch, FaPen } from 'react-icons/fa';
 import AdminInfo from '../../components/AdminInfo';
@@ -7,25 +7,23 @@ import AddItemModal from '../../components/modals/add-item-modal';
 import EditItemModal from '../../components/modals/edit-item-modal';
 import LogsModal from '../../components/modals/logs-modal';
 import CategoryFilterModal from '../../components/modals/category-filter-modal';
-import { allItemsFlat } from '../../utils/data';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
 import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
 import AddCategoryModal from '../../components/modals/AddCategoryModal';
 import ShowEntries from '../../components/ShowEntries';
 import Pagination from '../../components/Pagination';
 import { useCategories } from '../../contexts/CategoryContext';
-
-const initialInventoryData = allItemsFlat;
+import { useInventory } from '../../contexts/InventoryContext';
 
 export default function Inventory() {
-  const [adminName, setAdminName] = useState(localStorage.getItem('fullName') || 'Admin');
+  const [adminName] = useState(localStorage.getItem('fullName') || 'Admin');
   const [searchQuery, setSearchQuery] = useState('');
-  const [inventory, setInventory] = useState(initialInventoryData);
+  const { inventory = [], addItem, updateItem } = useInventory(); // shared inventory
   const [logs, setLogs] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
-  const [selectedItemIndex, setSelectedItemIndex] = useState(null);
+  const [selectedItemId, setSelectedItemId] = useState(null);
   const [newItem, setNewItem] = useState({
     name: '', price: '', category: '', quantity: '', status: 'Available',
     allergens: '', addons: [], description: '', sizes: []
@@ -44,47 +42,40 @@ export default function Inventory() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // derive categories from inventory items (existing)
-  const uniqueCategories = [...new Set(inventory.map(item => item.category))].filter(Boolean);
+  // control AddCategory modal visibility (DECLARED to fix the red squiggles)
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
   // Use shared category context (so admin + POS share categories)
-  // The provider must wrap the app (index.js) — defensive fallback to avoid crashes
   const categoriesCtx = useCategories() || {};
   const ctxCategoriesRaw = categoriesCtx.categories || [];
   const addCategory = categoriesCtx.addCategory || (() => {});
 
-  // ctxCategoriesRaw entries may be strings OR objects like { key, icon }
-  // map them to strings (keys)
+  // map ctx categories to strings
   const ctxCategoryKeys = ctxCategoriesRaw
     .map(c => (typeof c === 'string' ? c : (c && c.key ? c.key : '')))
     .filter(Boolean);
 
+  // inventory-derived categories
+  const uniqueCategories = [...new Set((inventory || []).map(item => item.category))].filter(Boolean);
+
   // Merge context categories and inventory-derived categories into a deduped array of strings
-// Context categories take precedence over inventory-derived categories
-const mergedCategoryKeys = (() => {
-  const seen = new Map(); // lowercased key -> original casing
+  const mergedCategoryKeys = useMemo(() => {
+    const seen = new Map();
+    ctxCategoriesRaw.forEach(c => {
+      const key = typeof c === 'string' ? c.trim() : c?.key?.trim();
+      if (!key) return;
+      const lower = key.toLowerCase();
+      if (!seen.has(lower)) seen.set(lower, key);
+    });
+    uniqueCategories.forEach(c => {
+      const key = (c || '').trim();
+      const lower = key.toLowerCase();
+      if (!seen.has(lower)) seen.set(lower, key);
+    });
+    return Array.from(seen.values());
+  }, [ctxCategoriesRaw, uniqueCategories]);
 
-  // Add context categories first (objects or strings)
-  ctxCategoriesRaw.forEach(c => {
-    const key = typeof c === 'string' ? c.trim() : c?.key?.trim();
-    if (!key) return;
-    const lower = key.toLowerCase();
-    if (!seen.has(lower)) seen.set(lower, key);
-  });
-
-  // Add inventory-derived categories (strings)
-  uniqueCategories.forEach(c => {
-    const key = c.trim();
-    const lower = key.toLowerCase();
-    if (!seen.has(lower)) seen.set(lower, key);
-  });
-
-  return Array.from(seen.values());
-})();
-  // control AddCategory modal visibility
-  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
-
-  const filteredInventory = inventory.filter(item =>
+  const filteredInventory = (inventory || []).filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
     (selectedCategory === '' || item.category === selectedCategory) &&
     (selectedStatus === '' || item.status === selectedStatus)
@@ -134,8 +125,15 @@ const mergedCategoryKeys = (() => {
       sizes: newItem.sizes || [],
     };
 
-    setInventory(prev => [...prev, newItemData]);
-
+    // use context addItem
+    try {
+      addItem(newItemData);
+    } catch (e) {
+      console.error("addItem failed", e);
+      setErrorMessage("Failed to add item.");
+      setShowErrorModal(true);
+      return;
+    }
 
     setLogs(prev => [
       ...prev,
@@ -160,10 +158,12 @@ const mergedCategoryKeys = (() => {
   };
 
   const handleEditItem = () => {
-    const updated = [...inventory];
-    const oldItem = updated[selectedItemIndex];
+    if (!selectedItemId) return;
 
-    const updatedItem = {
+    const oldItem = (inventory || []).find(it => it.id === selectedItemId);
+    if (!oldItem) return;
+
+    const updatedItemPatch = {
       name: newItem.name,
       price: parseFloat(newItem.price),
       category: newItem.category,
@@ -184,47 +184,51 @@ const mergedCategoryKeys = (() => {
     };
 
     let changes = [];
-    if (oldItem.name !== updatedItem.name) {
-      changes.push(`name from "${oldItem.name}" to "${updatedItem.name}"`);
+    if (oldItem.name !== updatedItemPatch.name) {
+      changes.push(`name from "${oldItem.name}" to "${updatedItemPatch.name}"`);
     }
-    if (oldItem.price !== updatedItem.price) {
-      changes.push(`price from ₱${oldItem.price} to ₱${updatedItem.price}`);
+    if (oldItem.price !== updatedItemPatch.price) {
+      changes.push(`price from ₱${oldItem.price} to ₱${updatedItemPatch.price}`);
     }
-    if (oldItem.quantity !== updatedItem.quantity) {
-      changes.push(`quantity from ${oldItem.quantity} to ${updatedItem.quantity}`);
+    if (oldItem.quantity !== updatedItemPatch.quantity) {
+      changes.push(`quantity from ${oldItem.quantity} to ${updatedItemPatch.quantity}`);
     }
-    if (oldItem.category !== updatedItem.category) {
-      changes.push(`category from "${oldItem.category}" to "${updatedItem.category}"`);
+    if (oldItem.category !== updatedItemPatch.category) {
+      changes.push(`category from "${oldItem.category}" to "${updatedItemPatch.category}"`);
     }
-    if (oldItem.status !== updatedItem.status) {
-      changes.push(`status from "${oldItem.status}" to "${updatedItem.status}"`);
+    if (oldItem.status !== updatedItemPatch.status) {
+      changes.push(`status from "${oldItem.status}" to "${updatedItemPatch.status}"`);
     }
-    if (oldItem.allergens !== updatedItem.allergens) {
+    if (oldItem.allergens !== updatedItemPatch.allergens) {
       changes.push(`allergens changed`);
     }
-    if (JSON.stringify(oldItem.addons) !== JSON.stringify(updatedItem.addons)) {
+    if (JSON.stringify(oldItem.addons) !== JSON.stringify(updatedItemPatch.addons)) {
       changes.push(`addons changed`);
     }
-    if (oldItem.description !== updatedItem.description) {
+    if (oldItem.description !== updatedItemPatch.description) {
       changes.push(`description updated`);
     }
-    if (JSON.stringify(oldItem.sizes) !== JSON.stringify(updatedItem.sizes)) {
-      changes.push(`sizes from "${formatSizes(oldItem.sizes)}" to "${formatSizes(updatedItem.sizes)}"`);
+    if (JSON.stringify(oldItem.sizes) !== JSON.stringify(updatedItemPatch.sizes)) {
+      changes.push(`sizes from "${formatSizes(oldItem.sizes)}" to "${formatSizes(updatedItemPatch.sizes)}"`);
     }
 
     const detailText = changes.length > 0
       ? `Updated ${changes.join(', ')}`
       : `No changes made`;
 
-    updated[selectedItemIndex] = updatedItem;
-    setInventory(updated);
+    // call context update by id with patch
+    try {
+      updateItem(selectedItemId, updatedItemPatch);
+    } catch (e) {
+      console.error("updateItem failed", e);
+    }
 
     // if edited category is new, add to context
-    const editCatLower = (updatedItem.category || '').toLowerCase();
+    const editCatLower = (updatedItemPatch.category || '').toLowerCase();
     const existsEdit = mergedCategoryKeys.some(k => k.toLowerCase() === editCatLower);
-    if (updatedItem.category && !existsEdit) {
+    if (updatedItemPatch.category && !existsEdit) {
       try {
-        addCategory({ key: updatedItem.category, icon: '/assets/default-category.png' });
+        addCategory({ key: updatedItemPatch.category, icon: '/assets/default-category.png' });
       } catch (e) {}
     }
 
@@ -234,12 +238,12 @@ const mergedCategoryKeys = (() => {
         datetime: formatDateTime(),
         action: "Update",
         admin: adminName || '—',
-        product: updatedItem.name || '—',
+        product: updatedItemPatch.name || '—',
         field: "Edited Fields",
-        stock: `${updatedItem.quantity ?? 0} pcs`,
-        oldPrice: updatedItem.price ? `₱${oldItem.price}` : '—',
-        newPrice: updatedItem.price ? `₱${updatedItem.price}` : '—',
-        category: updatedItem.category || '—',
+        stock: `${updatedItemPatch.quantity ?? 0} pcs`,
+        oldPrice: updatedItemPatch.price ? `₱${oldItem.price}` : '—',
+        newPrice: updatedItemPatch.price ? `₱${updatedItemPatch.price}` : '—',
+        category: updatedItemPatch.category || '—',
         detail: detailText
       }
     ]);
@@ -250,33 +254,30 @@ const mergedCategoryKeys = (() => {
   };
 
   // called when admin AddCategoryModal reports new category; we also add to context
- const handleAdminAddCategory = (newCatRaw) => {
-  const clean = (newCatRaw || '').trim();
-  if (!clean) return;
+  const handleAdminAddCategory = (newCatRaw) => {
+    const clean = (newCatRaw || '').trim();
+    if (!clean) return;
 
-  // Add to context (so POS and other admin pages see it)
-  try {
-    addCategory({ key: clean, icon: '/assets/default-category.png' });
-  } catch (e) {}
+    try {
+      addCategory({ key: clean, icon: '/assets/default-category.png' });
+    } catch (e) {}
 
-  // Add a log entry for the new category
-  setLogs(prevLogs => [
-    ...prevLogs,
-    {
-      datetime: formatDateTime(),
-      action: "Add",
-      admin: adminName,
-      product: "—",
-      field: "Category",
-      stock: "—",
-      oldPrice: "",
-      newPrice: "",
-      category: clean,          // show the newly added category
-       detail: `added new category: "${clean}"`   // detail text
-    }
-  ]);
-};
-  
+    setLogs(prevLogs => [
+      ...prevLogs,
+      {
+        datetime: formatDateTime(),
+        action: "Add",
+        admin: adminName,
+        product: "—",
+        field: "Category",
+        stock: "—",
+        oldPrice: "",
+        newPrice: "",
+        category: clean,
+        detail: `added new category: "${clean}"`
+      }
+    ]);
+  };
 
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
@@ -324,6 +325,7 @@ const mergedCategoryKeys = (() => {
             <button
               onClick={() => {
                 setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' });
+                setSelectedItemId(null);
                 setShowAddModal(true);
               }}
               className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-sm font-semibold border border-yellow-500 rounded-full"
@@ -337,11 +339,12 @@ const mergedCategoryKeys = (() => {
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full table-auto border-collapse text-sm">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
-  <tr className="text-left">
-    <th className="p-3">No.</th>
-    <th className="p-3">Name</th>
-    <th className="p-3">Price</th>
-    <th className="p-3">
+                <tr className="text-left">
+                  <th className="p-3">No.</th>
+                  <th className="p-3">Name</th>
+                  <th className="p-3">Price</th>
+                  <th className="p-3">Category</th>
+                  <th className="p-3">
       <div className="flex items-center gap-2">
         <span className="text-white font-semibold">Category</span>
         <div className="relative inline-block">
@@ -364,65 +367,40 @@ const mergedCategoryKeys = (() => {
         </div>
       </div>
     </th>
-    <th className="p-3">Allergens</th>
-    <th className="p-3">Add-ons</th>
-    <th className="p-3">Description</th>
-    <th className="p-3">Sizes</th>
-    <th className="p-3 text-center">Stock</th>
-    <th className="p-3 text-center">
-      <div className="flex items-center justify-center gap-2">
-        <span className="text-white font-semibold">Status</span>
-        <div className="relative inline-block">
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-             className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-0.5 rounded text-xs font-medium border-none cursor-pointer"
-            style={{ width: '24px' }}
-          >
-            <option value="">All</option>
-            <option value="Available">Available</option>
-            <option value="Unavailable">Unavailable</option>
-          </select>
-          <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </div>
-      </div>
-    </th>
-    <th className="p-3 text-center">Edit</th>
-  </tr>
-</thead>
-
-
-
+                  <th className="p-3">Add-ons</th>
+                  <th className="p-3">Description</th>
+                  <th className="p-3">Sizes</th>
+                  <th className="p-3 text-center">Stock</th>
+                  <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Edit</th>
+                </tr>
+              </thead>
 
               <tbody>
                 {paginatedInventory.map((item, index) => (
-                  <tr key={index} className="bg-[#fdfdfd] border-b hover:bg-[#f1f1f1]">
+                  <tr key={item.id || index} className="bg-[#fdfdfd] border-b hover:bg-[#f1f1f1]">
                     <td className="p-3">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="p-3">{item.name}</td>
-                    <td className="p-3">₱{item.price.toFixed(2)}</td>
+                    <td className="p-3">₱{Number(item.price || 0).toFixed(2)}</td>
                     <td className="p-3">{item.category}</td>
                     <td className="p-3">{item.allergens || '—'}</td>
                     <td className="p-3">
                       {Array.isArray(item.addons)
                         ? item.addons.map(a =>
-                          typeof a === 'string'
-                            ? a
-                            : `${a.label}${a.price ? ` (₱${a.price})` : ''}`
-                        ).join(', ')
+                            typeof a === 'string'
+                              ? a
+                              : `${a.label}${a.price ? ` (₱${a.price})` : ''}`
+                          ).join(', ')
                         : '—'}
                     </td>
                     <td className="p-3">{item.description || '—'}</td>
                     <td className="p-3">
                       {Array.isArray(item.sizes)
                         ? item.sizes.map(size =>
-                          typeof size === 'string'
-                            ? size
-                            : `${size.label}${size.price ? ` (₱${size.price})` : ''}`
-                        ).join(', ')
+                            typeof size === 'string'
+                              ? size
+                              : `${size.label}${size.price ? ` (₱${size.price})` : ''}`
+                          ).join(', ')
                         : '—'}
                     </td>
                     <td className="p-3 text-center">{item.quantity}</td>
@@ -435,8 +413,9 @@ const mergedCategoryKeys = (() => {
                       <FaPen
                         className="text-red-600 cursor-pointer mx-auto"
                         onClick={() => {
-                          setSelectedItemIndex((currentPage - 1) * entriesPerPage + index);
+                          setSelectedItemId(item.id);
                           setNewItem({
+                            id: item.id,
                             name: item.name,
                             price: item.price,
                             category: item.category,
@@ -538,40 +517,40 @@ const mergedCategoryKeys = (() => {
             onClose={() => setShowErrorModal(false)}
           />
         )}
-        
-       {showAddCategoryModal && (
-  <AddCategoryModal
-    onClose={() => setShowAddCategoryModal(false)}
-    onAdded={(newCat, iconPath) => {
-      const clean = (newCat || "").trim();
-      if (!clean) return setShowAddCategoryModal(false);
 
-      // Add to context once
-      try {
-        addCategory({ key: clean, icon: iconPath || "/assets/default-category.png" });
-      } catch (e) {}
+        {showAddCategoryModal && (
+          <AddCategoryModal
+            onClose={() => setShowAddCategoryModal(false)}
+            onAdded={(newCat, iconPath) => {
+              const clean = (newCat || "").trim();
+              if (!clean) return setShowAddCategoryModal(false);
 
-      // Add log entry
-      setLogs((prevLogs) => [
-        ...prevLogs,
-        {
-          datetime: formatDateTime(),
-          action: "Add",
-          admin: adminName,
-          product: "—",
-          field: "Category",
-          stock: "—",
-          oldPrice: "",
-          newPrice: "",
-          category: clean,
-          detail: `Added new category: "${clean}"`
-        }
-      ]);
+              // Add to context once
+              try {
+                addCategory({ key: clean, icon: iconPath || "/assets/default-category.png" });
+              } catch (e) {}
 
-      setShowAddCategoryModal(false);
-    }}
-  />
-)}
+              // Add log entry
+              setLogs((prevLogs) => [
+                ...prevLogs,
+                {
+                  datetime: formatDateTime(),
+                  action: "Add",
+                  admin: adminName,
+                  product: "—",
+                  field: "Category",
+                  stock: "—",
+                  oldPrice: "",
+                  newPrice: "",
+                  category: clean,
+                  detail: `Added new category: "${clean}"`
+                }
+              ]);
+
+              setShowAddCategoryModal(false);
+            }}
+          />
+        )}
 
       </div>
     </div>

@@ -5,6 +5,7 @@ import avatar from "../assets/avatar-ph.png";
 
 export default function Header({
   userName,
+  profilePic,
   onProfileClick,
   searchTerm,
   onSearchChange,
@@ -35,10 +36,10 @@ export default function Header({
         onClick={onProfileClick}
         className="flex items-center space-x-2 bg-[#FFC72C] px-3 py-1.5 rounded-full shadow hover:scale-105 transition-transform duration-150"
       >
-        <img
-          src={avatar}
-          alt="Avatar"
-          className="w-9 h-9 rounded-full object-cover"
+         <img
+          src={profilePic}
+          alt="Profile"
+          className="w-10 h-10 rounded-full object-cover border border-gray-300"
         />
         <div className="text-left leading-tight">
           <div className="font-bold text-sm text-black">{userName}</div>

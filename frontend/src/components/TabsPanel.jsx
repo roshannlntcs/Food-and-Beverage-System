@@ -6,7 +6,7 @@ const tabs = [
   { key: "Menu", icon: "menu.png" },
   { key: "KVS", icon: "orders.png" },
   { key: "Logs", icon: "transactions.png" },
-  { key: "Items", icon: "items.png" },
+  { key: "Status", icon: "items.png" },
   { key: "Discount", icon: "discount.png" },
 ];
 

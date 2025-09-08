@@ -40,12 +40,16 @@ import {
   generateVoidID
 } from "../../utils/id";
 
+// Inventory context
+import { useInventory } from "../../contexts/InventoryContext";
+
 const importAll = (r) =>
   r.keys().reduce((acc, k) => ({ ...acc, [k.replace("./", "")]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
 
 export default function POSMain() {
   const navigate = useNavigate();
+  const { applyTransaction } = useInventory(); // <-- from InventoryContext
 
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
@@ -94,7 +98,7 @@ export default function POSMain() {
   const [editingCartIndex, setEditingCartIndex] = useState(null);
   const [modalEdited, setModalEdited] = useState(false);
 
-  const [itemAvailability, setItemAvailability] = useState({});
+  const [itemAvailability, setItemAvailability] = useState({}); // kept for compatibility but ItemsTab now reads inventory
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountType, setDiscountType] = useState("");
   const [couponCode, setCouponCode] = useState("");
@@ -135,6 +139,7 @@ export default function POSMain() {
   // user info
   const userName = localStorage.getItem("userName") || "Cashier";
   const schoolId = localStorage.getItem("schoolId") || "";
+  const profilePic = localStorage.getItem("profilePic") || images["avatar-ph.png"];
   const basePassword = "123456";
 
   // Customer view refs & state
@@ -160,7 +165,7 @@ export default function POSMain() {
       : Object.values(placeholders).flat();
 
     return baseList
-      .filter(i => itemAvailability[i.name])
+      .filter(i => (itemAvailability[i.name] ?? true)) // keep compatibility, but ItemsTab drives this now from inventory
       .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [activeCategory, itemAvailability, searchTerm]);
 
@@ -216,7 +221,7 @@ export default function POSMain() {
     setModalEdited(false);
   };
 
-  // init availability
+  // init availability (legacy fallback)
   useEffect(() => {
     if (Object.keys(itemAvailability).length === 0) {
       const avail = {};
@@ -419,6 +424,15 @@ export default function POSMain() {
     localStorage.setItem("orders", JSON.stringify(updatedOrders));
     setOrders(updatedOrders);
 
+    // Apply stock changes to InventoryContext
+    try {
+      // create an array of { name, qty } — InventoryContext supports name matching
+      const orderedItems = cart.map(it => ({ name: it.name, qty: Number(it.quantity || 1) }));
+      applyTransaction(orderedItems);
+    } catch (e) {
+      console.error("Failed to apply transaction to inventory:", e);
+    }
+
     // Build a normalized payment summary to show in Order Success
     const paymentSummary = {
       method: paymentInfo.method || paymentMethod || "N/A",
@@ -449,60 +463,45 @@ export default function POSMain() {
     setCustomerViewOpened(false);
   };
 
-  // --- VOID FLOW IMPLEMENTATION ---
-
-  // Called to start void flow. `type` = 'transaction' or 'item'.
-  // We expect the caller to pass the transaction object as `tx` when voiding (if available).
+  // --- VOID FLOW IMPLEMENTATION (unchanged) ---
   const triggerVoid = (type, indexOrTx = null) => {
-    // normalize incoming params:
-    // If an object with .id is passed, treat as tx
     if (indexOrTx && typeof indexOrTx === 'object' && indexOrTx.id) {
       setVoidContext({ type, tx: indexOrTx, index: null });
     } else {
-      // maybe caller passed index only — try to derive tx from historyContext or selectedTransaction
       const txFromHistory = historyContext?.tx || selectedTransaction || null;
       setVoidContext({ type, tx: txFromHistory, index: typeof indexOrTx === 'number' ? indexOrTx : null });
     }
-    // show first-level manager auth
     setShowFirstAuth(true);
     setShowReasonModal(false);
     setShowFinalAuth(false);
     setPendingVoidReason("");
   };
 
-  // first-level auth confirm
   const onFirstAuthConfirm = (passwordEntered) => {
     if (passwordEntered !== basePassword) {
       alert("Wrong manager password.");
       return;
     }
-    // proceed to reason/details modal
     setShowFirstAuth(false);
     setShowReasonModal(true);
   };
 
-  // when user submits reason in reason modal -> show final auth
   const onReasonSubmit = (reason) => {
     setPendingVoidReason(reason);
     setShowReasonModal(false);
     setShowFinalAuth(true);
   };
 
-  // final auth confirm
   const onFinalAuthConfirm = (passwordEntered) => {
     if (passwordEntered !== basePassword) {
       alert("Wrong manager password.");
       return;
     }
-    // run actual confirmVoid with pending reason
     confirmVoid(pendingVoidReason);
-    // reset flags
     setShowFinalAuth(false);
     setPendingVoidReason("");
   };
 
-  // confirmVoid actually performs the void operation and logging (same as your existing logic,
-  // but now accepts a reason string)
   const confirmVoid = (reason = "No reason provided") => {
     const { type, tx, index } = voidContext || {};
     if (!tx) {
@@ -515,15 +514,13 @@ export default function POSMain() {
       return;
     }
 
-    // --- Update Transactions (in-memory + localStorage) ---
+    // (void logic unchanged) ...
     const currentTxs = JSON.parse(localStorage.getItem("transactions") || "[]");
     const updatedTransactions = currentTxs.map(t => {
       if (t.id !== tx.id) return t;
-
       const updatedItems = t.items.map((it, idx) =>
         (type === "transaction" || idx === index) ? { ...it, voided: true } : it
       );
-
       const subtotal = updatedItems
         .filter(it => !it.voided)
         .reduce((sum, it) => {
@@ -532,11 +529,9 @@ export default function POSMain() {
           const addons = (it.selectedAddons || []).reduce((a, x) => a + (x.price || 0), 0);
           return sum + (base + sizeUp + addons) * it.quantity;
         }, 0);
-
       const discountAmt = +(subtotal * (t.discountPct || 0) / 100).toFixed(2);
       const tax = +(subtotal * 0.12).toFixed(2);
       const total = +(subtotal + tax - discountAmt).toFixed(2);
-
       return {
         ...t,
         items: updatedItems,
@@ -551,11 +546,9 @@ export default function POSMain() {
     localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
     setTransactions(updatedTransactions);
 
-    // --- Update Orders (in-memory + localStorage) ---
     const currentOrders = JSON.parse(localStorage.getItem("orders") || "[]");
     const updatedOrders = currentOrders.map(order => {
       if (order.transactionID !== tx.transactionID) return order;
-
       if (type === "transaction") {
         return {
           ...order,
@@ -572,7 +565,6 @@ export default function POSMain() {
             && !it.voided;
           return isMatch ? { ...it, voided: true } : it;
         });
-
         const allVoided = updatedItems.length > 0 && updatedItems.every(i => i.voided);
         return {
           ...order,
@@ -585,24 +577,18 @@ export default function POSMain() {
     localStorage.setItem("orders", JSON.stringify(updatedOrders));
     setOrders(updatedOrders);
 
-    // --- Update Void Logs (persisted) ---
     const existingLogs = JSON.parse(localStorage.getItem("voidLogs") || "[]");
     const existing = existingLogs.find(v => v.txId === tx.id);
-
     const newVoidedItem = tx.items[index] ? { ...tx.items[index] } : null;
-
     const newVoidedDetailed =
       type === "transaction" ? tx.items.map(it => ({ ...it })) : [...(existing?.voidedItemsDetailed || []), newVoidedItem].filter(Boolean);
-
     const uniqueDetailedItems = Array.from(
       new Map(newVoidedDetailed.map(it => {
         const key = `${it.name}-${it.size?.label || "N/A"}-${it.notes || ""}-${(it.selectedAddons || []).map(a => a.label).join(",")}`;
         return [key, it];
       })).values()
     );
-
     const voidedItemNames = uniqueDetailedItems.map(i => i.name);
-
     const newLog = {
       voidId: existing?.voidId || generateVoidID(),
       txId: existing?.txId || tx.id,
@@ -616,13 +602,10 @@ export default function POSMain() {
       voidedItems: Array.from(new Set(voidedItemNames)),
       voidedItemsDetailed: uniqueDetailedItems,
     };
-
     const updatedLogs = existing ? existingLogs.map(v => (v.txId === tx.id ? newLog : v)) : [newLog, ...existingLogs];
-
     localStorage.setItem("voidLogs", JSON.stringify(updatedLogs));
     setVoidLogs(updatedLogs);
 
-    // refresh modals referencing tx/order
     if (historyContext?.type === "detail" && historyContext.tx?.id === tx.id) {
       const refreshedTx = updatedTransactions.find(t => t.id === tx.id);
       setHistoryContext({ type: "detail", tx: refreshedTx });
@@ -632,7 +615,6 @@ export default function POSMain() {
       setHistoryContext({ type: "orderDetail", order: refreshedOrder });
     }
 
-    // reset flow state
     setShowFirstAuth(false);
     setShowReasonModal(false);
     setShowFinalAuth(false);
@@ -661,6 +643,7 @@ export default function POSMain() {
         {/* HEADER */}
         <Header
           userName={userName}
+           profilePic={profilePic}
           onProfileClick={() => setShowProfileModal(true)}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
@@ -743,12 +726,12 @@ export default function POSMain() {
               )}
 
               {/* Items Availability */}
-              {activeTab === "Items" && (
+              {activeTab === "Status" && (
                 <ItemsTab
                   placeholders={placeholders}
                   activeCategory={activeCategory}
                   searchTerm={searchTerm}
-                  itemAvailability={itemAvailability}
+                  itemAvailability={itemAvailability}         // left for compatibility but not authoritative now
                   setItemAvailability={setItemAvailability}
                 />
               )}

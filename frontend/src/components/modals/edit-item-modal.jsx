@@ -144,7 +144,8 @@ export default function EditItemModal({
               }
             >
               <option value="Available">Available</option>
-              <option value="Not Available">Not Available</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Unavailable">Unavailable</option>
             </select>
           </div>
 
