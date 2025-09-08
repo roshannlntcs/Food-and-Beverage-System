@@ -131,7 +131,7 @@ export default function TransactionsPanel({
       {/* ─── Transactions Panel ──────────────────────────────── */}
       <div className="flex-1 flex flex-col relative">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-bold">Transaction Log</h2>
+          <h2 className="text-lg font-bold">Transaction Logs</h2>
           <div className="relative" ref={txFilterRef}>
             <button
               onClick={() => setShowTxFilter(v => !v)}
@@ -193,11 +193,11 @@ export default function TransactionsPanel({
             <button
               key={tx.transactionID}
               onClick={() => onTransactionSelect(tx)}
-              className={`bg-white w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md ${tx.voided ? "bg-gray-100 opacity-60" : ""}`}
+              className={`bg-white w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md ${tx.voided ? "bg-red-200" : ""}`}
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2">
-                  <img src={images["trans_log.png"]} alt="Transaction Log" className="w-8 h-8 rounded-sm object-cover flex-shrink-0" />
+                  <img src={images["trans_log.png"]} alt="Transaction Logs" className="w-8 h-8 rounded-sm object-cover flex-shrink-0" />
                   <div className="space-y-1">
                     <div className="font-medium">{tx.transactionID}{tx.voided && " (Voided)"}</div>
                     <div className="text-xs text-gray-600">Order ID: {tx.orderID}</div>

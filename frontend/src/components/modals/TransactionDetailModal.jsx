@@ -69,7 +69,7 @@ export default function TransactionDetailModal({ historyContext, setHistoryConte
               return (
                 <div
                   key={idx}
-                  className={`p-3 border rounded-lg ${it.voided ? "bg-gray-100" : "hover:shadow-md transition-shadow duration-150"} bg-white`}
+                  className={`p-3 border rounded-lg ${it.voided ? "bg-red-200" : "hover:shadow-md transition-shadow duration-150"} bg-white`}
                 >
                   <div className={`flex justify-between ${it.voided ? "line-through text-gray-500" : ""}`}>
                     <span className="font-semibold">{it.name} {it.voided && "(Voided)"}</span>
