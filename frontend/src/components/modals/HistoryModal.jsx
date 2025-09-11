@@ -101,7 +101,7 @@ export default function HistoryModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-[28rem] max-h-[80vh] flex flex-col overflow-hidden relative">
+      <div className="bg-white rounded-2xl shadow-xl w-[28rem] h-[80vh] flex flex-col overflow-hidden relative">
         {/* Header */}
         <div className="bg-[#800000] px-6 py-4 border-b flex justify-between items-center relative">
           <h2 className="text-xl text-white font-bold">Transaction History</h2>

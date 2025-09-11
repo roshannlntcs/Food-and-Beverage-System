@@ -193,7 +193,7 @@ export default function TransactionsPanel({
             <button
               key={tx.transactionID}
               onClick={() => onTransactionSelect(tx)}
-              className={`bg-white w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md ${tx.voided ? "bg-red-200" : ""}`}
+              className={`bg-white w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md ${tx.voided ? "bg-red-300" : ""}`}
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2">

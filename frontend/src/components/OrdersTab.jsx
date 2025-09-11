@@ -136,12 +136,19 @@ export default function OrdersPanel({ orders, onSelectOrder }) {
     // Render the card contents scaled to fit
     return createPortal(
       <div
-        onMouseEnter={handleOverlayEnter}
-        onMouseLeave={handleOverlayLeave}
-        onClick={() => onSelectOrder(order)}
-        style={style}
-        className="rounded-lg shadow-2xl bg-white overflow-hidden cursor-pointer"
-      >
+  onMouseEnter={handleOverlayEnter}
+  onMouseLeave={handleOverlayLeave}
+  onClick={() => onSelectOrder(order)}
+  style={style}
+  className={`
+    rounded-lg shadow-2xl bg-white overflow-hidden cursor-pointer
+    ${order.status === "pending"   ? "border-2 border-yellow-300" : ""}
+    ${order.status === "ongoing"   ? "border-2 border-blue-300"   : ""}
+    ${order.status === "complete"  ? "border-2 border-green-300"  : ""}
+    ${order.status === "cancelled" ? "border-2 border-red-300"    : ""}
+  `}
+>
+
         {/* use a small internal container to match card padding */}
         <div className="w-full h-full p-3 flex flex-col justify-between">
           <img

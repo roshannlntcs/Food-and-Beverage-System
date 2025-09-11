@@ -152,7 +152,7 @@ export default function CartPanel({
           Discount
           {discountType && (
             <>
-              :{" "}
+              :
               {discountType === "senior" && "Senior"}
               {discountType === "pwd" && "PWD"}
               {discountType === "student" && "Student"}

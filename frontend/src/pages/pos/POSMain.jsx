@@ -634,7 +634,7 @@ export default function POSMain() {
     setOrders(prev => prev.map(o => o.orderID === orderID ? { ...o, status: newStatus } : o));
   };
 
-  const categoriesEnabled = activeTab === "Menu" || activeTab === "Items";
+  const categoriesEnabled = activeTab === "Menu" || activeTab === "Status";
 
   return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
