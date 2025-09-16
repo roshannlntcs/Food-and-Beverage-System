@@ -46,7 +46,9 @@ const SupplierRecords = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
-  const adminName = localStorage.getItem("adminFullName") || "Admin";
+  const adminName = localStorage.getItem("fullName") || "Admin";
+
+
 
   const handleAddSupplier = (supplier) => {
     setSuppliers([...suppliers, supplier]);

@@ -23,7 +23,8 @@ export default function UserLoginPage() {
       localStorage.setItem("isLoggedIn", "true");
       localStorage.setItem("fullName", "Administrator");
       localStorage.setItem("schoolId", dummyId);
-
+      localStorage.setItem("sex", "");
+      
       // Update recent login for SuperAdmin
       let users = JSON.parse(localStorage.getItem("userCSV")) || [];
       const now = new Date().toLocaleString();
@@ -61,7 +62,8 @@ export default function UserLoginPage() {
     localStorage.setItem("isLoggedIn", "true");
     localStorage.setItem("fullName", foundUser.name);
     localStorage.setItem("schoolId", foundUser.id_number);
-
+    localStorage.setItem("sex", foundUser.sex || ""); // M or F
+    
     // Update recent login
     storedUsers[foundUserIndex].recentLogin = new Date().toLocaleString();
     localStorage.setItem("userCSV", JSON.stringify(storedUsers));

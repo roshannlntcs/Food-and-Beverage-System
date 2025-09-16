@@ -1,59 +1,65 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCashRegister } from "react-icons/fa";
+import { FaCashRegister, FaMale, FaFemale, FaWrench, FaUser } from "react-icons/fa";
+
 
 export default function RoleSelection() {
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState(null);
   const [fullName, setFullName] = useState("");
+  const [sex, setSex] = useState("");
 
   useEffect(() => {
     const storedName = localStorage.getItem("fullName");
-    if (storedName) {
-      setFullName(storedName);
-    }
+    const storedSex = localStorage.getItem("sex"); // "M" or "F"
+    if (storedName) setFullName(storedName);
+    if (storedSex) setSex(storedSex);
   }, []);
 
   const handleContinue = () => {
-    if (selectedRole === "admin") {
-      navigate("/admin/home");
-    } else if (selectedRole === "cashier") {
+    if (selectedRole === "admin") navigate("/admin/home");
+    else if (selectedRole === "cashier") {
       const isLoggedIn = localStorage.getItem("isLoggedIn");
-      if (isLoggedIn === "true") {
-        navigate("/user");
-      } else {
-        navigate("/user-login");
-      }
+      if (isLoggedIn === "true") navigate("/user");
+      else navigate("/user-login");
     }
   };
 
   return (
     <div
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
-      style={{
-        backgroundImage: "url('/b.jpg')",
-      }}
+      style={{ backgroundImage: "url('/b.jpg')" }}
     >
       <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-sm"></div>
 
       <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[500px] text-center">
-        {/* Hello, [Name] (centered at top, bigger font) */}
+        {/* Greeting */}
         {fullName && (
           <h1 className="text-2xl font-semibold text-gray-700 mb-6">
             Hello, <span className="text-yellow-500">{fullName}</span>!
           </h1>
         )}
 
-        {/* Profile Picture (Lebron.png) */}
+        {/* Profile Icon */}
         <div className="flex justify-center mb-6">
-          <img
-            src="/lebron.png"
-            alt="Profile"
-            className="w-24 h-24 rounded-full object-cover border-4 border-gray-300 shadow-md"
-          />
-        </div>
+  {sex === "M" ? (
+    <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
+      <FaMale size={64} className="text-black" />
+    </div>
+  ) : sex === "F" ? (
+    <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
+      <FaFemale size={64} className="text-red-500" />
+    </div>
+  ) : (
+    <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
+      <FaUser size={64} className="text-gray-500" /> {/* ✅ Default icon */}
+    </div>
+  )}
+</div>
 
-        {/* Subtitle smaller */}
+
+
+        {/* Subtitle */}
         <h2 className="text-lg font-medium mb-6 text-gray-800">
           Please select your role
         </h2>
@@ -69,8 +75,9 @@ export default function RoleSelection() {
                 : "text-gray-700 hover:text-[#FFC72C]"
             }`}
           >
-            <i
-              className={`fas fa-wrench text-3xl mb-2 transition-colors duration-300 ${
+            <FaWrench
+              size={30}
+              className={`mb-2 transition-colors duration-300 ${
                 selectedRole === "admin"
                   ? "text-[#FFC72C]"
                   : "text-gray-500 group-hover:text-[#FFC72C]"
