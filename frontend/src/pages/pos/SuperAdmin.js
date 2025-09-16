@@ -127,10 +127,10 @@ const SuperAdmin = () => {
     if (!file) return;
 
     const reader = new FileReader();
-
     reader.onload = (e) => {
       const decoder = new TextDecoder("latin1");
       const csvText = decoder.decode(e.target.result);
+
 
       const newFileHash = hashString(csvText);
 

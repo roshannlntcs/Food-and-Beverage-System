@@ -41,14 +41,23 @@ export default function RoleSelection() {
         )}
 
         {/* Profile Icon */}
-        <div className="flex justify-center mb-6">
+       {/* Profile Icon */}
+<div className="flex justify-center mb-6">
   {sex === "M" ? (
     <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-      <FaMale size={64} className="text-black" />
+      <img 
+        src="/male_user.png" 
+        alt="Male Icon" 
+        className="w-16 h-16 object-contain"
+      />
     </div>
   ) : sex === "F" ? (
     <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-      <FaFemale size={64} className="text-red-500" />
+      <img 
+        src="/female_user.png" 
+        alt="Female Icon" 
+        className="w-16 h-16 object-contain"
+      />
     </div>
   ) : (
     <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
@@ -56,6 +65,7 @@ export default function RoleSelection() {
     </div>
   )}
 </div>
+
 
 
 
