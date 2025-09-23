@@ -338,13 +338,12 @@ export default function Inventory() {
         <div className="border rounded-md overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full table-auto border-collapse text-sm">
-              <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
-                <tr className="text-left">
-                  <th className="p-3">No.</th>
-                  <th className="p-3">Name</th>
-                  <th className="p-3">Price</th>
-                  <th className="p-3">Category</th>
-                  <th className="p-3">
+             <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
+  <tr className="text-left">
+    <th className="p-3">No.</th>
+    <th className="p-3">Name</th>
+    <th className="p-3">Price</th>
+    <th className="p-3">
       <div className="flex items-center gap-2">
         <span className="text-white font-semibold">Category</span>
         <div className="relative inline-block">
@@ -367,14 +366,16 @@ export default function Inventory() {
         </div>
       </div>
     </th>
-                  <th className="p-3">Add-ons</th>
-                  <th className="p-3">Description</th>
-                  <th className="p-3">Sizes</th>
-                  <th className="p-3 text-center">Stock</th>
-                  <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-center">Edit</th>
-                </tr>
-              </thead>
+    <th className="p-3">Allergens</th>
+    <th className="p-3">Add-ons</th>
+    <th className="p-3">Description</th>
+    <th className="p-3">Sizes</th>
+    <th className="p-3 text-center">Stock</th>
+    <th className="p-3 text-center">Status</th>
+    <th className="p-3 text-center">Edit</th>
+  </tr>
+</thead>
+
 
               <tbody>
                 {paginatedInventory.map((item, index) => (

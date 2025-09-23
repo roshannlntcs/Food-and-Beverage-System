@@ -7,6 +7,7 @@ import ResetConfirmationModal from "../../components/ResetConfirmationModal";
 import MessageModal from "../../components/modals/MessageModal";
 import Papa from "papaparse";
 import AddUserModal from "../../components/modals/AddUserModal"; // ✅ Import the modal
+import ShowEntries from "../../components/ShowEntries";
 
 const resetWarnings = {
   transactions:
@@ -416,47 +417,63 @@ const SuperAdmin = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="py-3 px-4">SCHOOL ID</th>
-                  <th className="py-3 px-4">NAME</th>
-                  <th className="py-3 px-4">PROGRAM</th>
-                  <th className="py-3 px-4">SECTION</th>
-                  <th className="py-3 px-4">SEX</th>
-                  <th className="py-3 px-4">RECENT LOGIN</th>
-                  <th className="py-3 px-4">TYPE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedUsers.map((user, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">{user.id_number}</td>
-                    <td className="py-3 px-4">{user.name}</td>
-                    <td className="py-3 px-4">{user.program || "-"}</td>
-                    <td className="py-3 px-4">{user.section || "-"}</td>
-                    <td className="py-3 px-4">{user.sex || "-"}</td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      {user.recentLogin || "Never"}
-                    </td>
-                    <td className="py-3 px-4">{user.type}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+  <div className="max-h-[500px] overflow-y-auto">
+    <table className="min-w-full border-collapse text-sm">
+      <thead className="bg-gray-100 sticky top-0 z-10">
+        <tr className="text-left border-b">
+          <th className="py-3 px-4">SCHOOL ID</th>
+          <th className="py-3 px-4">NAME</th>
+          <th className="py-3 px-4">PROGRAM</th>
+          <th className="py-3 px-4">SECTION</th>
+          <th className="py-3 px-4">SEX</th>
+          <th className="py-3 px-4">RECENT LOGIN</th>
+          <th className="py-3 px-4">TYPE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {paginatedUsers.map((user, index) => (
+          <tr key={index} className="border-b hover:bg-gray-50">
+            <td className="py-3 px-4">{user.id_number}</td>
+            <td className="py-3 px-4">{user.name}</td>
+            <td className="py-3 px-4">{user.program || "-"}</td>
+            <td className="py-3 px-4">{user.section || "-"}</td>
+            <td className="py-3 px-4">{user.sex || "-"}</td>
+            <td className="py-3 px-4 whitespace-nowrap">
+              {user.recentLogin || "Never"}
+            </td>
+            <td className="py-3 px-4">{user.type}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-center mt-4">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-            />
-          </div>
-        </section>
-      </div>
+
+         {/* Bottom Controls (Show Entries + Pagination) */}
+<div className="flex flex-col md:flex-row items-center justify-between mt-4 gap-4">
+  <div className="self-start md:self-auto">
+    <ShowEntries
+      entriesPerPage={entriesPerPage}
+      setEntriesPerPage={setEntriesPerPage}
+      setCurrentPage={setCurrentPage}
+    />
+  </div>
+
+  <div className="flex justify-center flex-1">
+    <Pagination
+      currentPage={currentPage}
+      totalPages={totalPages}
+      setCurrentPage={setCurrentPage}
+    />
+  </div>
+
+  <div className="w-[150px]" /> {/* spacer to balance flex */}
+</div>
+</section>
+</div>
+
 
       {/* Reset Confirmation Modal */}
       <ResetConfirmationModal
