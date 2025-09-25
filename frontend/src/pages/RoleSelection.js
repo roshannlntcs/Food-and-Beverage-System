@@ -48,7 +48,7 @@ export default function RoleSelection() {
       <img 
         src="/male_user.png" 
         alt="Male Icon" 
-        className="w-16 h-16 object-contain"
+        className="w-24 h-24 object-contain -m-4" // Increased image size, negative margin to keep inside circle
       />
     </div>
   ) : sex === "F" ? (
@@ -56,12 +56,12 @@ export default function RoleSelection() {
       <img 
         src="/female_user.png" 
         alt="Female Icon" 
-        className="w-16 h-16 object-contain"
+        className="w-24 h-24 object-contain -m-4" // Increased image size, negative margin to keep inside circle
       />
     </div>
   ) : (
     <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-      <FaUser size={64} className="text-gray-500" /> {/* ✅ Default icon */}
+      <FaUser size={64} className="text-gray-500" />
     </div>
   )}
 </div>
