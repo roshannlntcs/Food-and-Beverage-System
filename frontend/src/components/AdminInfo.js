@@ -5,16 +5,16 @@ import { useNavigate } from 'react-router-dom';
 const AdminInfo = () => {
   const navigate = useNavigate();
   const adminName = localStorage.getItem('fullName') || 'Admin';
+  const sex = localStorage.getItem('sex') || ''; // "M" or "F"
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const dropdownRef = useRef(null);
-  const dropdownBtnRef = useRef(null); // separate button ref
+  const dropdownBtnRef = useRef(null);
   const notifRef = useRef(null);
 
   const handleClickOutside = (event) => {
-    // check dropdown
     if (
       dropdownRef.current &&
       dropdownBtnRef.current &&
@@ -23,8 +23,6 @@ const AdminInfo = () => {
     ) {
       setDropdownOpen(false);
     }
-
-    // check notifications
     if (notifRef.current && !notifRef.current.contains(event.target)) {
       setNotifOpen(false);
     }
@@ -36,7 +34,6 @@ const AdminInfo = () => {
   }, []);
 
   const handleSwitchRole = () => {
-    console.log('Switch Role clicked');
     navigate('/roles');
     setDropdownOpen(false);
   };
@@ -45,7 +42,10 @@ const AdminInfo = () => {
     <div className="flex items-center space-x-4 relative z-50">
       {/* Notifications */}
       <div className="relative" ref={notifRef}>
-        <button onClick={() => setNotifOpen(prev => !prev)} className="relative focus:outline-none hover:text-yellow-500 transition">
+        <button
+          onClick={() => setNotifOpen((prev) => !prev)}
+          className="relative focus:outline-none hover:text-yellow-500 transition"
+        >
           <FaBell className="text-xl text-gray-700" />
         </button>
         {notifOpen && (
@@ -60,14 +60,26 @@ const AdminInfo = () => {
       <div className="relative">
         <button
           ref={dropdownBtnRef}
-          onClick={() => setDropdownOpen(prev => !prev)}
+          onClick={() => setDropdownOpen((prev) => !prev)}
           className="flex items-center space-x-3 cursor-pointer select-none"
         >
-          <img
-            src="https://i.pravatar.cc/100?img=68"
-            alt="Admin Avatar"
-            className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
-          />
+          {/* ✅ Gender-based icon */}
+          {sex === 'M' ? (
+            <img
+              src="/male_user.png"
+              alt="Male User"
+              className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+            />
+          ) : sex === 'F' ? (
+            <img
+              src="/female_user.png"
+              alt="Female User"
+              className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+            />
+          ) : (
+            <FaUser className="w-10 h-10 p-2 rounded-full bg-gray-200 text-gray-600 border-2 border-gray-300 shadow-sm" />
+          )}
+
           <div className="hidden md:block leading-tight">
             <div className="text-sm font-semibold">{adminName}</div>
             <div className="text-xs text-gray-500">Administrator</div>
@@ -75,7 +87,10 @@ const AdminInfo = () => {
         </button>
 
         {dropdownOpen && (
-          <div ref={dropdownRef} className="absolute right-0 top-14 w-44 bg-white border rounded shadow-lg z-50 pointer-events-auto">
+          <div
+            ref={dropdownRef}
+            className="absolute right-0 top-14 w-44 bg-white border rounded shadow-lg z-50 pointer-events-auto"
+          >
             <div className="px-4 py-2 text-sm font-semibold border-b">{adminName}</div>
             <button className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100">
               <FaUser /> Profile
