@@ -40,34 +40,14 @@ export default function RoleSelection() {
           </h1>
         )}
 
-        {/* Profile Icon */}
-       {/* Profile Icon */}
-<div className="flex justify-center mb-6">
-  {sex === "M" ? (
-    <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-      <img 
-        src="/male_user.png" 
-        alt="Male Icon" 
-        className="w-24 h-24 object-contain -m-4" // Increased image size, negative margin to keep inside circle
-      />
-    </div>
-  ) : sex === "F" ? (
-    <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-      <img 
-        src="/female_user.png" 
-        alt="Female Icon" 
-        className="w-24 h-24 object-contain -m-4" // Increased image size, negative margin to keep inside circle
-      />
-    </div>
-  ) : (
-    <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-      <FaUser size={64} className="text-gray-500" />
-    </div>
-  )}
-</div>
-
-
-
+        {/* Profile Picture (Lebron.png) */}
+        <div className="flex justify-center mb-6">
+          <img
+            src="/lebron.png"
+            alt="Profile"
+            className="w-24 h-24 rounded-full object-cover border-4 border-gray-300 shadow-md"
+          />
+        </div>
 
         {/* Subtitle */}
         <h2 className="text-lg font-medium mb-6 text-gray-800">
