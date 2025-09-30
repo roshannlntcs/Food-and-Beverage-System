@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCashRegister, FaFemale, FaMale, FaUser, FaWrench } from "react-icons/fa";
+import { FaCashRegister, FaWrench } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function RoleSelection() {
@@ -9,29 +9,21 @@ export default function RoleSelection() {
 
   const [selectedRole, setSelectedRole] = useState(null);
   const [fullName, setFullName] = useState("");
-  const [sex, setSex] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(null);
 
   useEffect(() => {
     if (!currentUser) {
       setFullName("");
-      setSex("");
       setAvatarUrl(null);
       return;
     }
-
     setFullName(currentUser.fullName || "");
-    setSex(currentUser.sex || "");
-    setAvatarUrl(currentUser.avatarUrl || null);
+    setAvatarUrl(currentUser.avatarUrl || "/lebron.png");
   }, [currentUser]);
 
   const handleContinue = () => {
-    if (selectedRole === "admin") {
-      navigate("/admin/home");
-      return;
-    }
-
-    if (selectedRole === "cashier") {
+    if (selectedRole === "admin") navigate("/admin/home");
+    else if (selectedRole === "cashier") {
       if (currentUser) navigate("/user");
       else navigate("/user-login");
     }
@@ -42,7 +34,7 @@ export default function RoleSelection() {
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
       style={{ backgroundImage: "url('/b.jpg')" }}
     >
-      <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-sm"></div>
 
       <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[500px] text-center">
         {fullName && (
@@ -52,30 +44,16 @@ export default function RoleSelection() {
         )}
 
         <div className="flex justify-center mb-6">
-          {avatarUrl ? (
-            <div className="border-4 border-gray-300 rounded-full p-2 shadow-md flex items-center justify-center bg-white overflow-hidden w-24 h-24">
-              <img
-                src={avatarUrl}
-                alt="Profile"
-                className="w-full h-full object-cover rounded-full"
-              />
-            </div>
-          ) : sex === "M" ? (
-            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-              <img src="/male_user.png" alt="Male Icon" className="w-16 h-16 object-contain" />
-            </div>
-          ) : sex === "F" ? (
-            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-              <img src="/female_user.png" alt="Female Icon" className="w-16 h-16 object-contain" />
-            </div>
-          ) : (
-            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-              <FaUser size={64} className="text-gray-500" />
-            </div>
-          )}
+          <img
+            src={avatarUrl || "/lebron.png"}
+            alt="Profile"
+            className="w-24 h-24 rounded-full object-cover border-4 border-gray-300 shadow-md"
+          />
         </div>
 
-        <h2 className="text-lg font-medium mb-6 text-gray-800">Please select your role</h2>
+        <h2 className="text-lg font-medium mb-6 text-gray-800">
+          Please select your role
+        </h2>
 
         <div className="flex justify-center gap-12 mb-6">
           <div
