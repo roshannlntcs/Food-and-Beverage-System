@@ -1,7 +1,8 @@
 // src/pages/admin/Inventory.js
 import React, { useState, useMemo } from 'react';
 import Sidebar from '../../components/Sidebar';
-import { FaSearch, FaPen } from 'react-icons/fa';
+import { FaSearch, FaPen, FaTrash } from 'react-icons/fa'; 
+import DeleteConfirmModal from '../../components/modals/DeleteConfirmModal';
 import AdminInfo from '../../components/AdminInfo';
 import AddItemModal from '../../components/modals/add-item-modal';
 import EditItemModal from '../../components/modals/edit-item-modal';
@@ -18,7 +19,10 @@ import { useInventory } from '../../contexts/InventoryContext';
 export default function Inventory() {
   const [adminName] = useState(localStorage.getItem('fullName') || 'Admin');
   const [searchQuery, setSearchQuery] = useState('');
-  const { inventory = [], addItem, updateItem } = useInventory(); // shared inventory
+  const [showDeleteModal, setShowDeleteModal] = useState(false);   
+  const [deleteTarget, setDeleteTarget] = useState(null);          
+  const { inventory = [], addItem, updateItem, removeItem } = useInventory();
+
   const [logs, setLogs] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -42,23 +46,20 @@ export default function Inventory() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // control AddCategory modal visibility (DECLARED to fix the red squiggles)
+  // AddCategory modal visibility
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
-  // Use shared category context (so admin + POS share categories)
+  // categories
   const categoriesCtx = useCategories() || {};
   const ctxCategoriesRaw = categoriesCtx.categories || [];
   const addCategory = categoriesCtx.addCategory || (() => {});
 
-  // map ctx categories to strings
   const ctxCategoryKeys = ctxCategoriesRaw
     .map(c => (typeof c === 'string' ? c : (c && c.key ? c.key : '')))
     .filter(Boolean);
 
-  // inventory-derived categories
   const uniqueCategories = [...new Set((inventory || []).map(item => item.category))].filter(Boolean);
 
-  // Merge context categories and inventory-derived categories into a deduped array of strings
   const mergedCategoryKeys = useMemo(() => {
     const seen = new Map();
     ctxCategoriesRaw.forEach(c => {
@@ -81,7 +82,6 @@ export default function Inventory() {
     (selectedStatus === '' || item.status === selectedStatus)
   );
 
-  // pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredInventory.length / entriesPerPage));
   const paginatedInventory = filteredInventory.slice(
     (currentPage - 1) * entriesPerPage,
@@ -125,7 +125,6 @@ export default function Inventory() {
       sizes: newItem.sizes || [],
     };
 
-    // use context addItem
     try {
       addItem(newItemData);
     } catch (e) {
@@ -216,14 +215,12 @@ export default function Inventory() {
       ? `Updated ${changes.join(', ')}`
       : `No changes made`;
 
-    // call context update by id with patch
     try {
       updateItem(selectedItemId, updatedItemPatch);
     } catch (e) {
       console.error("updateItem failed", e);
     }
 
-    // if edited category is new, add to context
     const editCatLower = (updatedItemPatch.category || '').toLowerCase();
     const existsEdit = mergedCategoryKeys.some(k => k.toLowerCase() === editCatLower);
     if (updatedItemPatch.category && !existsEdit) {
@@ -253,7 +250,36 @@ export default function Inventory() {
     setShowSaveModal(true);
   };
 
-  // called when admin AddCategoryModal reports new category; we also add to context
+  // delete handler (now used from the table row)
+  const handleDeleteItem = async (id, name, category) => {
+    if (!id) return;
+    try {
+      await removeItem(id);
+
+      setLogs(prev => [
+        ...prev,
+        {
+          datetime: formatDateTime(),
+          action: "Delete",
+          admin: adminName,
+          product: name || "—",
+          field: "Item",
+          stock: "—",
+          oldPrice: "",
+          newPrice: "",
+          category: category || "—",
+          detail: `Deleted item: ${name || id}`
+        }
+      ]);
+
+      setShowEditModal(false);
+    } catch (e) {
+      console.error("removeItem failed", e);
+      setErrorMessage("Failed to delete item.");
+      setShowErrorModal(true);
+    }
+  };
+
   const handleAdminAddCategory = (newCatRaw) => {
     const clean = (newCatRaw || '').trim();
     if (!clean) return;
@@ -338,44 +364,43 @@ export default function Inventory() {
         <div className="border rounded-md overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full table-auto border-collapse text-sm">
-             <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
-  <tr className="text-left">
-    <th className="p-3">No.</th>
-    <th className="p-3">Name</th>
-    <th className="p-3">Price</th>
-    <th className="p-3">
-      <div className="flex items-center gap-2">
-        <span className="text-white font-semibold">Category</span>
-        <div className="relative inline-block">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
-            style={{ width: '24px' }}
-          >
-            <option value="">All</option>
-            {mergedCategoryKeys.map((cat, i) => (
-              <option key={i} value={cat}>{cat}</option>
-            ))}
-          </select>
-          <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </div>
-      </div>
-    </th>
-    <th className="p-3">Allergens</th>
-    <th className="p-3">Add-ons</th>
-    <th className="p-3">Description</th>
-    <th className="p-3">Sizes</th>
-    <th className="p-3 text-center">Stock</th>
-    <th className="p-3 text-center">Status</th>
-    <th className="p-3 text-center">Edit</th>
-  </tr>
-</thead>
-
+              <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
+                <tr className="text-left">
+                  <th className="p-3">No.</th>
+                  <th className="p-3">Name</th>
+                  <th className="p-3">Price</th>
+                  <th className="p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-semibold">Category</span>
+                      <div className="relative inline-block">
+                        <select
+                          value={selectedCategory}
+                          onChange={(e) => setSelectedCategory(e.target.value)}
+                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+                          style={{ width: '24px' }}
+                        >
+                          <option value="">All</option>
+                          {mergedCategoryKeys.map((cat, i) => (
+                            <option key={i} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </th>
+                  <th className="p-3">Allergens</th>
+                  <th className="p-3">Add-ons</th>
+                  <th className="p-3">Description</th>
+                  <th className="p-3">Sizes</th>
+                  <th className="p-3 text-center">Stock</th>
+                  <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Actions</th> {/* renamed */}
+                </tr>
+              </thead>
 
               <tbody>
                 {paginatedInventory.map((item, index) => (
@@ -410,26 +435,37 @@ export default function Inventory() {
                         {item.status}
                       </span>
                     </td>
-                    <td className="p-3 text-center">
-                      <FaPen
-                        className="text-red-600 cursor-pointer mx-auto"
-                        onClick={() => {
-                          setSelectedItemId(item.id);
-                          setNewItem({
-                            id: item.id,
-                            name: item.name,
-                            price: item.price,
-                            category: item.category,
-                            quantity: item.quantity,
-                            status: item.status,
-                            allergens: item.allergens,
-                            addons: item.addons,
-                            description: item.description,
-                            sizes: item.sizes || []
-                          });
-                          setShowEditModal(true);
-                        }}
-                      />
+                    <td className="p-3">
+                      <div className="flex items-center justify-center gap-4">
+                        <FaPen
+                          title="Edit"
+                          className="text-red-600 cursor-pointer"
+                          onClick={() => {
+                            setSelectedItemId(item.id);
+                            setNewItem({
+                              id: item.id,
+                              name: item.name,
+                              price: item.price,
+                              category: item.category,
+                              quantity: item.quantity,
+                              status: item.status,
+                              allergens: item.allergens,
+                              addons: item.addons,
+                              description: item.description,
+                              sizes: item.sizes || []
+                            });
+                            setShowEditModal(true);
+                          }}
+                        />
+                         <FaTrash
+                            title="Delete"
+                            className="text-red-600 cursor-pointer"
+                            onClick={() => {
+                              setDeleteTarget({ id: item.id, name: item.name, category: item.category });
+                              setShowDeleteModal(true);
+                            }}
+                          />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -526,12 +562,10 @@ export default function Inventory() {
               const clean = (newCat || "").trim();
               if (!clean) return setShowAddCategoryModal(false);
 
-              // Add to context once
               try {
                 addCategory({ key: clean, icon: iconPath || "/assets/default-category.png" });
               } catch (e) {}
 
-              // Add log entry
               setLogs((prevLogs) => [
                 ...prevLogs,
                 {
@@ -552,6 +586,23 @@ export default function Inventory() {
             }}
           />
         )}
+
+        {showDeleteModal && (
+              <DeleteConfirmModal
+                itemName={deleteTarget?.name}
+                onCancel={() => {
+                  setShowDeleteModal(false);
+                  setDeleteTarget(null);
+                }}
+                onConfirm={async () => {
+                  if (deleteTarget?.id) {
+                    await handleDeleteItem(deleteTarget.id, deleteTarget.name, deleteTarget.category);
+                  }
+                  setShowDeleteModal(false);
+                  setDeleteTarget(null);
+                }}
+              />
+            )}
 
       </div>
     </div>

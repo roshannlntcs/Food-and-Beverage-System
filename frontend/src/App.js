@@ -39,9 +39,8 @@ function App() {
         <Route path="/admin/pos-monitoring" element={<POSMonitoring />} />
         <Route path="/admin/supplier-records" element={<SupplierRecords />} />
         <Route path="/admin/void-logs" element={<VoidLogs />} />
-       <Route path="/admin/super-admin" element={<SuperAdmin />} />
-        
-<Route path="/pos/sales-report" element={<SalesReport />} /> {/* <-- Add this */}
+        <Route path="/admin/super-admin" element={<SuperAdmin />} />
+        <Route path="/pos/sales-report" element={<SalesReport />} />
       </Routes>
     </Router>
   );

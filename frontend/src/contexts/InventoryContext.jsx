@@ -161,6 +161,44 @@ export function InventoryProvider({ children }) {
     });
   }, [computeAutoStatus]);
 
+  // Reset inventory back to hard-coded seed items (allItemsFlat)
+const resetToSeed = useCallback(() => {
+  const normalized = allItemsFlat.map(item => {
+    const qty = (typeof item.quantity === "number" && !isNaN(item.quantity) && item.quantity > 0)
+      ? item.quantity
+      : DEFAULT_QUANTITY;
+    return {
+      id: item.id || (item.name || "").replace(/\s+/g, "_").toLowerCase(),
+      name: item.name,
+      price: item.price ?? 0,
+      category: item.category ?? "",
+      quantity: qty,
+      status: item.status || (qty <= 0 ? "Unavailable" : qty <= LOW_STOCK_THRESHOLD ? "Low Stock" : "Available"),
+      statusManual: !!item.statusManual,
+      ordersToday: item.ordersToday || 0,
+      allergens: item.allergens || "",
+      addons: item.addons || [],
+      description: item.description || "",
+      sizes: item.sizes || []
+    };
+  });
+  setInventory(normalized);
+}, []);
+
+// Reset ALL items' stock to 100 (seed + added). Respect manual status; otherwise recompute.
+const resetAllStocks = useCallback(() => {
+  setInventory(prev => prev.map(it => {
+    const q = DEFAULT_QUANTITY;
+    const status = it.statusManual ? it.status : computeAutoStatus(q);
+    return { ...it, quantity: q, status };
+  }));
+}, [computeAutoStatus]);
+
+    // NEW: removeItem by id
+  const removeItem = useCallback((id) => {
+    setInventory(prev => prev.filter(it => it.id !== id));
+  }, []);
+
   // daily reset of ordersToday (once per calendar day)
   useEffect(() => {
     const resetIfNeeded = () => {
@@ -199,6 +237,7 @@ export function InventoryProvider({ children }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+
   const api = {
     inventory,
     setInventory,
@@ -206,7 +245,10 @@ export function InventoryProvider({ children }) {
     addItem,
     applyTransaction,
     computeAutoStatus,
-    getEffectiveStatus
+    getEffectiveStatus,
+    removeItem,
+    resetToSeed,
+    resetAllStocks 
   };
 
   return <InventoryContext.Provider value={api}>{children}</InventoryContext.Provider>;

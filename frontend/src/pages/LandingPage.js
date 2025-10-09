@@ -20,11 +20,11 @@ const LandingPage = () => {
       </div>
 
        {/* Top Navigation Bar */}
-      <div className="absolute top-6 left-12 z-50 flex space-x-8">
-        <button className="text-white text-sm font-medium hover:underline transition">About</button>
-        <button className="text-white text-sm font-medium hover:underline transition">How it Works</button>
-        <button className="text-white text-sm font-medium hover:underline transition">Features</button>
-        <button className="text-white text-sm font-medium hover:underline transition">Help</button>
+      <div className="absolute top-6 left-16 z-50 flex space-x-12">
+        <button className="text-white text-base font-medium hover:underline transition">About</button>
+        <button className="text-white text-base font-medium hover:underline transition">How it Works</button>
+        <button className="text-white text-base font-medium hover:underline transition">Features</button>
+        <button className="text-white text-base font-medium hover:underline transition">Help</button>
       </div>
 
 

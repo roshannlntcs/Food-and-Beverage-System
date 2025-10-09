@@ -1,3 +1,4 @@
+// src/components/modals/edit-item-modal.jsx
 import React, { useState, useEffect } from "react";
 
 export default function EditItemModal({
@@ -5,7 +6,7 @@ export default function EditItemModal({
   setNewItem,
   uniqueCategories,
   onClose,
-  onSave,
+  onSave
 }) {
   const [imagePreview, setImagePreview] = useState(null);
 
@@ -18,21 +19,17 @@ export default function EditItemModal({
         onClose();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onSave, onClose]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      {/* Compact size same as AddItemModal */}
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
-        {/* Header */}
         <div className="bg-[#8B0000] text-white text-center py-2 rounded-t-lg text-lg font-semibold">
           Edit Item
         </div>
 
-        {/* Form */}
         <div
           className="p-4 grid grid-cols-2 gap-2 
           [&_input]:px-2 [&_input]:py-1 [&_input]:text-sm [&_input]:border [&_input]:border-gray-300 [&_input]:rounded [&_input]:focus:border-gray-500 [&_input]:focus:ring-1 [&_input]:focus:ring-gray-400
@@ -40,73 +37,55 @@ export default function EditItemModal({
           [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm [&_select]:border [&_select]:border-gray-300 [&_select]:rounded [&_select]:focus:border-gray-500 [&_select]:focus:ring-1 [&_select]:focus:ring-gray-400
           [&_label]:text-base [&_label]:font-semibold [&_label]:mb-1"
         >
-          {/* Name */}
           <div>
             <label className="block font-semibold">Name</label>
             <input
               type="text"
               value={newItem.name}
-              onChange={(e) =>
-                setNewItem({ ...newItem, name: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
             />
           </div>
 
-          {/* Category */}
           <div>
             <label className="block font-semibold">Category</label>
             <select
               value={newItem.category}
-              onChange={(e) =>
-                setNewItem({ ...newItem, category: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
             >
               <option value="">Select category</option>
               {uniqueCategories.map((cat, i) => (
-                <option key={i} value={cat}>
-                  {cat}
-                </option>
+                <option key={i} value={cat}>{cat}</option>
               ))}
             </select>
           </div>
 
-          {/* Description */}
           <div className="col-span-2">
             <label className="block font-semibold">Description</label>
             <textarea
               className="w-full h-25 resize-y"
               value={newItem.description}
-              onChange={(e) =>
-                setNewItem({ ...newItem, description: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
             />
           </div>
 
-          {/* Price */}
           <div>
             <label className="block font-semibold">Price</label>
             <input
               type="number"
               value={newItem.price}
-              onChange={(e) =>
-                setNewItem({ ...newItem, price: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
             />
           </div>
 
-          {/* Quantity */}
           <div>
             <label className="block font-semibold">Stock</label>
             <input
               type="number"
               value={newItem.quantity}
-              onChange={(e) =>
-                setNewItem({ ...newItem, quantity: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
             />
           </div>
 
-          {/* Sizes + Status on same row */}
           <div>
             <label className="block font-semibold">Sizes</label>
             <input
@@ -114,23 +93,19 @@ export default function EditItemModal({
               placeholder="e.g. Regular (₱0), Large (₱20)"
               value={
                 Array.isArray(newItem.sizes)
-                  ? newItem.sizes
-                      .map((s) =>
-                        typeof s === "string"
-                          ? s
-                          : `${s.label}${s.price ? ` (₱${s.price})` : ""}`
-                      )
-                      .join(", ")
+                  ? newItem.sizes.map(s =>
+                      typeof s === "string" ? s : `${s.label}${s.price ? ` (₱${s.price})` : ""}`
+                    ).join(", ")
                   : ""
               }
               onChange={(e) => {
-                const parsedSizes = e.target.value.split(",").map((str) => {
-                  const match = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
-                  return match
-                    ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                const parsed = e.target.value.split(",").map((str) => {
+                  const m = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                  return m
+                    ? { label: m[1].trim(), price: parseFloat(m[2]) }
                     : { label: str.trim(), price: 0 };
                 });
-                setNewItem({ ...newItem, sizes: parsedSizes });
+                setNewItem({ ...newItem, sizes: parsed });
               }}
             />
           </div>
@@ -139,9 +114,7 @@ export default function EditItemModal({
             <label className="block font-semibold">Status</label>
             <select
               value={newItem.status || "Available"}
-              onChange={(e) =>
-                setNewItem({ ...newItem, status: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
             >
               <option value="Available">Available</option>
               <option value="Low Stock">Low Stock</option>
@@ -149,7 +122,6 @@ export default function EditItemModal({
             </select>
           </div>
 
-          {/* Add-ons + Allergen on same row */}
           <div>
             <label className="block font-semibold">Add-ons</label>
             <input
@@ -157,23 +129,19 @@ export default function EditItemModal({
               placeholder="e.g. Cheese (₱10), Bacon (₱15)"
               value={
                 Array.isArray(newItem.addons)
-                  ? newItem.addons
-                      .map((a) =>
-                        typeof a === "string"
-                          ? a
-                          : `${a.label}${a.price ? ` (₱${a.price})` : ""}`
-                      )
-                      .join(", ")
+                  ? newItem.addons.map(a =>
+                      typeof a === "string" ? a : `${a.label}${a.price ? ` (₱${a.price})` : ""}`
+                    ).join(", ")
                   : ""
               }
               onChange={(e) => {
-                const parsedAddons = e.target.value.split(",").map((str) => {
-                  const match = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
-                  return match
-                    ? { label: match[1].trim(), price: parseFloat(match[2]) }
+                const parsed = e.target.value.split(",").map((str) => {
+                  const m = str.trim().match(/^(.+?)\s*\(₱?(\d+)\)$/);
+                  return m
+                    ? { label: m[1].trim(), price: parseFloat(m[2]) }
                     : { label: str.trim(), price: 0 };
                 });
-                setNewItem({ ...newItem, addons: parsedAddons });
+                setNewItem({ ...newItem, addons: parsed });
               }}
             />
           </div>
@@ -184,16 +152,13 @@ export default function EditItemModal({
               type="text"
               placeholder="e.g. Chicken, Nuts"
               value={newItem.allergens || ""}
-              onChange={(e) =>
-                setNewItem({ ...newItem, allergens: e.target.value })
-              }
+              onChange={(e) => setNewItem({ ...newItem, allergens: e.target.value })}
             />
           </div>
 
-          {/* Upload Image */}
           <div className="col-span-2">
             <label className="block font-semibold">Upload image</label>
-            <div className="w-full border-2 border-dashed border-gray-300 rounded px-3 py-4 text-center text-sm">
+            <div className="w-full border-2 border-dashed border-gray-3 00 rounded px-3 py-4 text-center text-sm">
               <input
                 type="file"
                 accept="image/*"
@@ -208,13 +173,9 @@ export default function EditItemModal({
                 className="hidden"
                 id="edit-upload-image"
               />
-              <label
-                htmlFor="edit-upload-image"
-                className="cursor-pointer block"
-              >
+              <label htmlFor="edit-upload-image" className="cursor-pointer block">
                 <p className="text-xs text-gray-600">
-                  Drop files here or{" "}
-                  <span className="text-blue-600 underline">browse</span>
+                  Drop files here or <span className="text-blue-600 underline">browse</span>
                 </p>
               </label>
 
@@ -231,8 +192,8 @@ export default function EditItemModal({
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="flex justify-end gap-2 mt-4 pr-4 pb-4">
+        {/* Footer (no delete here anymore) */}
+        <div className="flex items-center justify-end gap-2 mt-4 px-4 pb-4">
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-black text-white rounded-full text-sm font-semibold"
