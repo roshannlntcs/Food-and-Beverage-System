@@ -1,5 +1,4 @@
-// src/pages/admin/Inventory.js
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
 import { FaSearch, FaPen, FaTrash } from 'react-icons/fa'; 
 import DeleteConfirmModal from '../../components/modals/DeleteConfirmModal';
@@ -16,14 +15,30 @@ import Pagination from '../../components/Pagination';
 import { useCategories } from '../../contexts/CategoryContext';
 import { useInventory } from '../../contexts/InventoryContext';
 
+const LOGS_KEY = 'inventoryLogs';
+const EMPTY_ARRAY = Object.freeze([]);
+const NOOP = () => {};
+
 export default function Inventory() {
   const [adminName] = useState(localStorage.getItem('fullName') || 'Admin');
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);   
   const [deleteTarget, setDeleteTarget] = useState(null);          
-  const { inventory = [], addItem, updateItem, removeItem } = useInventory();
+  const { inventory = [], addItem, updateItem, removeItem, getEffectiveStatus } = useInventory();
 
-  const [logs, setLogs] = useState([]);
+
+  // CHANGED: initialize from storage
+  const [logs, setLogs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LOGS_KEY) || '[]'); }
+    catch { return []; }
+  });
+
+  // CHANGED: persist to storage whenever logs change
+  useEffect(() => {
+    try { localStorage.setItem(LOGS_KEY, JSON.stringify(logs)); }
+    catch {}
+  }, [logs]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
@@ -50,15 +65,23 @@ export default function Inventory() {
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
   // categories
-  const categoriesCtx = useCategories() || {};
-  const ctxCategoriesRaw = categoriesCtx.categories || [];
-  const addCategory = categoriesCtx.addCategory || (() => {});
+const categoriesCtx = useCategories();                           
+const ctxCategoriesRaw = categoriesCtx?.categories ?? EMPTY_ARRAY; 
+const addCategory = categoriesCtx?.addCategory ?? NOOP;            
 
-  const ctxCategoryKeys = ctxCategoriesRaw
-    .map(c => (typeof c === 'string' ? c : (c && c.key ? c.key : '')))
-    .filter(Boolean);
 
   const uniqueCategories = [...new Set((inventory || []).map(item => item.category))].filter(Boolean);
+  
+  const uniqueStatuses = useMemo(() => {
+  const baseline = ['Available', 'Unavailable', 'Low Stock'];
+  const dynamic = Array.from(new Set(
+    (inventory || [])
+      .map(it => (it.status || '').trim())
+      .filter(Boolean)
+  ));
+  const rest = dynamic.filter(s => !baseline.includes(s));
+  return [...baseline, ...rest];
+  }, [inventory]);
 
   const mergedCategoryKeys = useMemo(() => {
     const seen = new Map();
@@ -76,20 +99,22 @@ export default function Inventory() {
     return Array.from(seen.values());
   }, [ctxCategoriesRaw, uniqueCategories]);
 
-  const filteredInventory = (inventory || []).filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-    (selectedCategory === '' || item.category === selectedCategory) &&
-    (selectedStatus === '' || item.status === selectedStatus)
-  );
+  const matchesStatus = (item) => {
+  if (selectedStatus === '') return true;
+  return getEffectiveStatus(item) === selectedStatus; // respects manual status and Low Stock threshold
+};
+
+const filteredInventory = (inventory || []).filter(item =>
+  item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+  (selectedCategory === '' || item.category === selectedCategory) &&
+  matchesStatus(item)
+);
+
 
   const totalPages = Math.max(1, Math.ceil(filteredInventory.length / entriesPerPage));
   const paginatedInventory = filteredInventory.slice(
     (currentPage - 1) * entriesPerPage,
     currentPage * entriesPerPage
-  );
-
-  const filteredLogs = logs.filter(log =>
-    !filterDate || log.datetime.startsWith(filterDate)
   );
 
   const formatDateTime = () => {
@@ -205,7 +230,7 @@ export default function Inventory() {
       changes.push(`addons changed`);
     }
     if (oldItem.description !== updatedItemPatch.description) {
-      changes.push(`description updated`);
+      changes.push(`description`);
     }
     if (JSON.stringify(oldItem.sizes) !== JSON.stringify(updatedItemPatch.sizes)) {
       changes.push(`sizes from "${formatSizes(oldItem.sizes)}" to "${formatSizes(updatedItemPatch.sizes)}"`);
@@ -235,12 +260,12 @@ export default function Inventory() {
         datetime: formatDateTime(),
         action: "Update",
         admin: adminName || '—',
-        product: updatedItemPatch.name || '—',
+        product: updatedItemPatch.name || '',
         field: "Edited Fields",
         stock: `${updatedItemPatch.quantity ?? 0} pcs`,
-        oldPrice: updatedItemPatch.price ? `₱${oldItem.price}` : '—',
-        newPrice: updatedItemPatch.price ? `₱${updatedItemPatch.price}` : '—',
-        category: updatedItemPatch.category || '—',
+        oldPrice: updatedItemPatch.price ? `₱${oldItem.price}` : '',
+        newPrice: updatedItemPatch.price ? `₱${updatedItemPatch.price}` : '',
+        category: updatedItemPatch.category || '',
         detail: detailText
       }
     ]);
@@ -262,12 +287,12 @@ export default function Inventory() {
           datetime: formatDateTime(),
           action: "Delete",
           admin: adminName,
-          product: name || "—",
+          product: name || "",
           field: "Item",
-          stock: "—",
+          stock: "",
           oldPrice: "",
           newPrice: "",
-          category: category || "—",
+          category: category || "",
           detail: `Deleted item: ${name || id}`
         }
       ]);
@@ -280,31 +305,7 @@ export default function Inventory() {
     }
   };
 
-  const handleAdminAddCategory = (newCatRaw) => {
-    const clean = (newCatRaw || '').trim();
-    if (!clean) return;
-
-    try {
-      addCategory({ key: clean, icon: '/assets/default-category.png' });
-    } catch (e) {}
-
-    setLogs(prevLogs => [
-      ...prevLogs,
-      {
-        datetime: formatDateTime(),
-        action: "Add",
-        admin: adminName,
-        product: "—",
-        field: "Category",
-        stock: "—",
-        oldPrice: "",
-        newPrice: "",
-        category: clean,
-        detail: `added new category: "${clean}"`
-      }
-    ]);
-  };
-
+  
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
@@ -397,8 +398,31 @@ export default function Inventory() {
                   <th className="p-3">Description</th>
                   <th className="p-3">Sizes</th>
                   <th className="p-3 text-center">Stock</th>
-                  <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-center">Actions</th> {/* renamed */}
+                  <th className="p-3">
+                    <div className="flex items-center gap-2 justify-center">
+                      <span className="text-white font-semibold">Status</span>
+                      <div className="relative inline-block">
+                        <select
+                          value={selectedStatus}
+                          onChange={(e) => setSelectedStatus(e.target.value)}
+                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
+                          style={{ width: '24px' }}
+                        >
+                          <option value="">All</option>
+                          {uniqueStatuses.map((st, i) => (
+                            <option key={i} value={st}>{st}</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </th>
+
+                  <th className="p-3 text-center">Actions</th> 
                 </tr>
               </thead>
 
@@ -409,7 +433,7 @@ export default function Inventory() {
                     <td className="p-3">{item.name}</td>
                     <td className="p-3">₱{Number(item.price || 0).toFixed(2)}</td>
                     <td className="p-3">{item.category}</td>
-                    <td className="p-3">{item.allergens || '—'}</td>
+                    <td className="p-3">{item.allergens || ''}</td>
                     <td className="p-3">
                       {Array.isArray(item.addons)
                         ? item.addons.map(a =>
@@ -417,9 +441,9 @@ export default function Inventory() {
                               ? a
                               : `${a.label}${a.price ? ` (₱${a.price})` : ''}`
                           ).join(', ')
-                        : '—'}
+                        : ''}
                     </td>
-                    <td className="p-3">{item.description || '—'}</td>
+                    <td className="p-3">{item.description || ''}</td>
                     <td className="p-3">
                       {Array.isArray(item.sizes)
                         ? item.sizes.map(size =>
@@ -427,7 +451,7 @@ export default function Inventory() {
                               ? size
                               : `${size.label}${size.price ? ` (₱${size.price})` : ''}`
                           ).join(', ')
-                        : '—'}
+                        : ''}
                     </td>
                     <td className="p-3 text-center">{item.quantity}</td>
                     <td className="p-3 text-center">

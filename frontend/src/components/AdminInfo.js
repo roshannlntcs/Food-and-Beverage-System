@@ -68,13 +68,13 @@ const AdminInfo = () => {
             <img
               src="/male_user.png"
               alt="Male User"
-              className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+              className="w-10 h-10 rounded-full object-contain border-2 border-gray-300 shadow-sm bg-white"
             />
           ) : sex === 'F' ? (
             <img
               src="/female_user.png"
               alt="Female User"
-              className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+              className="w-10 h-10 rounded-full object-contain border-2 border-gray-300 shadow-sm bg-white"
             />
           ) : (
             <FaUser className="w-10 h-10 p-2 rounded-full bg-gray-200 text-gray-600 border-2 border-gray-300 shadow-sm" />

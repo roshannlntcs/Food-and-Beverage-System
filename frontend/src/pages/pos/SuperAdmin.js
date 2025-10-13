@@ -86,18 +86,6 @@ const SuperAdmin = () => {
     setSections(uniqueSections);
   }, [users]);
 
-  const hashString = (str) => {
-    let hash = 0,
-      i,
-      chr;
-    if (str.length === 0) return hash;
-    for (i = 0; i < str.length; i++) {
-      chr = str.charCodeAt(i);
-      hash = (hash << 5) - hash + chr;
-      hash |= 0;
-    }
-    return hash;
-  };
 
   // Manual Add User
   const handleAddUser = (newUser) => {
@@ -136,101 +124,124 @@ const SuperAdmin = () => {
     });
   };
 
-  // CSV upload
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+// CSV upload 
+const handleFileUpload = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const decoder = new TextDecoder("latin1");
-      const csvText = decoder.decode(e.target.result);
+  const normalizeId = (s) => (s || "").toString().trim().toLowerCase();
 
-      Papa.parse(csvText, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          const firstRow = results.data[0];
-          if (
-            !firstRow ||
-            !firstRow["Student ID No."] ||
-            !firstRow["Full Name"] ||
-            !firstRow["Default Password"] ||
-            !firstRow["Program"] ||
-            !firstRow["Section"] ||
-            !firstRow["Sex"]
-          ) {
-            setMessageModal({
-              isOpen: true,
-              title: "Invalid CSV",
-              message:
-                "CSV must have headers: Student ID No., Full Name, Default Password, Program, Section, Sex. Please upload a valid file.",
-              type: "error",
-            });
-            return;
-          }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const decoder = new TextDecoder("latin1");
+    const csvText = decoder.decode(e.target.result);
 
-          let parsedUsers = results.data.map((row) => ({
-            id_number: row["Student ID No."].trim(),
-            name: row["Full Name"].trim(),
-            password: row["Default Password"].trim(),
-            program: row["Program"].trim(),
-            section: row["Section"].trim(),
-            sex: row["Sex"].trim(),
-            type: "Student",
-            recentLogin: "Never",
-          }));
-
-          let existingUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
-
-          // Filter out duplicates
-          let newUsers = parsedUsers.filter(
-            (newUser) =>
-              !existingUsers.some((u) => u.id_number === newUser.id_number)
-          );
-
-          if (newUsers.length === 0) {
-            setMessageModal({
-              isOpen: true,
-              title: "Duplicate File",
-              message:
-                "This CSV contains only duplicate users. No new users were added.",
-              type: "error",
-            });
-            return;
-          }
-
-          // Merge new users
-          const merged = [...existingUsers, ...newUsers];
-
-          if (!merged.find((u) => u.id_number === "admin")) {
-            merged.unshift({
-              id_number: "admin",
-              name: "Administrator",
-              password: "admin123",
-              program: "-",
-              section: "-",
-              sex: "-",
-              type: "SuperAdmin",
-              recentLogin: "Never",
-            });
-          }
-
-          localStorage.setItem("userCSV", JSON.stringify(merged));
-          setUsers(merged);
-
+    Papa.parse(csvText, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const firstRow = results.data[0];
+        if (
+          !firstRow ||
+          !firstRow["Student ID No."] ||
+          !firstRow["Full Name"] ||
+          !firstRow["Default Password"] ||
+          !firstRow["Program"] ||
+          !firstRow["Section"] ||
+          !firstRow["Sex"]
+        ) {
           setMessageModal({
             isOpen: true,
-            title: "Upload Successful",
-            message: `${newUsers.length} new user(s) added successfully!`,
-            type: "success",
+            title: "Invalid CSV",
+            message:
+              "CSV must have headers: Student ID No., Full Name, Default Password, Program, Section, Sex. Please upload a valid file.",
+            type: "error",
           });
-        },
-      });
-    };
+          return;
+        }
 
-    reader.readAsArrayBuffer(file);
+        // Parse rows -> normalized objects
+        const parsedUsers = results.data.map((row) => ({
+          id_number: (row["Student ID No."] || "").toString().trim(),
+          name: (row["Full Name"] || "").toString().trim(),
+          password: (row["Default Password"] || "").toString().trim(),
+          program: (row["Program"] || "").toString().trim(),
+          section: (row["Section"] || "").toString().trim(),
+          sex: (row["Sex"] || "").toString().trim(),
+          type: "Student",
+          recentLogin: "Never",
+        }));
+
+        const existingUsers = JSON.parse(localStorage.getItem("userCSV")) || [];
+        const existingIds = new Set(
+          existingUsers.map((u) => normalizeId(u.id_number))
+        );
+
+        // Dedupe within the CSV AND against existing users
+        const seenInFile = new Set();
+        const toAdd = [];
+        let skippedInFileDup = 0;
+        let skippedExistingDup = 0;
+
+        for (const u of parsedUsers) {
+          const key = normalizeId(u.id_number);
+          if (!key) continue; // skip blanks
+
+          if (existingIds.has(key)) {
+            skippedExistingDup++;
+            continue;
+          }
+          if (seenInFile.has(key)) {
+            skippedInFileDup++;
+            continue;
+          }
+          seenInFile.add(key);
+          toAdd.push(u);
+        }
+
+        if (toAdd.length === 0) {
+          setMessageModal({
+            isOpen: true,
+            title: "Duplicate File",
+            message:
+              "No new users were added. All entries already exist or are duplicates within the file.",
+            type: "error",
+          });
+          return;
+        }
+
+        // Merge and ensure SuperAdmin exists
+        const merged = [...existingUsers, ...toAdd];
+        if (!merged.find((u) => u.id_number === "admin")) {
+          merged.unshift({
+            id_number: "admin",
+            name: "Administrator",
+            password: "admin123",
+            program: "-",
+            section: "-",
+            sex: "-",
+            type: "SuperAdmin",
+            recentLogin: "Never",
+          });
+        }
+
+        localStorage.setItem("userCSV", JSON.stringify(merged));
+        setUsers(merged);
+
+        const skippedTotal = skippedInFileDup + skippedExistingDup;
+        setMessageModal({
+          isOpen: true,
+          title: "Upload Result",
+          message: `${toAdd.length} new user(s) added. ${skippedTotal} duplicate(s) skipped (${skippedInFileDup} in-file, ${skippedExistingDup} already existed).`,
+          type: "success",
+        });
+      },
+    });
   };
+
+  reader.readAsArrayBuffer(file);
+};
+
 
   // Filtering + Pagination
   const filteredUsers = users.filter((u) => {
@@ -293,9 +304,10 @@ const SuperAdmin = () => {
 
     // these must NOT be inside the "users" block
     if (activeReset === "inventorySeed") {
-      resetToSeed(); // restores ONLY your hard-coded items
+        try { localStorage.removeItem("inventoryLogs"); } catch {}
+      resetToSeed(); 
     }
-
+    
     if (activeReset === "stocksTo100") {
       resetAllStocks(); // sets quantity=100 for ALL items (seed + added)
     }
@@ -696,4 +708,6 @@ const SuperAdmin = () => {
   );
 };
 
+
 export default SuperAdmin;
+

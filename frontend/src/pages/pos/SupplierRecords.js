@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// src/pages/admin/SupplierRecords.jsx
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
 import { FaSearch, FaPen } from "react-icons/fa";
@@ -7,20 +8,23 @@ import EditSupplierModal from "../../components/EditSupplierModal";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
 
+const SUPPLIER_LOGS_KEY = "supplierLogs";
+
+// All default to Active
 const initialSuppliers = [
   { name: "Davao Fresh Supplies", contactPerson: "Maria Santos", phone: "09171234567", email: "davaofresh@example.com", address: "Davao City", products: "Eggs, Chicken", status: "Active" },
-  { name: "Panabo Meats", contactPerson: "Jose Dela Cruz", phone: "09281234567", email: "panabomeats@example.com", address: "Panabo City", products: "Beef, Pork", status: "Inactive" },
+  { name: "Panabo Meats", contactPerson: "Jose Dela Cruz", phone: "09281234567", email: "panabomeats@example.com", address: "Panabo City", products: "Beef, Pork", status: "Active" },
   { name: "Tagum Agro Supplies", contactPerson: "Liza Moreno", phone: "09391234567", email: "tagumagro@example.com", address: "Tagum City", products: "Vegetables, Spices", status: "Active" },
   { name: "Mintal Livestock", contactPerson: "Carlos Mendoza", phone: "09551234567", email: "mintallive@example.com", address: "Mintal, Davao City", products: "Chicken, Duck", status: "Active" },
-  { name: "Toril Groceries", contactPerson: "Jenny Abad", phone: "09661234567", email: "torilgrocery@example.com", address: "Toril, Davao City", products: "Fruits, Canned Goods", status: "Inactive" },
+  { name: "Toril Groceries", contactPerson: "Jenny Abad", phone: "09661234567", email: "torilgrocery@example.com", address: "Toril, Davao City", products: "Fruits, Canned Goods", status: "Active" },
   { name: "Calinan Egg Supply", contactPerson: "Ronnie Cruz", phone: "09184561234", email: "calinanegg@example.com", address: "Calinan, Davao City", products: "Eggs", status: "Active" },
-  { name: "Agdao Market Bulk", contactPerson: "Elaine Yu", phone: "09999992345", email: "agdao_bulk@example.com", address: "Agdao, Davao City", products: "Meat, Vegetables", status: "Inactive" },
+  { name: "Agdao Market Bulk", contactPerson: "Elaine Yu", phone: "09999992345", email: "agdao_bulk@example.com", address: "Agdao, Davao City", products: "Meat, Vegetables", status: "Active" },
   { name: "Ecoland Dairy", contactPerson: "Francis Dy", phone: "09213456789", email: "ecolanddairy@example.com", address: "Ecoland, Davao City", products: "Milk, Yogurt", status: "Active" },
   { name: "Bajada Farms", contactPerson: "Althea Tan", phone: "09112223344", email: "bajadafarms@example.com", address: "Bajada, Davao City", products: "Organic Chicken", status: "Active" },
-  { name: "SM Wholesale", contactPerson: "Janice Ong", phone: "09199887766", email: "smwholesale@example.com", address: "Lanang, Davao City", products: "Various Goods", status: "Inactive" },
+  { name: "SM Wholesale", contactPerson: "Janice Ong", phone: "09199887766", email: "smwholesale@example.com", address: "Lanang, Davao City", products: "Various Goods", status: "Active" },
   { name: "Matina Traders", contactPerson: "Arthur G.", phone: "09988776655", email: "matinatraders@example.com", address: "Matina, Davao City", products: "Spices, Oil", status: "Active" },
   { name: "Tagum Veggies Depot", contactPerson: "Rowena L.", phone: "09173334455", email: "tagumveggies@example.com", address: "Tagum City", products: "Lettuce, Tomatoes", status: "Active" },
-  { name: "Panabo Cold Storage", contactPerson: "Dexter Lim", phone: "09334455667", email: "panabocold@example.com", address: "Panabo City", products: "Frozen Goods", status: "Inactive" },
+  { name: "Panabo Cold Storage", contactPerson: "Dexter Lim", phone: "09334455667", email: "panabocold@example.com", address: "Panabo City", products: "Frozen Goods", status: "Active" },
   { name: "Gaisano Bulk Center", contactPerson: "Clarence Uy", phone: "09215557788", email: "gaisanobulk@example.com", address: "Davao City", products: "Dry Goods, Beverages", status: "Active" },
   { name: "Sasa Fisheries", contactPerson: "Irene Mendoza", phone: "09097773344", email: "sasafish@example.com", address: "Sasa, Davao City", products: "Fish, Shrimp", status: "Active" },
 ];
@@ -31,7 +35,32 @@ const SupplierRecords = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
-  const [logs, setLogs] = useState([]);
+
+  // initialize logs from storage
+  const [logs, setLogs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(SUPPLIER_LOGS_KEY) || "[]"); }
+    catch { return []; }
+  });
+
+  // persist logs on change
+  useEffect(() => {
+    try { localStorage.setItem(SUPPLIER_LOGS_KEY, JSON.stringify(logs)); }
+    catch {}
+  }, [logs]);
+
+  // de-dupe guard for double-calls (StrictMode, double submit, etc.)
+  const lastLogKeyRef = useRef("");
+  const appendLog = (entry) => {
+    const key = `${entry.action}|${entry.supplier}|${entry.detail}`;
+    if (lastLogKeyRef.current === key) return;
+    lastLogKeyRef.current = key;
+    setLogs(prev => [...prev, { ...entry }]);
+    // release key shortly so legitimate identical next action later can log
+    setTimeout(() => {
+      if (lastLogKeyRef.current === key) lastLogKeyRef.current = "";
+    }, 1000);
+  };
+
   const [selectedSupplierIndex, setSelectedSupplierIndex] = useState(null);
   const [newSupplier, setNewSupplier] = useState({
     name: "",
@@ -48,63 +77,66 @@ const SupplierRecords = () => {
 
   const adminName = localStorage.getItem("fullName") || "Admin";
 
-
+  const nowStr = () =>
+    new Date().toISOString().slice(0, 16).replace("T", " ");
 
   const handleAddSupplier = (supplier) => {
-    setSuppliers([...suppliers, supplier]);
-    setLogs([
-      ...logs,
-      {
-        datetime: new Date().toISOString().slice(0, 16).replace("T", " "),
-        action: "Add",
-        admin: adminName,
-        supplier: supplier.name,
-        detail: `Added new supplier: 
-Name: ${supplier.name}
-Contact Person: ${supplier.contactPerson}
-Phone: ${supplier.phone}
-Email: ${supplier.email}
-Address: ${supplier.address}
-Products: ${supplier.products}
-Status: ${supplier.status}`,
-      },
-    ]);
+    const toSave = { ...supplier, status: supplier?.status || "Active" };
+    setSuppliers(prev => [...prev, toSave]);
+
+    appendLog({
+      datetime: nowStr(),
+      action: "Add",
+      admin: adminName,
+      supplier: toSave.name,
+      detail: `Added new supplier:
+Name: ${toSave.name}
+Contact Person: ${toSave.contactPerson}
+Phone: ${toSave.phone}
+Email: ${toSave.email}
+Address: ${toSave.address}
+Products: ${toSave.products}
+Status: ${toSave.status}`,
+    });
   };
 
   const handleEditSupplier = (updatedSupplier) => {
-    const updated = [...suppliers];
-    const old = updated[selectedSupplierIndex];
-    updated[selectedSupplierIndex] = updatedSupplier;
-    setSuppliers(updated);
+    // compute next state and changes outside of setState to avoid side effects duplication
+    const next = [...suppliers];
+    const old = next[selectedSupplierIndex];
+    const curr = {
+      ...updatedSupplier,
+      status: updatedSupplier?.status || "Active",
+    };
+    next[selectedSupplierIndex] = curr;
 
-    let changes = [];
-    for (let key in old) {
-      if (old[key] !== updatedSupplier[key]) {
-        changes.push(`${key}: "${old[key]}" → "${updatedSupplier[key]}"`);
+    const changes = [];
+    for (const key of Object.keys(old)) {
+      if ((old[key] ?? "") !== (curr[key] ?? "")) {
+        changes.push(`${key}: "${old[key] ?? ""}" → "${curr[key] ?? ""}"`);
       }
     }
 
-    setLogs([
-      ...logs,
-      {
-        datetime: new Date().toISOString().slice(0, 16).replace("T", " "),
-        action: "Update",
-        admin: adminName,
-        supplier: updatedSupplier.name,
-        detail: changes.length > 0 ? changes.join("\n") : "No changes made",
-      },
-    ]);
+    setSuppliers(next);
+
+    appendLog({
+      datetime: nowStr(),
+      action: "Update",
+      admin: adminName,
+      supplier: curr.name,
+      detail: changes.length > 0 ? changes.join("\n") : "No changes made",
+    });
   };
 
   const filteredSuppliers = suppliers.filter((supplier) => {
-  const searchTerm = search.toLowerCase();
-  return (
-    supplier.name.toLowerCase().includes(searchTerm) ||
-    supplier.contactPerson.toLowerCase().includes(searchTerm) ||
-    supplier.phone.toLowerCase().includes(searchTerm) ||
-     supplier.email.toLowerCase().includes(searchTerm)
-  );
-});
+    const searchTerm = search.toLowerCase();
+    return (
+      supplier.name.toLowerCase().includes(searchTerm) ||
+      supplier.contactPerson.toLowerCase().includes(searchTerm) ||
+      supplier.phone.toLowerCase().includes(searchTerm) ||
+      supplier.email.toLowerCase().includes(searchTerm)
+    );
+  });
 
   const indexOfLastEntry = currentPage * entriesPerPage;
   const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
@@ -172,9 +204,7 @@ Status: ${supplier.status}`,
                       <td className="p-3 text-center">
                         <span
                           className={`px-3 py-1 text-sm font-medium rounded-full ${
-                            supplier.status === "Active"
-                              ? "bg-green-500"
-                              : "bg-red-500"
+                            supplier.status === "Active" ? "bg-green-500" : "bg-red-500"
                           } text-white`}
                         >
                           {supplier.status}
@@ -211,13 +241,11 @@ Status: ${supplier.status}`,
             setEntriesPerPage={setEntriesPerPage}
             setCurrentPage={setCurrentPage}
           />
-
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             setCurrentPage={setCurrentPage}
           />
-
           <button
             onClick={() => setShowLogsModal(true)}
             className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full text-sm"
