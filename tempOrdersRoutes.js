@@ -1,0 +1,740 @@
+const router = require("express").Router();
+const {
+  PrismaClient,
+  OrderType,
+  OrderStatus,
+  PaymentMethod,
+  Role,
+  VoidType,
+} = require("@prisma/client");
+const { z } = require("zod");
+const crypto = require("crypto");
+
+const prisma = new PrismaClient();
+
+const sanitizeUser = (user) =>
+  user
+    ? {
+        id: user.id,
+        fullName: user.fullName,
+        schoolId: user.schoolId,
+        role: user.role,
+      }
+    : null;
+
+const ORDER_INCLUDE = {
+  items: true,
+  payments: true,
+  cashier: true,
+  voidLogs: {
+    include: {
+      cashier: true,
+      manager: true,
+    },
+  },
+};
+
+const shapeOrder = (order) => {
+  if (!order) return null;
+  return {
+    id: order.id,
+    orderCode: order.orderCode,
+    transactionId: order.transactionId,
+    type: order.type,
+    status: order.status,
+    subtotal: order.subtotal,
+    taxRate: order.taxRate,
+    tax: order.tax,
+    discount: order.discount,
+    discountPct: order.discountPct,
+    discountType: order.discountType,
+    couponCode: order.couponCode,
+    couponValue: order.couponValue,
+    total: order.total,
+    paidAmount: order.paidAmount,
+    tendered: order.tendered,
+    changeDue: order.changeDue,
+    notes: order.notes,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    servedAt: order.servedAt,
+    cashier: sanitizeUser(order.cashier),
+    items: order.items.map((item) => ({
+      id: item.id,
+      orderId: item.orderId,
+      productId: item.productId,
+      name: item.name,
+      price: item.price,
+      qty: item.qty,
+      size: item.size,
+      addons: item.addons,
+      lineTotal: item.lineTotal,
+      voided: item.voided,
+      voidReason: item.voidReason,
+      voidedAt: item.voidedAt,
+      voidApprovedById: item.voidApprovedById,
+    })),
+    payments: order.payments.map((payment) => ({
+      id: payment.id,
+      method: payment.method,
+      amount: payment.amount,
+      tendered: payment.tendered,
+      change: payment.change,
+      ref: payment.ref,
+      details: payment.details,
+      createdAt: payment.createdAt,
+    })),
+    voidLogs: order.voidLogs.map((log) => ({
+      id: log.id,
+      voidId: log.voidId,
+      transactionId: log.transactionId,
+      orderId: log.orderId,
+      voidType: log.voidType,
+      items: log.items,
+      amount: log.amount,
+      cashier: sanitizeUser(log.cashier),
+      manager: sanitizeUser(log.manager),
+      reason: log.reason,
+      notes: log.notes,
+      requestedAt: log.requestedAt,
+      approvedAt: log.approvedAt,
+    })),
+  };
+};
+
+const OrderItemInputSchema = z.object({
+  productId: z.string(),
+  name: z.string(),
+  price: z.coerce.number().nonnegative(),
+  quantity: z.coerce.number().int().positive(),
+  size: z
+    .object({
+      label: z.string(),
+      price: z.coerce.number().nonnegative().default(0),
+    })
+    .optional()
+    .nullable(),
+  addons: z
+    .array(
+      z.object({
+        label: z.string(),
+        price: z.coerce.number().nonnegative().default(0),
+      })
+    )
+    .optional()
+    .nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+const PaymentInputSchema = z.object({
+  method: z.nativeEnum(PaymentMethod).default(PaymentMethod.CASH),
+  tendered: z.coerce.number().min(0).optional(),
+  amount: z.coerce.number().min(0).optional(),
+  ref: z.string().optional().nullable(),
+  details: z.any().optional(),
+});
+
+const OrderCreateSchema = z.object({
+  type: z.nativeEnum(OrderType).default(OrderType.WALKIN),
+  items: z.array(OrderItemInputSchema).min(1),
+  discountPct: z.coerce.number().min(0).default(0),
+  discountValue: z.coerce.number().min(0).default(0),
+  discountType: z.string().optional().nullable(),
+  couponCode: z.string().optional().nullable(),
+  couponValue: z.coerce.number().min(0).default(0),
+  taxRate: z.coerce.number().min(0).default(0.12),
+  notes: z.string().optional().nullable(),
+  payment: PaymentInputSchema,
+});
+
+const OrderQuerySchema = z.object({
+  status: z
+    .string()
+    .optional()
+    .transform((val) => (val ? val.toUpperCase() : undefined))
+    .refine(
+      (val) =>
+        !val ||
+        val === "ALL" ||
+        Object.values(OrderStatus).includes(val),
+      { message: "Invalid status" }
+    ),
+  cashierId: z
+    .string()
+    .optional()
+    .transform((val) => (val ? Number(val) : undefined))
+    .refine((val) => !val || Number.isInteger(val), {
+      message: "Invalid cashier id",
+    }),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  search: z.string().optional(),
+  take: z.coerce.number().int().positive().max(100).optional(),
+  cursor: z.coerce.number().int().positive().optional(),
+});
+
+const OrderStatusSchema = z.object({
+  status: z.nativeEnum(OrderStatus),
+});
+
+const VoidRequestSchema = z.object({
+  type: z.nativeEnum(VoidType),
+  reason: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  items: z
+    .array(
+      z.object({
+        orderItemId: z.coerce.number().int().positive(),
+      })
+    )
+    .optional(),
+});
+
+const randomToken = () =>
+  crypto.randomBytes(4).toString("hex").toUpperCase();
+
+const createOrderIdentifiers = () => {
+  const baseToken = randomToken();
+  return {
+    baseToken,
+    transactionId: `TRN-${baseToken}`,
+    orderCode: `ORD-${baseToken}`,
+  };
+};
+
+const extractBaseToken = (identifier) => {
+  if (!identifier) return null;
+  const parts = String(identifier).split("-");
+  return parts.length > 1 ? parts[1] : parts[0];
+};
+
+const generateVoidId = (baseToken) => {
+  const base = (baseToken || randomToken()).slice(0, 8).toUpperCase();
+  return `VOID-${base}`;
+};
+
+async function initializeOrderTransactionSupport() {
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Order" ADD COLUMN transactionId TEXT`);
+  } catch (error) {
+    const msg = String(error?.message || error);
+    if (!/duplicate column/i.test(msg)) {
+      console.error("Failed to add transactionId column:", error);
+    }
+  }
+
+  try {
+    await prisma.$executeRawUnsafe(
+      `CREATE UNIQUE INDEX IF NOT EXISTS Order_transactionId_key ON "Order"(transactionId)`
+    );
+  } catch (error) {
+    console.error("Failed to ensure transactionId index:", error);
+  }
+
+  try {
+    const missing = await prisma.order.findMany({
+      where: { transactionId: null },
+      select: { id: true, orderCode: true },
+    });
+
+    for (const ord of missing) {
+      let attempts = 0;
+      let updated = false;
+      while (attempts < 5 && !updated) {
+        attempts += 1;
+        const { transactionId } = createOrderIdentifiers();
+        try {
+          await prisma.order.update({
+            where: { id: ord.id },
+            data: { transactionId },
+          });
+          await prisma.voidLog
+            .updateMany({
+              where: {
+                orderId: ord.id,
+              },
+              data: { transactionId },
+            })
+            .catch(() => {});
+          updated = true;
+        } catch (error) {
+          if (error?.code !== "P2002") {
+            console.error("Failed to backfill transactionId for order", ord.id, error);
+            break;
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Failed to backfill transaction IDs:", error);
+  }
+}
+
+const setupPromise = initializeOrderTransactionSupport();
+
+const requireManager = (req, res, next) => {
+  try {
+    if (!req.user || ![Role.ADMIN, Role.SUPER_ADMIN].includes(req.user.role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    return next();
+  } catch (err) {
+    return res.status(500).json({ error: "Authorization failed" });
+  }
+};
+
+const computeItems = (itemsInput) => {
+  return itemsInput.map((item) => {
+    const addons = Array.isArray(item.addons) ? item.addons : [];
+    const addonsTotal = addons.reduce(
+      (sum, addon) => sum + Number(addon.price || 0),
+      0
+    );
+    const sizePrice = item.size ? Number(item.size.price || 0) : 0;
+    const basePrice = Number(item.price || 0);
+    const quantity = Number(item.quantity || 1);
+    const unitPrice = basePrice + sizePrice + addonsTotal;
+    const lineTotal = Number((unitPrice * quantity).toFixed(2));
+
+    return {
+      productId: item.productId,
+      name: item.name,
+      basePrice,
+      unitPrice,
+      quantity,
+      size: item.size || null,
+      addons,
+      lineTotal,
+    };
+  });
+};
+
+const recomputeFinancials = ({
+  items,
+  discountPct,
+  discountValue,
+  couponValue,
+  taxRate,
+  tendered,
+  paidAmount,
+}) => {
+  const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  const discountFromPct = Number((subtotal * (discountPct / 100)).toFixed(2));
+  const rawDiscount = discountFromPct + discountValue + couponValue;
+  const totalDiscount = Number(Math.min(rawDiscount, subtotal).toFixed(2));
+  const taxableBase = Math.max(subtotal - discountFromPct, 0);
+  const tax = Number((taxableBase * taxRate).toFixed(2));
+  const total = Number(Math.max(subtotal - totalDiscount + tax, 0).toFixed(2));
+  const tenderedValue = Number(
+    tendered !== undefined && tendered !== null ? tendered : total
+  );
+  const paidValue = Number(
+    paidAmount !== undefined && paidAmount !== null ? paidAmount : total
+  );
+  const changeDue = Number((tenderedValue - total).toFixed(2));
+
+  return {
+    subtotal,
+    discountFromPct,
+    totalDiscount,
+    tax,
+    total,
+    tenderedValue,
+    paidValue,
+    changeDue,
+  };
+};
+
+router.get("/", async (req, res) => {
+  try {
+    const query = OrderQuerySchema.parse(req.query || {});
+    const where = {};
+
+    if (query.status && query.status !== "ALL") {
+      where.status = query.status;
+    }
+    if (query.cashierId) {
+      where.cashierId = query.cashierId;
+    }
+    if (query.search) {
+      where.orderCode = {
+        contains: query.search,
+        mode: "insensitive",
+      };
+    }
+    if (query.from || query.to) {
+      where.createdAt = {};
+      if (query.from) where.createdAt.gte = new Date(query.from);
+      if (query.to) where.createdAt.lte = new Date(query.to);
+    }
+
+    const take = query.take || 50;
+
+    const findOptions = {
+      where,
+      orderBy: { createdAt: "desc" },
+      take,
+      include: ORDER_INCLUDE,
+    };
+
+    if (query.cursor) {
+      findOptions.cursor = { id: query.cursor };
+      findOptions.skip = 1;
+    }
+
+    const orders = await prisma.order.findMany(findOptions);
+    const nextCursor =
+      orders.length === take ? orders[orders.length - 1].id : null;
+
+    res.json({ data: orders.map(shapeOrder), nextCursor });
+  } catch (error) {
+    console.error("GET /orders failed:", error);
+    if (error instanceof z.ZodError) {
+      return res
+        .status(400)
+        .json({ error: error.issues[0]?.message || "Invalid query" });
+    }
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId)) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: ORDER_INCLUDE,
+    });
+
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    res.json({ order: shapeOrder(order) });
+  } catch (error) {
+    console.error("GET /orders/:id failed:", error);
+    res.status(500).json({ error: "Failed to fetch order" });
+  }
+});
+
+router.post("/", async (req, res) => {
+  try {
+    const input = OrderCreateSchema.parse(req.body || {});
+    const computedItems = computeItems(input.items);
+
+    const flatDiscountValue = Number(input.discountValue || 0);
+    const couponValue = Number(input.couponValue || 0);
+
+    const {
+      subtotal,
+      discountFromPct,
+      totalDiscount,
+      tax,
+      total,
+      tenderedValue,
+      paidValue,
+      changeDue,
+    } = recomputeFinancials({
+      items: computedItems,
+      discountPct: input.discountPct,
+      discountValue: flatDiscountValue,
+      couponValue,
+      taxRate: input.taxRate,
+      tendered: input.payment.tendered,
+      paidAmount: input.payment.amount,
+    });
+
+    const { baseToken, transactionId, orderCode } = createOrderIdentifiers();
+    const cashierId = req.user?.sub ? Number(req.user.sub) : null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          orderCode,
+          transactionId,
+          type: input.type,
+          status: OrderStatus.PAID,
+          subtotal,
+          taxRate: input.taxRate,
+          tax,
+          discount: totalDiscount,
+          discountPct: input.discountPct,
+          discountType: input.discountType || null,
+          couponCode: input.couponCode || null,
+          couponValue,
+          total,
+          paidAmount: paidValue,
+          tendered: tenderedValue,
+          changeDue,
+          notes: input.notes || null,
+          cashierId,
+        },
+      });
+
+      for (const item of computedItems) {
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: item.productId,
+            name: item.name,
+            price: item.unitPrice,
+            qty: item.quantity,
+            size: item.size,
+            addons: item.addons,
+            lineTotal: item.lineTotal,
+          },
+        });
+
+        await tx.product
+          .update({
+            where: { id: item.productId },
+            data: { quantity: { decrement: item.quantity } },
+          })
+          .catch(() => {});
+      }
+
+      await tx.payment.create({
+        data: {
+          orderId: order.id,
+          method: input.payment.method,
+          amount: paidValue,
+          tendered: tenderedValue,
+          change: changeDue,
+          ref: input.payment.ref || null,
+          details: input.payment.details || null,
+        },
+      });
+
+      return tx.order.findUnique({
+        where: { id: order.id },
+        include: ORDER_INCLUDE,
+      });
+    });
+
+    res.status(201).json({ order: shapeOrder(result) });
+  } catch (error) {
+    console.error("POST /orders failed:", error);
+    if (error instanceof z.ZodError) {
+      return res
+        .status(400)
+        .json({ error: error.issues[0]?.message || "Invalid payload" });
+    }
+    res.status(500).json({ error: "Failed to create order" });
+  }
+});
+
+router.patch("/:id/status", requireManager, async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId)) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const input = OrderStatusSchema.parse(req.body || {});
+    const data = { status: input.status };
+    if (input.status === OrderStatus.SERVED) {
+      data.servedAt = new Date();
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: orderId },
+      data,
+      include: ORDER_INCLUDE,
+    });
+
+    res.json({ order: shapeOrder(updated) });
+  } catch (error) {
+    console.error("PATCH /orders/:id/status failed:", error);
+    if (error instanceof z.ZodError) {
+      return res
+        .status(400)
+        .json({ error: error.issues[0]?.message || "Invalid payload" });
+    }
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.status(500).json({ error: "Failed to update order status" });
+  }
+});
+
+router.post("/:id/void", requireManager, async (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    if (!Number.isInteger(orderId)) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const input = VoidRequestSchema.parse(req.body || {});
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: true,
+        payments: true,
+      },
+    });
+
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    const itemsToVoid =
+      input.type === VoidType.TRANSACTION
+        ? order.items.filter((item) => !item.voided)
+        : (input.items || [])
+            .map((payload) =>
+              order.items.find(
+                (item) => item.id === Number(payload.orderItemId)
+              )
+            )
+            .filter((item) => item && !item.voided);
+
+    if (!itemsToVoid.length) {
+      return res.status(400).json({ error: "No items available to void" });
+    }
+
+    const voidAmount = itemsToVoid.reduce(
+      (sum, item) => sum + Number(item.lineTotal || 0),
+      0
+    );
+
+    const managerId = Number(req.user.sub);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const item of itemsToVoid) {
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: {
+            voided: true,
+            voidReason: input.reason || null,
+            voidedAt: new Date(),
+            voidApprovedById: managerId,
+          },
+        });
+
+        await tx.product
+          .update({
+            where: { id: item.productId },
+            data: { quantity: { increment: item.qty } },
+          })
+          .catch(() => {});
+      }
+
+      const freshOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true, payments: true },
+      });
+
+      const remainingItems = freshOrder.items.filter((item) => !item.voided);
+      const remainingComputedItems = remainingItems.map((item) => ({
+        lineTotal: Number(item.lineTotal || 0),
+      }));
+
+      const originalSubtotal = order.items.reduce(
+        (sum, item) => sum + Number(item.lineTotal || 0),
+        0
+      );
+      const originalDiscountPctAmount = Number(
+        (originalSubtotal * (order.discountPct / 100)).toFixed(2)
+      );
+      const flatDiscountValue = Math.max(
+        order.discount - originalDiscountPctAmount - order.couponValue,
+        0
+      );
+
+      const {
+        subtotal,
+        discountFromPct,
+        totalDiscount,
+        tax,
+        total,
+        tenderedValue,
+        paidValue,
+        changeDue,
+      } = recomputeFinancials({
+        items: remainingComputedItems,
+        discountPct: order.discountPct,
+        discountValue: flatDiscountValue,
+        couponValue: order.couponValue,
+        taxRate: order.taxRate,
+        tendered: order.tendered,
+        paidAmount: order.paidAmount,
+      });
+
+      const nextStatus = remainingItems.length
+        ? order.status
+        : OrderStatus.VOIDED;
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          subtotal,
+          discount: totalDiscount,
+          tax,
+          total,
+          paidAmount: Math.min(paidValue, total),
+          changeDue,
+          status: nextStatus,
+        },
+      });
+
+      await tx.payment.updateMany({
+        where: { orderId },
+        data: {
+          amount: Math.min(paidValue, total),
+          change: changeDue,
+        },
+      });
+
+      const baseTokenFromOrder =
+        extractBaseToken(order.transactionId) ||
+        extractBaseToken(order.orderCode) ||
+        randomToken();
+
+      await tx.voidLog.create({
+        data: {
+          voidId: generateVoidId(baseTokenFromOrder),
+          transactionId:
+            order.transactionId || `TRN-${baseTokenFromOrder}`,
+          orderId,
+          voidType: input.type,
+          items: itemsToVoid.map((item) => ({
+            orderItemId: item.id,
+            productId: item.productId,
+            name: item.name,
+            qty: item.qty,
+            lineTotal: item.lineTotal,
+          })),
+          amount: voidAmount,
+          cashierId: order.cashierId,
+          managerId,
+          reason: input.reason || null,
+          notes: input.notes || null,
+          approvedAt: new Date(),
+        },
+      });
+
+      return tx.order.findUnique({
+        where: { id: orderId },
+        include: ORDER_INCLUDE,
+      });
+    });
+
+    res.json({ order: shapeOrder(updated) });
+  } catch (error) {
+    console.error("POST /orders/:id/void failed:", error);
+    if (error instanceof z.ZodError) {
+      return res
+        .status(400)
+        .json({ error: error.issues[0]?.message || "Invalid payload" });
+    }
+    if (error.code === "P2025") {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    res.status(500).json({ error: "Failed to process void" });
+  }
+});
+
+module.exports = router;
+
+

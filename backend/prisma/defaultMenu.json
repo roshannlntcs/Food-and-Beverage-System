@@ -1,0 +1,100 @@
+{
+  "categories": [
+    {
+      "id": "main-dish",
+      "name": "Main Dish",
+      "products": [
+        { "id": "humba", "name": "Humba", "price": 120, "imageUrl": "humba.jpeg", "description": "Sweet braised pork with pineapple and soy.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":20}], "addons": [{"label":"Extra Sauce","price":10}], "allergens": "Soy, Pork" },
+        { "id": "kaldereta", "name": "Kaldereta", "price": 130, "imageUrl": "kaldereta.jpg", "description": "Rich beef stew in tomato sauce and veggies.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":20}], "addons": [{"label":"Cheese","price":15}], "allergens": "Beef, Dairy" },
+        { "id": "beef-mechado", "name": "Beef Mechado", "price": 135, "imageUrl": "beef-mechado.jpg", "description": "Tender beef chunks simmered in tomato gravy.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":25}], "addons": [{"label":"Extra Carrots","price":5}], "allergens": "Beef" },
+        { "id": "chicken-adobo", "name": "Chicken Adobo", "price": 115, "imageUrl": "chicken-adobo.jpg", "description": "Classic chicken marinated in soy and vinegar.", "sizes": [{"label":"Regular","price":0},{"label":"Double Chicken","price":40}], "addons": [{"label":"Hard-Boiled Egg","price":10}], "allergens": "Soy, Egg" },
+        { "id": "pork-binagoongan", "name": "Pork Binagoongan", "price": 140, "imageUrl": "pork-binagoongan.jpg", "description": "Savory pork in fermented shrimp paste sauce.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Extra Bagoong","price":10}], "allergens": "Fish" },
+        { "id": "chicken-curry", "name": "Chicken Curry", "price": 125, "imageUrl": "chicken-curry.jpg", "description": "Creamy curry chicken with potatoes.", "sizes": [{"label":"Regular","price":0},{"label":"Spicy","price":10}], "addons": [{"label":"Potato","price":5}], "allergens": "Dairy" },
+        { "id": "beef-caldereta", "name": "Beef Caldereta", "price": 138, "imageUrl": "beef-caldereta.jpg", "description": "Spicy beef stew with bell peppers and olives.", "sizes": [{"label":"Regular","price":0},{"label":"Extra Meat","price":30}], "addons": [{"label":"Green Peas","price":5}], "allergens": "Beef" },
+        { "id": "pork-sisig", "name": "Pork Sisig", "price": 150, "imageUrl": "pork-sisig.jpg", "description": "Crispy chopped pork with chili and onions.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Extra Chili","price":5}], "allergens": "Pork, Onion" },
+        { "id": "laing", "name": "Laing", "price": 110, "imageUrl": "laing.jpg", "description": "Taro leaves cooked in coconut milk and spices.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Extra Coconut Milk","price":10}], "allergens": "Coconut" },
+        { "id": "bicol-express", "name": "Bicol Express", "price": 130, "imageUrl": "bicol-express.png", "description": "Spicy pork stew in creamy coconut sauce.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Extra Chili","price":5}], "allergens": "Pork, Coconut" }
+      ]
+    },
+    {
+      "id": "appetizers",
+      "name": "Appetizers",
+      "products": [
+        { "id": "spring-rolls", "name": "Spring Rolls", "price": 80, "imageUrl": "spring-rolls.jpg", "description": "Crispy veggie rolls with sweet dipping sauce.", "sizes": [{"label":"6 pcs","price":0}], "addons": [{"label":"Sweet Sauce","price":10}], "allergens": "Gluten" },
+        { "id": "chicken-wings", "name": "Chicken Wings", "price": 120, "imageUrl": "chicken-wings.jpg", "description": "Spicy fried wings served with dip.", "sizes": [{"label":"6 pcs","price":0}], "addons": [{"label":"Spicy Dip","price":10}], "allergens": "Chicken" },
+        { "id": "mozza-sticks", "name": "Mozzarella Sticks", "price": 100, "imageUrl": "mozza-sticks.jpg", "description": "Fried cheese sticks with marinara sauce.", "sizes": [{"label":"5 pcs","price":0}], "addons": [{"label":"Marinara","price":10}], "allergens": "Dairy, Gluten" },
+        { "id": "calamari", "name": "Calamari", "price": 150, "imageUrl": "calamari.jpeg", "description": "Crispy squid rings with lemon wedge.", "sizes": [{"label":"200g","price":0}], "addons": [{"label":"Lemon","price":5}], "allergens": "Shellfish" },
+        { "id": "potato-wedges", "name": "Potato Wedges", "price": 90, "imageUrl": "potato-wedges.jpg", "description": "Seasoned crispy potato wedges.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Ketchup","price":5}] },
+        { "id": "bruschetta", "name": "Bruschetta", "price": 110, "imageUrl": "bruschetta.jpg", "description": "Toasted bread topped with tomato & basil.", "sizes": [{"label":"4 pcs","price":0}], "addons": [{"label":"Balsamic","price":10}], "allergens": "Gluten" },
+        { "id": "garlic-bread", "name": "Garlic Bread", "price": 70, "imageUrl": "garlic-bread.jpg", "description": "Buttery garlic toast with melted cheese.", "sizes": [{"label":"4 pcs","price":0}], "addons": [{"label":"Cheese","price":15}], "allergens": "Dairy, Gluten" },
+        { "id": "nachos", "name": "Nachos", "price": 130, "imageUrl": "nachos.jpg", "description": "Corn chips loaded with melted cheese.", "sizes": [{"label":"Single","price":0}], "addons": [{"label":"Cheese Dip","price":15}], "allergens": "Dairy" },
+        { "id": "stuffed-mushrooms", "name": "Stuffed Mushrooms", "price": 140, "imageUrl": "stuffed-mushrooms.jpg", "description": "Baked mushrooms with herbed butter.", "sizes": [{"label":"6 pcs","price":0}], "addons": [{"label":"Herb Butter","price":10}] },
+        { "id": "onion-rings", "name": "Onion Rings", "price": 95, "imageUrl": "onion-rings.jpg", "description": "Golden fried onion rings with ranch.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Ranch","price":10}], "allergens": "Gluten" }
+      ]
+    },
+    {
+      "id": "side-dish",
+      "name": "Side Dish",
+      "products": [
+        { "id": "garlic-rice", "name": "Garlic Rice", "price": 40, "imageUrl": "garlic-rice.jpg", "description": "Fragrant rice tossed in garlic oil.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":10}], "addons": [{"label":"Cheese","price":15}], "allergens": "Garlic, Dairy" },
+        { "id": "plain-rice", "name": "Plain Rice", "price": 30, "imageUrl": "plain-rice.jpg", "description": "Steamed white rice, perfect with any dish.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":10}] },
+        { "id": "fried-egg", "name": "Fried Egg", "price": 20, "imageUrl": "fried-egg.jpg", "description": "Sunny side up or double yolk option.", "sizes": [{"label":"Single","price":0},{"label":"Double","price":15}], "allergens": "Egg" },
+        { "id": "steamed-vegetables", "name": "Steamed Vegetables", "price": 50, "imageUrl": "steamed-vegetables.jpg", "description": "Mixed veggies lightly seasoned.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Garlic Sauce","price":10}], "allergens": "Garlic" },
+        { "id": "french-fries", "name": "French Fries", "price": 55, "imageUrl": "french-fries.jpg", "description": "Crispy fries with golden crunch.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":15}], "addons": [{"label":"Ketchup","price":5}] },
+        { "id": "tofu-cubes", "name": "Tofu Cubes", "price": 60, "imageUrl": "tofu-cubes.jpg", "description": "Fried tofu with sweet chili dip.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Sweet Chili","price":10}], "allergens": "Soy" },
+        { "id": "grilled-corn", "name": "Grilled Corn", "price": 45, "imageUrl": "grilled-corn.jpg", "description": "Charcoal-grilled corn with butter.", "sizes": [{"label":"Single","price":0}], "addons": [{"label":"Butter","price":5}], "allergens": "Dairy" },
+        { "id": "atchara", "name": "Atchara", "price": 35, "imageUrl": "atchara.jpg", "description": "Pickled green papaya side dish.", "sizes": [{"label":"Regular","price":0}] },
+        { "id": "chicharon", "name": "Chicharon", "price": 70, "imageUrl": "chicharon.jpg", "description": "Crispy pork rind snack.", "sizes": [{"label":"Small","price":0},{"label":"Large","price":20}], "allergens": "Pork" },
+        { "id": "ukoy", "name": "Ukoy", "price": 65, "imageUrl": "ukoy.jpg", "description": "Shrimp fritters with vinegar dip.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Vinegar Dip","price":5}], "allergens": "Shrimp, Gluten" }
+      ]
+    },
+    {
+      "id": "soup",
+      "name": "Soup",
+      "products": [
+        { "id": "sinigang", "name": "Sinigang", "price": 100, "imageUrl": "sinigang.jpg", "description": "Tamarind soup with meat & veggies.", "sizes": [{"label":"Small","price":0},{"label":"Large","price":25}], "addons": [{"label":"Extra Tamarind","price":5}], "allergens": "Pork, Tamarind" },
+        { "id": "bulalo", "name": "Bulalo", "price": 150, "imageUrl": "bulalo.jpg", "description": "Hearty beef marrow soup.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Bone Marrow","price":20}], "allergens": "Beef" },
+        { "id": "tinola", "name": "Tinola", "price": 90, "imageUrl": "tinola.jpg", "description": "Ginger chicken soup with papaya.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Ginger","price":5}], "allergens": "Chicken, Ginger" },
+        { "id": "molo-soup", "name": "Molo Soup", "price": 110, "imageUrl": "molo-soup.jpg", "description": "Pork dumpling soup in clear broth.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Siomai","price":15}], "allergens": "Pork, Gluten" },
+        { "id": "kare-kare", "name": "Beef Kare-Kare Soup", "price": 140, "imageUrl": "kare-kare.jpg", "description": "Peanut-flavored oxtail soup.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Bagoong","price":10}], "allergens": "Peanut, Shrimp" },
+        { "id": "cream-mushroom", "name": "Cream of Mushroom", "price": 95, "imageUrl": "cream-mushroom.jpg", "description": "Creamy blended mushroom soup.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Croutons","price":10}], "allergens": "Dairy, Gluten" },
+        { "id": "corn-soup", "name": "Corn Soup", "price": 85, "imageUrl": "corn-soup.jpg", "description": "Sweet corn chowder in creamy base.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Extra Corn","price":5}] },
+        { "id": "seafood-chowder", "name": "Seafood Chowder", "price": 160, "imageUrl": "seafood-chowder.jpg", "description": "Hearty chowder with mixed seafood.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Thickener","price":10}], "allergens": "Shellfish, Dairy" },
+        { "id": "pepper-soup", "name": "Black Pepper Soup", "price": 105, "imageUrl": "pepper-soup.jpg", "description": "Peppery broth with a zing.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Extra Pepper","price":5}] },
+        { "id": "pumpkin-soup", "name": "Pumpkin Soup", "price": 100, "imageUrl": "pumpkin-soup.jpg", "description": "Smooth pureed pumpkin soup.", "sizes": [{"label":"Bowl","price":0}], "addons": [{"label":"Cream","price":10}], "allergens": "Dairy" }
+      ]
+    },
+    {
+      "id": "desserts",
+      "name": "Desserts",
+      "products": [
+        { "id": "leche-flan", "name": "Leche Flan", "price": 50, "imageUrl": "leche-flan.jpg", "description": "Creamy caramel-topped custard.", "sizes": [{"label":"Single","price":0}], "addons": [{"label":"Caramel Sauce","price":5}], "allergens": "Egg, Dairy" },
+        { "id": "halohalo", "name": "Halo-Halo", "price": 120, "imageUrl": "halohalo.jpg", "description": "Mixed shaved ice dessert bowl.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Leche Flan","price":15}], "allergens": "Dairy" },
+        { "id": "bibingka", "name": "Bibingka", "price": 70, "imageUrl": "bibingka.jpg", "description": "Rice cake topped with salted egg.", "sizes": [{"label":"Small","price":0}], "addons": [{"label":"Salted Egg","price":10}], "allergens": "Egg, Dairy" },
+        { "id": "puto", "name": "Puto", "price": 60, "imageUrl": "puto.jpg", "description": "Steamed rice cupcakes (3 or 6 pcs).", "sizes": [{"label":"3 pcs","price":0},{"label":"6 pcs","price":15}], "addons": [{"label":"Cheese","price":10}], "allergens": "Dairy, Gluten" },
+        { "id": "turon", "name": "Turon", "price": 55, "imageUrl": "turon.jpg", "description": "Banana-spring roll with brown sugar.", "sizes": [{"label":"2 pcs","price":0},{"label":"4 pcs","price":15}], "addons": [{"label":"Ice Cream","price":20}], "allergens": "Banana" },
+        { "id": "sapin-sapin", "name": "Sapin-Sapin", "price": 65, "imageUrl": "sapin-sapin.jpg", "description": "Layered sticky rice colored dessert.", "sizes": [{"label":"Slice","price":0}], "addons": [], "allergens": "Coconut" },
+        { "id": "ube-halaya", "name": "Ube Halaya", "price": 80, "imageUrl": "ube-halaya.jpg", "description": "Purple yam jam served chilled.", "sizes": [{"label":"Cup","price":0}], "addons": [{"label":"Coconut Strings","price":5}] },
+        { "id": "buko-pandan", "name": "Buko Pandan", "price": 75, "imageUrl": "buko-pandan.jpg", "description": "Young coconut with pandan jelly.", "sizes": [{"label":"Cup","price":0}], "addons": [{"label":"Nata de Coco","price":5}], "allergens": "Coconut" },
+        { "id": "mango-float", "name": "Mango Float", "price": 110, "imageUrl": "mango-float.jpg", "description": "Layers of graham, mango & cream.", "sizes": [{"label":"Slice","price":0}], "addons": [{"label":"Whipped Cream","price":10}], "allergens": "Dairy" },
+        { "id": "taho", "name": "Taho", "price": 45, "imageUrl": "taho.jpg", "description": "Warm silken tofu with arnibal syrup.", "sizes": [{"label":"Cup","price":0}], "addons": [{"label":"Sago","price":5}], "allergens": "Soy" }
+      ]
+    },
+    {
+      "id": "drinks",
+      "name": "Drinks",
+      "products": [
+        { "id": "iced-tea", "name": "Iced Tea", "price": 30, "imageUrl": "iced-tea.png", "description": "Chilled black tea with lemon.", "sizes": [{"label":"Small","price":0},{"label":"Medium","price":5},{"label":"Large","price":10}], "addons": [{"label":"Lemon","price":5}], "allergens": "Caffeine" },
+        { "id": "salabat", "name": "Salabat", "price": 40, "imageUrl": "salabat.jpg", "description": "Ginger tea for soothing warmth.", "sizes": [{"label":"Cup","price":0}], "addons": [{"label":"Honey","price":5}] },
+        { "id": "calamansi-juice", "name": "Calamansi Juice", "price": 35, "imageUrl": "calamansi-juice.jpg", "description": "Fresh calamansi citrus drink.", "sizes": [{"label":"Cup","price":0},{"label":"Pitcher","price":50}], "addons": [{"label":"Sugar","price":5}] },
+        { "id": "buko-juice", "name": "Buko Juice", "price": 50, "imageUrl": "buko-juice.jpg", "description": "Refreshing young coconut water.", "sizes": [{"label":"Bottle","price":0}], "addons": [{"label":"Ice Cream","price":15}], "allergens": "Coconut" },
+        { "id": "coffee", "name": "Coffee (Hot)", "price": 45, "imageUrl": "coffee.jpg", "description": "Brewed coffee served steaming hot.", "sizes": [{"label":"Regular","price":0},{"label":"Large","price":10}], "addons": [{"label":"Cream","price":5},{"label":"Sugar","price":2}], "allergens": "Dairy" },
+        { "id": "milo-dino", "name": "Milo Dinosaur", "price": 70, "imageUrl": "milo-dino.jpg", "description": "Iced chocolate malt drink.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Condensed Milk","price":10}], "allergens": "Dairy" },
+        { "id": "coke", "name": "Coke", "price": 40, "imageUrl": "coke.jpg", "description": "Chilled cola soda.", "sizes": [{"label":"330ml","price":0},{"label":"500ml","price":10}] },
+        { "id": "sprite", "name": "Sprite", "price": 40, "imageUrl": "sprite.jpg", "description": "Lemon-lime soda, ice-cold.", "sizes": [{"label":"330ml","price":0},{"label":"500ml","price":10}] },
+        { "id": "royal", "name": "Royal", "price": 40, "imageUrl": "royal.jpg", "description": "Sweet grape-flavored soda.", "sizes": [{"label":"330ml","price":0},{"label":"500ml","price":10}] },
+        { "id": "water", "name": "Water", "price": 20, "imageUrl": "water.png", "description": "Pure filtered bottled water.", "sizes": [{"label":"Bottle","price":0}] }
+      ]
+    }
+  ]
+}

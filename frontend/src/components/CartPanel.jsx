@@ -1,5 +1,6 @@
+// src/components/CartPanel.jsx
 import React from "react";
-import images from "../utils/images";
+import { getImage } from "../utils/images";
 import { useToast } from "./ToastProvider"; // correct relative path (same folder)
 
 export default function CartPanel({
@@ -19,7 +20,8 @@ export default function CartPanel({
   setShowHistoryModal,
   transactions,
   customerConfirmed, // kept for backwards compatibility but not used (customer view is read-only)
-  openCustomerView
+  openCustomerView,
+  triggerVoid
 }) {
   const { showToast } = useToast();
 
@@ -64,7 +66,7 @@ export default function CartPanel({
               className="p-1 rounded hover:bg-gray-200 transition-colors"
               title="Open Customer View"
             >
-              <img src={images["cusview.png"]} alt="Customer View" className="w-5 h-5" />
+              <img src={getImage("cusview.png")} alt="Customer View" className="w-5 h-5" />
             </button>
 
             <button
@@ -73,7 +75,7 @@ export default function CartPanel({
               className={`p-1 rounded ${transactions.length ? "hover:bg-gray-200" : "opacity-50 cursor-not-allowed"}`}
               title="History & Void Logs"
             >
-              <img src={images["history.png"]} alt="History & Void" className="w-5 h-5" />
+              <img src={getImage("history.png")} alt="History & Void" className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -95,19 +97,20 @@ export default function CartPanel({
                     {/* Left: image + details */}
                     <div className="flex space-x-1.5 flex-1 min-w-0">
                       <img
-                        src={images[item.image] || images["react.svg"]}
+                        src={getImage(item.image, item.name)}
                         alt={item.name}
                         className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
+                        onError={(e) => { e.currentTarget.src = getImage("placeholder.png"); }}
                       />
                       <div className="flex flex-col flex-1 min-w-0">
                         <div className="text-xs font-medium truncate">{item.name}</div>
-                        <div className="text-[10px] text-gray-700 truncate">Size: {item.size.label}</div>
+                        <div className="text-[10px] text-gray-700 truncate">Size: {item.size?.label || item.sizes?.[0]?.label || "N/A"}</div>
                         <div className="text-[10px] text-gray-700">
                           {item.quantity} × ₱{(item.totalPrice / item.quantity).toFixed(2)}
                         </div>
-                        {item.addons.length > 0 && (
+                        {(item.selectedAddons || item.addons || []).length > 0 && (
                           <div className="text-[10px] text-gray-700 truncate">
-                            Add-ons: {item.addons.map(a => a.label).join(", ")}
+                            Add-ons: {(item.selectedAddons || item.addons || []).map(a => (a && a.label) ? a.label : a).join(", ")}
                           </div>
                         )}
                         {item.notes && (
@@ -130,7 +133,7 @@ export default function CartPanel({
                   className="absolute inset-y-0 right-0 flex items-center justify-center w-8 bg-red-100 rounded-r opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                   title="Remove item"
                 >
-                  <img src={images["remove_item.png"]} alt="Remove" className="w-5 h-5" />
+                  <img src={getImage("remove_item.png")} alt="Remove" className="w-5 h-5" />
                 </button>
               </div>
             ))
@@ -138,53 +141,58 @@ export default function CartPanel({
         </div>
 
         {/* Totals */}
-{/* Totals */}
-<div className="bg-white p-3 rounded-lg mb-4 space-y-1 text-sm">
-  <div className="flex justify-between">
-    <span>Subtotal</span>
-    <span>₱{subtotal.toFixed(2)}</span>
-  </div>
+        <div className="bg-white p-3 rounded-lg mb-4 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>₱{subtotal.toFixed(2)}</span>
+          </div>
 
-  {discountPct > 0 && (
-    <>
-      <div className="flex justify-between">
-        <span>
-          Discount
-          {discountType && (
+          {discountPct > 0 && (
             <>
-              :
-              {discountType === "senior" && "Senior"}
-              {discountType === "pwd" && "PWD"}
-              {discountType === "student" && "Student"}
+              <div className="flex justify-between">
+                <span>
+                  Discount
+                  {discountType && (
+                    <>
+                      :
+                      {discountType === "senior" && "Senior"}
+                      {discountType === "pwd" && "PWD"}
+                      {discountType === "student" && "Student"}
+                    </>
+                  )}{" "}
+                  ({discountPct}%)
+                </span>
+                <span>-₱{discountAmt.toFixed(2)}</span>
+              </div>
+
+              {discountType &&(
+                <div className="flex justify-between text-gray-700">
+                  <span>Type:</span>
+                  <span>{discountType}</span>
+                </div>
+              )}
+
+              {couponCode && (
+                <div className="flex justify-between text-gray-700">
+                  <span>Coupon Code:</span>
+                  <span>{couponCode}</span>
+                </div>
+              )}
             </>
-          )}{" "}
-          ({discountPct}%)
-        </span>
-        <span>-₱{discountAmt.toFixed(2)}</span>
-      </div>
+          )}
 
-      {couponCode && (
-        <div className="flex justify-between text-gray-700">
-          <span>Coupon Code:</span>
-          <span>{couponCode}</span>
+          <div className="flex justify-between">
+            <span>VAT (12%)</span>
+            <span>₱{tax.toFixed(2)}</span>
+          </div>
+
+          <hr className="border-t border-gray-300 my-1" />
+
+          <div className="flex justify-between font-semibold">
+            <span>Total</span>
+            <span>₱{total.toFixed(2)}</span>
+          </div>
         </div>
-      )}
-    </>
-  )}
-
-  <div className="flex justify-between">
-    <span>VAT (12%)</span>
-    <span>₱{tax.toFixed(2)}</span>
-  </div>
-
-  <hr className="border-t border-gray-300 my-1" />
-
-  <div className="flex justify-between font-semibold">
-    <span>Total</span>
-    <span>₱{total.toFixed(2)}</span>
-  </div>
-</div>
-
 
         {/* Payment Methods */}
         <div className="space-y-3 relative">
@@ -205,7 +213,7 @@ export default function CartPanel({
                 title={method.key}
                 aria-pressed={paymentMethod === method.key}
               >
-                <img src={images[method.icon]} alt={method.key} className="w-6 h-6" />
+                <img src={getImage(method.icon)} alt={method.key} className="w-6 h-6" />
                 <span className="text-[10px]">{method.key}</span>
               </button>
             ))}

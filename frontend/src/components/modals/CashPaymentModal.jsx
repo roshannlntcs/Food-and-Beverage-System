@@ -198,7 +198,7 @@ export default function CashPaymentModal({ isOpen, total = 0, onClose, onSuccess
             {[20,50,100,200,500,1000].map(b => (
               <button key={b} onClick={() => quickAdd(b)} className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">+₱{b}</button>
             ))}
-            <button onClick={() => handleInput(Number(total).toFixed(2))} className="ml-auto px-3 py-1 rounded bg-yellow-100 hover:bg-yellow-200 text-sm">Exact</button>
+            <button onClick={() => handleInput(Number(total).toFixed(2))} className="px-3 py-1 rounded bg-yellow-100 hover:bg-yellow-200 text-sm">Exact</button>
           </div>
 
           {/* keypad */}

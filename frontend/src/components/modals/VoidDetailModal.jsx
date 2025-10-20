@@ -1,11 +1,31 @@
 import React from "react";
 
+const collectSpecialInstructions = (item) => {
+  if (!item || typeof item !== "object") return "";
+  return (
+    [
+      item.notes,
+      item.specialInstructions,
+      item.instructions,
+      item.customerNote,
+      item.remark,
+      item.remarks,
+    ]
+      .map((candidate) =>
+        typeof candidate === "string" ? candidate.trim() : candidate ?? ""
+      )
+      .find((candidate) => Boolean(candidate)) || ""
+  );
+};
+
 export default function VoidDetailModal({ voidLog, onClose }) {
   if (!voidLog) return null;
 
   // Ensure voidedItemsDetailed exists and is an array
   const rawItems = Array.isArray(voidLog.voidedItemsDetailed)
     ? voidLog.voidedItemsDetailed
+    : Array.isArray(voidLog.items)
+    ? voidLog.items
     : [];
 
   // Deduplicate items based on name, size label, notes, and addons
@@ -14,7 +34,9 @@ export default function VoidDetailModal({ voidLog, onClose }) {
       rawItems
         .filter(item => item && item.name && typeof item === "object")
         .map(item => {
-            const key = `${item?.name || "Unknown"}-${item?.size?.label || "N/A"}-${item?.notes || ""}-${(item?.selectedAddons || []).map(a => a?.label || "").join(",")}`;
+            const instructions = collectSpecialInstructions(item);
+            const addons = item.selectedAddons || item.addons || [];
+            const key = `${item?.name || "Unknown"}-${item?.size?.label || "N/A"}-${instructions || ""}-${addons.map(a => a?.label || "").join(",")}`;
 
           return [key, item];
         })
@@ -71,13 +93,18 @@ export default function VoidDetailModal({ voidLog, onClose }) {
           {/* Voided Items */}
           {uniqueItems.length > 0 ? (
             uniqueItems.map((item, idx) => {
-              const base = typeof item.price === "number" ? item.price : 0;
-              const sizeUp = item?.size?.price || 0;
+              const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+              const sizeUp = Number(item?.size?.price || 0);
               const sizeLabel = item?.size?.label || "N/A";
-              const addons = item.selectedAddons || [];
-              const addonsCost = addons.reduce((sum, a) => sum + (a.price || 0), 0);
+              const addons = item.selectedAddons || item.addons || [];
+              const addonsCost = addons.reduce((sum, a) => sum + Number(a.price || 0), 0);
               const addonLabels = addons.map(a => a.label).join(", ") || "None";
-              const totalLine = (base + sizeUp + addonsCost) * item.quantity;
+              const quantity = Number(item.quantity ?? item.qty ?? 0);
+              const specialInstructions = collectSpecialInstructions(item);
+              const lineTotal = Number(
+                item.lineTotal ?? ((unitPrice * quantity) || 0)
+              );
+              const basePrice = Math.max(unitPrice - sizeUp - addonsCost, 0);
 
               return (
                 <div
@@ -88,7 +115,7 @@ export default function VoidDetailModal({ voidLog, onClose }) {
     
                   <div className="text-sm flex justify-between">
                     <span>Base Price:</span>
-                    <span>₱{base.toFixed(2)}</span>
+                    <span>₱{basePrice.toFixed(2)}</span>
                   </div>
                   
                   <div className="text-sm flex justify-between">
@@ -110,16 +137,16 @@ export default function VoidDetailModal({ voidLog, onClose }) {
 
                   <div className="text-sm flex justify-between">
                     <span>Quantity:</span>
-                    <span>{item.quantity}</span>
+                    <span>{quantity}</span>
                   </div>
 
-                  {item.notes && (
-                    <div className="text-sm italic">Notes: {item.notes}</div>
+                  {specialInstructions && (
+                    <div className="text-sm italic">Special Instructions: {specialInstructions}</div>
                   )}
 
                   <div className="mt-1 text-sm font-semibold flex justify-between">
                     <span>Line Total:</span>
-                    <span>₱{totalLine.toFixed(2)}</span>
+                    <span>₱{lineTotal.toFixed(2)}</span>
                   </div>
                 </div>
               );

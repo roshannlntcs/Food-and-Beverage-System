@@ -1,7 +1,7 @@
 // src/components/modals/ItemDetailModal.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import images from "../../utils/images";
+import { getImage } from "../../utils/images";
 import { useInventory } from "../../contexts/InventoryContext";
 
 function TooltipPortal({ children, visible }) {
@@ -31,42 +31,36 @@ function TooltipPortal({ children, visible }) {
 
 export default function ItemDetailModal({
   isOpen,
-  product,              // the modalProduct object from parent
-  editingIndex,         // null when adding, or an integer when editing
-  onClose,              // () => void
-  onAdd,                // (itemData) => void
-  onApply,              // (itemData, index) => void
-  onRemove              // (index) => void
+  product,
+  editingIndex,
+  onClose,
+  onAdd,
+  onApply,
+  onRemove
 }) {
   const MAX_GLOBAL = 100;
   const { inventory = [] } = useInventory();
 
-  // find inventory record by name (case-insensitive)
   const invItem = inventory.find(
     it => String(it.name).toLowerCase() === String(product?.name || "").toLowerCase()
   );
 
-  // compute effective maximum stock (min(inventoryQty, 100))
   const inventoryQuantity = typeof invItem?.quantity === "number" ? Math.max(0, Math.floor(invItem.quantity)) : null;
   const effectiveMax = inventoryQuantity !== null ? Math.min(inventoryQuantity, MAX_GLOBAL) : MAX_GLOBAL;
   const isOutOfStock = effectiveMax === 0;
 
-  // Hooks
   const [quantity, setQuantity]     = useState(1);
   const [size, setSize]             = useState({ label: "", price: 0 });
   const [addons, setAddons]         = useState([]);
   const [notes, setNotes]           = useState("");
   const [dirty, setDirty]           = useState(false);
 
-  // inline-editing state for the quantity label
   const [isEditingQty, setIsEditingQty] = useState(false);
   const [editingQtyValue, setEditingQtyValue] = useState("");
 
-  // info tooltip text (rendered via portal so it doesn't affect layout)
   const [infoMsg, setInfoMsg] = useState("");
   const tooltipTimerRef = useRef(null);
 
-  // Seed state when modal opens or product changes
   useEffect(() => {
     if (!isOpen || !product) return;
     const initialQty = Number(product.quantity ?? 1) || 1;
@@ -79,7 +73,6 @@ export default function ItemDetailModal({
     setIsEditingQty(false);
     setEditingQtyValue(String(seededQty));
     setInfoMsg("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, product, effectiveMax]);
 
   useEffect(() => {
@@ -92,7 +85,6 @@ export default function ItemDetailModal({
       setEditingQtyValue(String(effectiveMax));
       showTooltipOnce(`Quantity reduced to available stock (${effectiveMax}).`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveMax]);
 
   function showTooltipOnce(text, ms = 2500) {
@@ -108,7 +100,6 @@ export default function ItemDetailModal({
     return () => clearTimeout(tooltipTimerRef.current);
   }, []);
 
-  // clamp helpers
   const clampToEffective = (raw) => {
     if (isOutOfStock) return 0;
     let n = Number(raw);
@@ -198,12 +189,17 @@ export default function ItemDetailModal({
     onClose();
   };
 
-  // lock modal size
   if (!isOpen || !product) return null;
 
   const addonsTotalPerUnit = addons.reduce((sum, a) => sum + (a.price || 0), 0);
-  const sizePrice = size?.price || 0;
-  const lineTotal = ((product.price || 0) + sizePrice + addonsTotalPerUnit) * Math.max(0, quantity);
+  const sizePriceRaw =
+    typeof size?.price === "number" && !Number.isNaN(Number(size.price))
+      ? Number(size.price)
+      : 0;
+  const basePricePerUnit = Number(product.price || 0);
+  const lineTotal =
+    (basePricePerUnit + Math.max(0, sizePriceRaw) + addonsTotalPerUnit) *
+    Math.max(0, quantity);
 
   return (
     <>
@@ -215,10 +211,11 @@ export default function ItemDetailModal({
           {/* HEADER */}
           <div className="bg-gray-100 p-4 flex items-start gap-4">
             <img
-              src={images[product.image]}
-              alt={product.name}
-              className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
-            />
+  src={getImage(product.image, product.name)}
+  alt={product.name}
+  className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+  onError={(e) => { e.currentTarget.src = getImage('placeholder.png'); }}
+/>
             <div className="flex-1 min-w-0">
               <h2 className="text-xl font-semibold truncate">{product.name}</h2>
               <p className="text-sm text-gray-600 truncate">{product.description}</p>
@@ -399,7 +396,6 @@ export default function ItemDetailModal({
         </div>
       </div>
 
-      {/* Tooltip portal (rendered into body so it doesn't affect layout/overflow) */}
       <TooltipPortal visible={!!infoMsg}>
         {infoMsg}
       </TooltipPortal>

@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const AdminInfo = () => {
   const navigate = useNavigate();
-  const adminName = localStorage.getItem('fullName') || 'Admin';
+  const { currentUser } = useAuth() || {};
+  const adminName = currentUser?.fullName || 'Admin';
+  const avatarUrl = currentUser?.avatarUrl || 'https://i.pravatar.cc/100?img=68';
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -65,7 +68,7 @@ const AdminInfo = () => {
           className="flex items-center space-x-3 cursor-pointer select-none"
         >
           <img
-            src="https://i.pravatar.cc/100?img=68"
+            src={avatarUrl}
             alt="Admin Avatar"
             className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
           />
@@ -103,3 +106,5 @@ const AdminInfo = () => {
 };
 
 export default AdminInfo;
+
+

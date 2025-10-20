@@ -7,6 +7,7 @@ import AddSupplierModal from "../../components/AddSupplierModal";
 import EditSupplierModal from "../../components/EditSupplierModal";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
+import { useAuth } from "../../contexts/AuthContext";
 
 const SUPPLIER_LOGS_KEY = "supplierLogs";
 
@@ -75,7 +76,8 @@ const SupplierRecords = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
-  const adminName = localStorage.getItem("fullName") || "Admin";
+  const { currentUser } = useAuth() || {};
+  const adminName = currentUser?.fullName || "Admin";
 
   const nowStr = () =>
     new Date().toISOString().slice(0, 16).replace("T", " ");

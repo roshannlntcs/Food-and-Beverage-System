@@ -1,17 +1,6 @@
-// frontend/src/utils/data.js
+// src/utils/data.js
+export { getImage } from '../utils/images'; // delegate to the single resolver
 
-// 1) Tell Webpack to bundle every image in /src/assets
-const images = require.context("../assets", false, /\.(png|jpe?g|svg)$/);
-
-// 2) Helper to fetch by filename
-function getImage(fileName) {
-  try {
-    return images(`./${fileName}`);
-  } catch {
-    console.error("Missing image:", fileName);
-    return "";
-  }
-}
 
 // 2. Menu placeholders (copy these straight from your old POSMain.jsx)
 export const placeholders = {
@@ -427,7 +416,7 @@ export const placeholders = {
       }
     ],
   
-    "Desserts": [
+    "Dessert": [
       {
         name:        "Leche Flan",
         description: "Creamy caramel‑topped custard.",
@@ -634,25 +623,31 @@ export const placeholders = {
     ]
   };
 
-  // 3. Shop details for receipts
+/// 3. Shop details for receipts
 export const shopDetails = {
-    name: "SPLICE ENTERPRISES, INC.",
-    address: "123 Placeholder Street, City, PH",
-    contact: "0912-345-6789",
-  };
- 
+  name: "SPLICE ENTERPRISES, INC.",
+  address: "123 Placeholder Street, City, PH",
+  contact: "0912-345-6789",
+};
 
-  export const allItemsFlat = Object.entries(placeholders).flatMap(
-    ([category, items]) =>
-        items.map(item => ({
-          name: item.name,
-          price: item.price,
-          category,
-          quantity: item.quantity ?? 0,
-          status: 'Available',
-          allergens: item.allergens || '',
-          addons: item.addons || [],
-          description: item.description || '',
-          sizes: item.sizes || [] 
-        }))
-      );
+// 4. Flatten placeholders into a single list BUT keep the `image` property
+export const allItemsFlat = Object.entries(placeholders).flatMap(([category, items]) =>
+  items.map(item => ({
+    name: item.name,
+    price: item.price,
+    category,
+    image: item.image || "",     // <-- include image here
+    quantity: item.quantity ?? 0,
+    status: item.status || "Available",
+    allergens: item.allergens || "",
+    addons: item.addons || [],
+    description: item.description || "",
+    sizes: item.sizes || []
+  }))
+);
+
+export default {
+  placeholders,
+  shopDetails,
+  allItemsFlat,
+};

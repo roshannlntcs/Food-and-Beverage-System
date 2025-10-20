@@ -1,3 +1,4 @@
+// src/pages/pos/HomeDashboard.js
 import React, { useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
@@ -34,52 +35,17 @@ const orderSummaryData = [
 ];
 
 const recentLogins = [
-  {
-    name: "Paula Marie Smith",
-    username: "@paulwcszzz",
-    time: "5 mins ago",
-    img: "https://i.pravatar.cc/40?img=1",
-  },
-  {
-    name: "Japit Self Fish",
-    username: "@japitkupsiss",
-    time: "3 days ago",
-    img: "https://i.pravatar.cc/40?img=2",
-  },
-  {
-    name: "Andrea Jane Swift",
-    username: "@andreaas",
-    time: "30 July 2025",
-    img: "https://i.pravatar.cc/40?img=3",
-  },
+  { name: "Paula Marie Smith", username: "@paulwcszzz", time: "5 mins ago", img: "https://i.pravatar.cc/40?img=1" },
+  { name: "Japit Self Fish", username: "@japitkupsiss", time: "3 days ago", img: "https://i.pravatar.cc/40?img=2" },
+  { name: "Andrea Jane Swift", username: "@andreaas", time: "30 July 2025", img: "https://i.pravatar.cc/40?img=3" },
 ];
 
 const notifications = [
-  {
-    icon: <Package size={16} />,
-    text: "Low stock: Cheesecake (5 left)",
-    time: "3:30 PM",
-  },
-  {
-    icon: <ShoppingCart size={16} />,
-    text: "New transaction: TXN-2045 completed",
-    time: "3:30 PM",
-  },
-  {
-    icon: <User size={16} />,
-    text: "Inventory updated by Rose",
-    time: "2:15 PM",
-  },
-  {
-    icon: <Package size={16} />,
-    text: "Low stock: Cheesecake (5 left)",
-    time: "3:30 PM",
-  },
-  {
-    icon: <ShoppingCart size={16} />,
-    text: "New transaction: TXN-2045 completed",
-    time: "3:30 PM",
-  },
+  { icon: <Package size={16} />, text: "Low stock: Cheesecake (5 left)", time: "3:30 PM" },
+  { icon: <ShoppingCart size={16} />, text: "New transaction: TXN-2045 completed", time: "3:30 PM" },
+  { icon: <User size={16} />, text: "Inventory updated by Rose", time: "2:15 PM" },
+  { icon: <Package size={16} />, text: "Low stock: Cheesecake (5 left)", time: "3:30 PM" },
+  { icon: <ShoppingCart size={16} />, text: "New transaction: TXN-2045 completed", time: "3:30 PM" },
 ];
 
 const categories = ["Soup", "Main Dish", "Dessert", "Drinks", "Snacks"];
@@ -87,7 +53,6 @@ const categories = ["Soup", "Main Dish", "Dessert", "Drinks", "Snacks"];
 const Dashboard = () => {
   const [selectedStock, setSelectedStock] = useState("Soup");
   const [stockOpen, setStockOpen] = useState(false);
-
   const [selectedTop, setSelectedTop] = useState("Main Dish");
   const [topOpen, setTopOpen] = useState(false);
 
@@ -135,9 +100,8 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* STOCK LEVEL & TOP SELLING */}
-            <div className="grid grid-cols-2 gap-2 mt-4 h-[220px]">
-              {/* Enhanced Stock Level */}
+            {/* STOCK LEVELS */}
+            <div className="grid grid-cols-2 gap-2">
               <div className="bg-white rounded-lg p-4 shadow flex flex-col">
                 <div className="flex justify-between items-center mb-2 relative">
                   <h2 className="font-bold">Stock Level</h2>
@@ -202,7 +166,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* Enhanced Top Selling */}
+              {/* Top Selling */}
               <div className="bg-white rounded-lg p-4 shadow flex flex-col">
                 <div className="flex justify-between items-center mb-2 relative">
                   <h2 className="font-bold">Top Selling Products</h2>
@@ -238,11 +202,7 @@ const Dashboard = () => {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Bar
-                      dataKey="sales"
-                      fill="#f59e0b"
-                      radius={[8, 8, 0, 0]}
-                    />
+                    <Bar dataKey="sales" fill="#f59e0b" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -250,14 +210,14 @@ const Dashboard = () => {
 
             {/* ORDER SUMMARY */}
             <div className="bg-white rounded-lg mt-12 p-4 shadow h-[200px]">
-  <div className="flex justify-between items-start">
-    <div className="text-left">
-      <p className="text-gray-500">Order Summary</p>
-      <h2 className="text-2xl font-bold">₱8,689</h2>
-      <p className="text-gray-400 text-sm">Total Profit</p>
-    </div>
-    <span className="text-gray-400 text-sm">This week</span>
-  </div>
+              <div className="flex justify-between items-start">
+                <div className="text-left">
+                  <p className="text-gray-500">Order Summary</p>
+                  <h2 className="text-2xl font-bold">₱8,689</h2>
+                  <p className="text-gray-400 text-sm">Total Profit</p>
+                </div>
+                <span className="text-gray-400 text-sm">This week</span>
+              </div>
               <ResponsiveContainer width="100%" height={90}>
                 <AreaChart data={orderSummaryData}>
                   <defs>
@@ -284,39 +244,48 @@ const Dashboard = () => {
 
           {/* RIGHT CONTENT */}
           <div className="col-span-3 flex flex-col gap-2">
-            {/* NOTIFICATIONS */}
-            <div className="bg-white rounded-lg p-4 shadow flex flex-col">
-              <h2 className="font-bold mb-3">Notifications</h2>
-              {notifications.map((n, idx) => (
-                <div key={idx} className="mb-3">
-                  <div className="flex items-center gap-2">
-                    {n.icon}
-                    <p>{n.text}</p>
+            {/* RECENT LOGINS */}
+            <div className="bg-white rounded-lg p-4 shadow h-[260px]">
+              <div className="flex justify-between items-center">
+                <h2 className="font-bold">Recent Logins</h2>
+                <span className="text-gray-400 text-sm">This week</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {recentLogins.map((user, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src={user.img} alt={user.name} className="w-10 h-10 rounded-full" />
+                      <div>
+                        <p className="font-medium">{user.name}</p>
+                        <p className="text-gray-500 text-sm">{user.username}</p>
+                      </div>
+                    </div>
+                    <span className="text-gray-400 text-xs">{user.time}</span>
                   </div>
-                  <p className="text-gray-400 text-xs ml-6">{n.time}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            {/* RECENT LOGIN */}
-            <div className="bg-white rounded-lg mt-2 p-7 shadow">
-              <h2 className="font-bold mb-3">Recent Login</h2>
-              {recentLogins.map((u, idx) => (
-                <div key={idx} className="flex items-center gap-3 mb-3">
-                  <img
-                    src={u.img}
-                    alt={u.name}
-                    className="w-10 h-10 rounded-full"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold">{u.name}</p>
-                    <p className="text-gray-500 text-sm">{u.username}</p>
+            {/* NOTIFICATIONS */}
+            <div className="bg-white rounded-lg p-4 shadow h-[300px]">
+              <div className="flex justify-between items-center">
+                <h2 className="font-bold">Notifications</h2>
+                <span className="text-gray-400 text-sm">This week</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {notifications.map((n, idx) => (
+                  <div key={idx}>
+                    <div className="flex items-center gap-2">
+                      {n.icon}
+                      <p>{n.text}</p>
+                    </div>
+                    <p className="text-gray-400 text-xs ml-6">{n.time}</p>
                   </div>
-                  <p className="text-gray-400 text-xs">{u.time}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

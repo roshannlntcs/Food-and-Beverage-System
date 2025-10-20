@@ -37,7 +37,8 @@ export default function TransactionsPanel({
   const filteredTx = useMemo(() => {
     let list = [...transactions];
     list = list.filter(t => {
-      const txDate = normalizeDate(t.date);
+      const rawDate = t.createdAt || t.date;
+      const txDate = normalizeDate(rawDate);
       if (!txDate) return false;
 
       if (txFrom && txTo && txFrom === txTo) {
@@ -58,8 +59,8 @@ export default function TransactionsPanel({
     });
 
     list.sort((a, b) => {
-      const dA = new Date(a.date);
-      const dB = new Date(b.date);
+      const dA = new Date(a.createdAt || a.date || 0);
+      const dB = new Date(b.createdAt || b.date || 0);
       if (txSort === "newest") return dB - dA;
       if (txSort === "oldest") return dA - dB;
       if (txSort === "high") return b.total - a.total;
@@ -188,7 +189,7 @@ export default function TransactionsPanel({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5">
+        <div className="flex-1 overflow-y-auto no-scrollbar min-h-0 space-y-0.5">
           {filteredTx.map(tx => (
             <button
               key={tx.transactionID}
@@ -259,7 +260,7 @@ export default function TransactionsPanel({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5">
+        <div className="flex-1 overflow-y-auto no-scrollbar min-h-0 space-y-0.5">
           {filteredVoids.length === 0 && <div className="text-gray-400">No voids yet.</div>}
           {filteredVoids.map(vl => (
             <div

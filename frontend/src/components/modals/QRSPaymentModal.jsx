@@ -12,7 +12,15 @@ import QRCode from "qrcode";
  *
  * The green scanning line is vertical and constrained to the QR box.
  */
-export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned, onSuccess }) {
+export default function QRSPaymentModal({
+  isOpen,
+  total = 0,
+  onClose,
+  onScanned,
+  onSuccess,
+  onReady,
+  onStatusChange,
+}) {
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [status, setStatus] = useState("waiting"); // waiting | scanned | paid
   const [reference, setReference] = useState(null);
@@ -20,6 +28,8 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
 
   useEffect(() => {
     if (!isOpen) {
+      onStatusChange?.({ status: "idle" });
+      onReady?.(null);
       setQrDataUrl(null);
       setStatus("waiting");
       setReference(null);
@@ -38,14 +48,19 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
 
     const text = JSON.stringify(payloadObj);
     QRCode.toDataURL(text, { margin: 1, width: 360 })
-      .then(url => setQrDataUrl(url))
+      .then(url => {
+        setQrDataUrl(url);
+        onReady?.({ code: url, reference: payloadObj.txRef, payload: payloadObj, status: "waiting" });
+        onStatusChange?.({ status: "waiting", reference: payloadObj.txRef, payload: payloadObj });
+      })
       .catch(err => {
         console.error("QR gen error", err);
         setQrDataUrl(null);
+        onReady?.(null);
       });
 
     setStatus("waiting");
-  }, [isOpen, total]);
+  }, [isOpen, total, onReady, onStatusChange]);
 
   if (!isOpen) return null;
 
@@ -57,11 +72,17 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
             <div className="text-sm font-semibold">QR Payment (Gcash)</div>
             <div className="text-xs text-gray-500">Ask customer to scan</div>
           </div>
-          <button onClick={() => onClose && onClose()} className="text-gray-500">✕</button>
+          <button
+            onClick={() => onClose && onClose()}
+            className="text-gray-500 hover:text-gray-700 text-xl leading-none"
+            aria-label="Close QR modal"
+          >
+            &times;
+          </button>
         </div>
 
         <div className="text-sm text-gray-600 mb-2">Amount</div>
-        <div className="text-2xl font-bold mb-4">₱{Number(total || 0).toFixed(2)}</div>
+        <div className="text-2xl font-bold mb-4">{`\u20B1${Number(total || 0).toFixed(2)}`}</div>
 
         <div className="flex flex-col items-center mb-4">
           <div className="bg-white p-2 rounded shadow-sm relative">
@@ -71,7 +92,7 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
                 {/* vertical scanning line confined to QR box */}
                 <div
                   className={`absolute left-0 right-0 h-1 bg-green-400/90 ${status === "scanned" ? "animate-scan-vertical" : "opacity-0"}`}
-                  style={{ top: 0 }}
+                  style={{ top: 8 }}
                 />
               </div>
             ) : (
@@ -89,6 +110,7 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
               onClick={() => {
                 setStatus("scanned");
                 onScanned && onScanned(payload);
+                onStatusChange?.({ status: "scanned", reference, payload });
               }}
               className="flex-1 py-2 rounded border hover:bg-gray-50"
             >
@@ -99,6 +121,7 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
               onClick={() => {
                 setStatus("paid");
                 onSuccess && onSuccess({ method: "QRS", reference, payload });
+                onStatusChange?.({ status: "paid", reference, payload });
                 onClose && onClose();
               }}
               className="flex-1 py-2 rounded bg-green-600 text-white"
@@ -109,13 +132,22 @@ export default function QRSPaymentModal({ isOpen, total = 0, onClose, onScanned,
         </div>
 
         <div className="text-sm text-center text-gray-600 mb-2">
-          {status === "waiting" && "Waiting for customer to scan the QR"}
-          {status === "scanned" && "QR scanned — awaiting payment confirmation"}
-          {status === "paid" && "Payment received ✓"}
+          {status === "waiting" && "Waiting for the customer to scan the QR"}
+          {status === "scanned" && "QR scanned � awaiting payment confirmation"}
+          {status === "paid" && "Payment received!"}
         </div>
 
         <div className="flex justify-end">
-          <button onClick={() => onClose && onClose()} className="px-3 py-2 rounded border">Close</button>
+          <button
+            onClick={() => {
+              onStatusChange?.({ status: "closed", reference, payload });
+              onReady?.(null);
+              onClose && onClose();
+            }}
+            className="px-3 py-2 rounded border"
+          >
+            Close
+          </button>
         </div>
 
         <style>{`

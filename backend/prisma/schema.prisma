@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  CASHIER
+}
+
+enum OrderType {
+  WALKIN
+  DINE_IN
+  DELIVERY
+}
+
+enum OrderStatus {
+  IN_PROGRESS
+  READY
+  SERVED
+  PAID
+  VOIDED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  QR
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum VoidType {
+  TRANSACTION
+  ITEM
+}
+
+model User {
+  id                Int        @id @default(autoincrement())
+  schoolId          String     @unique
+  username          String     @unique
+  fullName          String
+  program           String?
+  section           String?
+  sex               String?
+  role              Role
+  passwordHash      String
+  passwordChangedAt DateTime?
+  lastLogin         DateTime?
+  avatarUrl         String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  orders            Order[]            @relation("OrderCashier")
+  voidApprovals     OrderItem[]        @relation("OrderItemVoidApprover")
+  voidLogsCashier   VoidLog[]          @relation("VoidLogCashier")
+  voidLogsManager   VoidLog[]          @relation("VoidLogManager")
+  inventoryLogs     InventoryLog[]
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  active    Boolean   @default(true)
+  iconUrl   String?
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String     @id
+  name        String     @unique
+  sku         String?    @unique
+  price       Float
+  imageUrl    String?
+  active      Boolean    @default(true)
+  quantity    Int        @default(100)
+  status      String     @default("Available")
+  allergens   String?
+  sizes       Json?
+  addons      Json?
+  description String?
+  categoryId  Int?
+  category    Category?  @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  logs        InventoryLog[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Order {
+  id             Int          @id @default(autoincrement())
+  orderCode      String       @unique
+  transactionId  String?      @unique
+  type           OrderType    @default(WALKIN)
+  status         OrderStatus  @default(PAID)
+  subtotal       Float
+  taxRate        Float        @default(0)
+  tax            Float        @default(0)
+  discount       Float        @default(0)
+  discountPct    Float        @default(0)
+  discountType   String?
+  couponCode     String?
+  couponValue    Float        @default(0)
+  total          Float
+  paidAmount     Float
+  tendered       Float        @default(0)
+  changeDue      Float        @default(0)
+  notes          String?
+  servedAt       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  cashierId      Int
+  cashier        User         @relation("OrderCashier", fields: [cashierId], references: [id])
+  items          OrderItem[]
+  payments       Payment[]
+  voidLogs       VoidLog[]
+}
+
+model OrderItem {
+  id               Int       @id @default(autoincrement())
+  orderId          Int
+  productId        String
+  name             String
+  price            Float
+  qty              Int
+  size             Json?
+  addons           Json?
+  notes            String?
+  lineTotal        Float
+  voided           Boolean   @default(false)
+  voidReason       String?
+  voidedAt         DateTime?
+  voidApprovedById Int?
+  order            Order     @relation(fields: [orderId], references: [id])
+  product          Product   @relation(fields: [productId], references: [id])
+  voidApprovedBy   User?     @relation("OrderItemVoidApprover", fields: [voidApprovedById], references: [id])
+}
+
+model Payment {
+  id         Int           @id @default(autoincrement())
+  orderId    Int
+  method     PaymentMethod
+  amount     Float
+  tendered   Float        @default(0)
+  change     Float        @default(0)
+  ref        String?
+  details    Json?
+  createdAt  DateTime     @default(now())
+  order      Order        @relation(fields: [orderId], references: [id])
+}
+
+model VoidLog {
+  id          Int       @id @default(autoincrement())
+  voidId      String    @unique
+  transactionId String
+  orderId     Int?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  voidType    VoidType
+  items       Json?
+  amount      Float      @default(0)
+  cashierId   Int?
+  cashier     User?      @relation("VoidLogCashier", fields: [cashierId], references: [id])
+  managerId   Int?
+  manager     User?      @relation("VoidLogManager", fields: [managerId], references: [id])
+  reason      String?
+  notes       String?
+  requestedAt DateTime   @default(now())
+  approvedAt  DateTime?
+}
+
+model InventoryLog {
+  id            Int      @id @default(autoincrement())
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id])
+  productName   String
+  action        String
+  detail        String?
+  stock         Int?
+  oldPrice      Float?
+  newPrice      Float?
+  category      String?
+  userId        Int?
+  user          User?    @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model Supplier {
+  id            Int            @id @default(autoincrement())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  products      String?
+  notes         String?
+  status        SupplierStatus @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}

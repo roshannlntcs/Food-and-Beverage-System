@@ -1,6 +1,8 @@
 // src/pages/pos/POSMain.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchOrders, fetchVoidLogs, createOrder, voidOrderWithToken } from "../../api/orders";
+import { BASE_URL } from "../../api/client";
 
 // Layout Components
 import Header from "../../components/Header";
@@ -17,7 +19,7 @@ import ItemsTab from "../../components/ItemsTab";
 // Modals
 import ItemDetailModal from "../../components/modals/ItemDetailModal";
 import DiscountModal from "../../components/modals/DiscountModal";
-import VoidPasswordModal from "../../components/modals/VoidPasswordModal";
+import ManagerAuthModal from "../../components/modals/ManagerAuthModal";
 import VoidReasonModal from "../../components/modals/VoidReasonModal";
 import ReceiptModal from "../../components/modals/ReceiptModal";
 import OrderSuccessModal from "../../components/modals/OrderSuccessModal";
@@ -33,31 +35,113 @@ import CardPaymentModal from "../../components/modals/CardPaymentModal";
 import QRSPaymentModal from "../../components/modals/QRSPaymentModal";
 
 // Utilities
+import { mapOrderToTx, mapOrderToUiOrder } from "../../utils/mapOrder";
 import { placeholders, shopDetails } from "../../utils/data";
-import {
-  generateOrderID,
-  generateTransactionID,
-  generateVoidID
-} from "../../utils/id";
-
-// Inventory context
+import { canonicalCategoryName } from "../../utils/categories";
 import { useInventory } from "../../contexts/InventoryContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../components/ToastProvider";
 
+// assets helper
 const importAll = (r) =>
   r.keys().reduce((acc, k) => ({ ...acc, [k.replace("./", "")]: r(k) }), {});
 const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
 
+const toDateTimeString = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+};
+
+const getUserDisplayName = (user) => {
+  if (!user) return "N/A";
+  return (
+    user.fullName ||
+    user.schoolId ||
+    user.username ||
+    (typeof user.id !== "undefined" ? `User ${user.id}` : "N/A")
+  );
+};
+
+const buildVoidedItems = (items) => {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => {
+    const quantity = Number(item?.qty ?? item?.quantity ?? 0) || 0;
+    const lineTotal = Number(item?.lineTotal || 0);
+    const basePrice = Number(item?.price ?? item?.basePrice ?? 0);
+    const unitPrice =
+      quantity > 0 && lineTotal > 0
+        ? lineTotal / quantity
+        : basePrice || Number(item?.unitPrice ?? 0);
+    const selectedAddons = Array.isArray(item?.selectedAddons)
+      ? item.selectedAddons
+      : Array.isArray(item?.addons)
+      ? item.addons
+      : [];
+    const notes =
+      [
+        item?.notes,
+        item?.specialInstructions,
+        item?.instructions,
+        item?.customerNote,
+        item?.remark,
+        item?.remarks,
+      ]
+        .map((candidate) =>
+          typeof candidate === "string" ? candidate.trim() : candidate ?? ""
+        )
+        .find((candidate) => Boolean(candidate)) || "";
+    return {
+      name: item?.name || "Item",
+      quantity,
+      price: unitPrice,
+      selectedAddons,
+      size: item?.size || null,
+      notes,
+    };
+  });
+};
+
+const normalizeVoidLog = (log) => {
+  if (!log) return null;
+  const typeLabel =
+    log.voidType === "TRANSACTION" ? "Full Transaction Void" : "Item Void";
+
+  return {
+    ...log,
+    txId: log.transactionId,
+    type: typeLabel,
+    amount: Number(log.amount || 0),
+    dateTime: toDateTimeString(log.approvedAt || log.requestedAt),
+    cashier: getUserDisplayName(log.cashier),
+    manager: getUserDisplayName(log.manager),
+    cashierId: log.cashier?.id ?? log.cashierId ?? null,
+    managerId: log.manager?.id ?? log.managerId ?? null,
+    cashierUser: log.cashier || null,
+    managerUser: log.manager || null,
+    fullyVoided: log.voidType === "TRANSACTION",
+    voidedItemsDetailed: buildVoidedItems(log.items),
+  };
+};
+
+const filterVoidLogsForUser = (logs, userId) => {
+  if (!userId) return logs;
+  return logs.filter((log) => {
+    return log.cashierId === userId || log.managerId === userId;
+  });
+};
+
 export default function POSMain() {
   const navigate = useNavigate();
-  const { applyTransaction } = useInventory(); // <-- from InventoryContext
+  const { inventory = [], applyTransaction } = useInventory();
+  const { currentUser, updateProfile, changePassword, logout } = useAuth();
+  const { showToast } = useToast();
 
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
   const [activeTab, setActiveTab] = useState("Menu");
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [products, setProducts] = useState([]);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
@@ -67,107 +151,289 @@ export default function POSMain() {
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
 
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
-    // normalize older transactions so discountType / couponCode appear if present under different keys
-    const normalized = saved.map(t => ({
-      ...t,
-      transactionID: t.transactionID || t.id || "",
-      discountType: t.discountType || t.discount || t.discount_label || "",
-      couponCode:
-        t.couponCode ||
-        t.coupon ||
-        (t.paymentDetails && (t.paymentDetails.coupon || t.paymentDetails.code)) ||
-        t.couponCodeApplied ||
-        "",
-    }));
-    if (normalized.length) {
-      setTransactions(normalized);
-      localStorage.setItem("transactions", JSON.stringify(normalized));
-    }
-  }, []);
-
-  useEffect(() => {
-    const savedOrders = JSON.parse(localStorage.getItem("orders") || "[]");
-    if (savedOrders.length) {
-      const normalized = savedOrders.map(o => ({ ...o, orderID: o.orderID || o.id || "" }));
-      setOrders(normalized);
-    }
-  }, []);
-
   const [editingCartIndex, setEditingCartIndex] = useState(null);
   const [modalEdited, setModalEdited] = useState(false);
 
-  const [itemAvailability, setItemAvailability] = useState({}); // kept for compatibility but ItemsTab now reads inventory
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountType, setDiscountType] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [discountPct, setDiscountPct] = useState(0);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalProduct, setModalProduct] = useState(null);
 
-  // VOID workflow states (new flow)
-  const [showFirstAuth, setShowFirstAuth] = useState(false); // first manager password prompt
-  const [showReasonModal, setShowReasonModal] = useState(false); // shows details + reason input
-  const [showFinalAuth, setShowFinalAuth] = useState(false); // final manager password prompt
-  const [pendingVoidReason, setPendingVoidReason] = useState("");
+  // VOID workflow states
+  const [showManagerAuth, setShowManagerAuth] = useState(false);
+  const [managerAuth, setManagerAuth] = useState(null);
+  const [showReasonModal, setShowReasonModal] = useState(false);
   const [voidContext, setVoidContext] = useState({ type: null, index: null, tx: null }); // { type: 'transaction' | 'item', index, tx }
 
-  const [showVoidDetailModal, setShowVoidDetailModal] = useState(false); // existing detail viewer (history)
+  const [showVoidDetailModal, setShowVoidDetailModal] = useState(false);
   const [selectedVoidLog, setSelectedVoidLog] = useState(null);
 
   const [paymentMethod, setPaymentMethod] = useState("");
   const [voidLogs, setVoidLogs] = useState([]);
 
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("voidLogs") || "[]");
-    const normalized = saved.map(v => ({
-      ...v,
-      voidId: v.voidId || v.oidId || "",
-      txId: v.txId || v.transactionId || v.transactionID || "",
-    }));
-    if (normalized.length) {
-      setVoidLogs(normalized);
-      localStorage.setItem("voidLogs", JSON.stringify(normalized));
+  const currentUserId = currentUser?.id ?? null;
+
+  const refreshOrdersAndVoids = useCallback(async () => {
+    const userFilter = currentUserId ? { cashierId: currentUserId } : {};
+    try {
+      const ordersResponse = await fetchOrders(userFilter);
+      const orderList = Array.isArray(ordersResponse?.data)
+        ? ordersResponse.data
+        : Array.isArray(ordersResponse)
+          ? ordersResponse
+          : [];
+      const filteredList = currentUserId
+        ? orderList.filter(
+            (order) =>
+              (order.cashierId ?? order.cashier?.id ?? null) === currentUserId
+          )
+        : orderList;
+      const uiOrders = filteredList.map(mapOrderToUiOrder);
+      setOrders(uiOrders);
+      const mappedTransactions = filteredList
+        .map(mapOrderToTx)
+        .sort((a, b) => {
+          const aDate = new Date(a.createdAt || a.date || 0).getTime();
+          const bDate = new Date(b.createdAt || b.date || 0).getTime();
+          return bDate - aDate;
+        });
+      setTransactions(mappedTransactions);
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
     }
-  }, []);
+
+    try {
+      const voidResponse = await fetchVoidLogs();
+      const logs = Array.isArray(voidResponse?.data)
+        ? voidResponse.data
+        : Array.isArray(voidResponse)
+          ? voidResponse
+          : [];
+      const normalized = logs.map((entry) => normalizeVoidLog(entry)).filter(Boolean);
+      const filtered = filterVoidLogsForUser(normalized, currentUserId);
+      setVoidLogs(filtered);
+    } catch (error) {
+      console.error("Failed to fetch void logs:", error);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    refreshOrdersAndVoids();
+  }, [refreshOrdersAndVoids]);
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyContext, setHistoryContext] = useState(null);
 
   // user info
-  const userName = localStorage.getItem("userName") || "Cashier";
-  const schoolId = localStorage.getItem("schoolId") || "";
-  const profilePic = localStorage.getItem("profilePic") || images["avatar-ph.png"];
-  const basePassword = "123456";
+  const userName = currentUser?.fullName || "Cashier";
+  const schoolId = currentUser?.schoolId || "";
+  const avatarUrl = currentUser?.avatarUrl || images["avatar-ph.png"];
+  const profilePic = avatarUrl || images["avatar-ph.png"];
+  const profileAnalytics = useMemo(() => {
+    const totalTransactions = transactions.length;
+    const totalRevenue = transactions.reduce(
+      (sum, tx) => sum + Number(tx.total || 0),
+      0
+    );
+    const totalSold = transactions.reduce((sum, tx) => {
+      const items = Array.isArray(tx.items) ? tx.items : [];
+      const qty = items.reduce(
+        (acc, item) => acc + Number(item?.quantity || 0),
+        0
+      );
+      return sum + qty;
+    }, 0);
+    const totalVoids = voidLogs.length;
+    const avgPerTransaction = totalTransactions
+      ? totalRevenue / totalTransactions
+      : 0;
+
+    const itemTotals = new Map();
+    transactions.forEach((tx) => {
+      const items = Array.isArray(tx.items) ? tx.items : [];
+      items.forEach((item) => {
+        if (!item) return;
+        const key =
+          item.productId ||
+          item.name ||
+          String(item.id || item.orderItemId || "");
+        if (!key) return;
+        const current = itemTotals.get(key) || {
+          name: item.name || "Item",
+          qty: 0,
+        };
+        current.qty += Number(item.quantity || 0);
+        itemTotals.set(key, current);
+      });
+    });
+    const bestSeller = Array.from(itemTotals.values()).reduce(
+      (best, entry) => (entry.qty > (best?.qty || 0) ? entry : best),
+      null
+    );
+
+    return {
+      totalSold,
+      totalRevenue,
+      totalTransactions,
+      totalVoids,
+      avgPerTransaction,
+      bestSeller,
+    };
+  }, [transactions, voidLogs]);
 
   // Customer view refs & state
   const customerWinRef = React.useRef(null);
   const [lastPaymentInfo, setLastPaymentInfo] = useState(null);
-  const [customerViewOpened, setCustomerViewOpened] = useState(false); // only auto-open first click per transaction
+  const [customerViewOpened, setCustomerViewOpened] = useState(false);
 
   // Payment modal states
   const [showCashModal, setShowCashModal] = useState(false);
   const [showCardModal, setShowCardModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [qrPayment, setQrPayment] = useState({
+    status: "idle",
+    reference: null,
+    payload: null,
+    amount: 0,
+  });
 
-  // derive categories from placeholders (exclude "All Menu")
-  const categories = useMemo(
-    () => Object.keys(placeholders).filter(c => c && c.toLowerCase() !== "all menu"),
-    []
+  const placeholderProducts = useMemo(() => {
+    return Object.entries(placeholders).flatMap(([categoryName, items]) =>
+      (items || []).map((item) => ({
+        ...item,
+        id: item.id ?? null,
+        backendId: null,
+        source: "placeholder",
+        hasBackend: false,
+        category: canonicalCategoryName(categoryName),
+        price: Number(item.price || 0),
+        sizes: Array.isArray(item.sizes) ? item.sizes : [],
+        addons: Array.isArray(item.addons) ? item.addons : [],
+      }))
+    );
+  }, []);
+
+  const backendProducts = useMemo(() => {
+    return (inventory || []).map((item) => ({
+      ...item,
+      id: item.id,
+      backendId: item.id,
+      source: "backend",
+      hasBackend: true,
+      category: canonicalCategoryName(item.category || ""),
+      price: Number(item.price || 0),
+      sizes: Array.isArray(item.sizes) ? item.sizes : [],
+      addons: Array.isArray(item.addons) ? item.addons : [],
+      image: item.image || item.imageUrl || "",
+    }));
+  }, [inventory]);
+
+  const combinedProducts = useMemo(() => {
+    const mapByKey = new Map();
+    placeholderProducts.forEach((item) => {
+      const key = `${canonicalCategoryName(item.category || "")}|${String(item.name || "").toLowerCase()}`;
+      if (!mapByKey.has(key)) {
+        mapByKey.set(key, item);
+      }
+    });
+    backendProducts.forEach((item) => {
+      const key = `${canonicalCategoryName(item.category || "")}|${String(item.name || "").toLowerCase()}`;
+      const existing = mapByKey.get(key);
+      if (existing) {
+        mapByKey.set(key, {
+          ...existing,
+          ...item,
+          hasBackend: true,
+          backendId: item.id || existing.backendId || null,
+        });
+      } else {
+        mapByKey.set(key, item);
+      }
+    });
+    return Array.from(mapByKey.values());
+  }, [placeholderProducts, backendProducts]);
+
+  const displayProducts = useMemo(() => {
+    const withBackend = combinedProducts.filter((item) => item.hasBackend !== false);
+    return withBackend.length ? withBackend : combinedProducts;
+  }, [combinedProducts]);
+
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const active = canonicalCategoryName(activeCategory);
+    return displayProducts.filter((item) => {
+      const categoryLabel = canonicalCategoryName(item.category || "");
+      if (active && categoryLabel !== active) return false;
+      if (term && !String(item.name || "").toLowerCase().includes(term)) return false;
+      if (item.active === false) return false;
+      return true;
+    });
+  }, [displayProducts, activeCategory, searchTerm]);
+
+  const handleSwitchRole = useCallback(() => {
+    setShowProfileModal(false);
+    navigate("/roles", { replace: true });
+    window.location.reload();
+  }, [navigate]);
+
+  const handleSignOut = useCallback(async () => {
+    setShowProfileModal(false);
+    if (logout) {
+      try {
+        await logout();
+      } catch (err) {
+        console.warn("Logout failed:", err);
+      }
+    }
+    navigate("/user-login", { replace: true });
+    window.location.reload();
+  }, [logout, navigate]);
+
+  const handleAvatarUpload = useCallback(
+    async (file) => {
+      if (!file) return;
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+      try {
+        await updateProfile({ avatarUrl: dataUrl });
+        showToast({
+          message: "Profile photo updated",
+          type: "success",
+          ttl: 2500,
+        });
+      } catch (error) {
+        const message =
+          error?.message || "Failed to update profile photo";
+        showToast({ message, type: "error", ttl: 3000 });
+        throw error;
+      }
+    },
+    [updateProfile, showToast]
   );
 
-  // recompute product list
-  const filteredProducts = useMemo(() => {
-    const baseList = activeCategory && placeholders[activeCategory]
-      ? placeholders[activeCategory]
-      : Object.values(placeholders).flat();
-
-    return baseList
-      .filter(i => (itemAvailability[i.name] ?? true)) // keep compatibility, but ItemsTab drives this now from inventory
-      .filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [activeCategory, itemAvailability, searchTerm]);
+  const handleChangePassword = useCallback(
+    async (oldPassword, newPassword) => {
+      try {
+        await changePassword(oldPassword, newPassword);
+        showToast({
+          message: "Password updated successfully",
+          type: "success",
+          ttl: 2500,
+        });
+      } catch (error) {
+        const message = error?.message || "Failed to change password";
+        showToast({ message, type: "error", ttl: 3000 });
+        throw error;
+      }
+    },
+    [changePassword, showToast]
+  );
 
   const openEditModal = (item, index) => {
     setModalProduct({
@@ -187,7 +453,23 @@ export default function POSMain() {
 
   // open product details/modal (when clicking item in ProductGrid)
   const openProductModal = (item) => {
-    setModalProduct({ ...item, size: item.sizes[0], selectedAddons: [], quantity: 1, notes: "" });
+    if (!item?.id) {
+      showToast({
+        message: "This item is not available in inventory yet.",
+        type: "warning",
+        ttl: 2600,
+      });
+      return;
+    }
+    const defaultSize =
+      Array.isArray(item.sizes) && item.sizes.length ? item.sizes[0] : null;
+    setModalProduct({
+      ...item,
+      size: defaultSize,
+      selectedAddons: [],
+      quantity: 1,
+      notes: "",
+    });
     setShowModal(true);
     setEditingCartIndex(null);
     setModalEdited(false);
@@ -202,9 +484,18 @@ export default function POSMain() {
   };
 
   const applyCartItemChanges = () => {
-    const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
-    const sizeCost = modalProduct.size.price;
-    const price = (modalProduct.price + addonsCost + sizeCost) * modalProduct.quantity;
+    const addonList = Array.isArray(modalProduct.selectedAddons)
+      ? modalProduct.selectedAddons
+      : [];
+    const addonsCost = addonList.reduce(
+      (sum, addon) => sum + Number(addon?.price || 0),
+      0
+    );
+    const sizeCost = modalProduct.size
+      ? Number(modalProduct.size.price || 0)
+      : 0;
+    const quantity = Number(modalProduct.quantity || 1);
+    const price = (Number(modalProduct.price || 0) + addonsCost + sizeCost) * quantity;
 
     setCart(prev => prev.map((item, idx) => {
       if (idx === editingCartIndex) {
@@ -221,113 +512,285 @@ export default function POSMain() {
     setModalEdited(false);
   };
 
-  // init availability (legacy fallback)
-  useEffect(() => {
-    if (Object.keys(itemAvailability).length === 0) {
-      const avail = {};
-      Object.values(placeholders)
-        .flat()
-        .forEach((i) => (avail[i.name] = true));
-      setItemAvailability(avail);
-    }
-  }, []);
-
-  // totals
+  // ---- totals (compute BEFORE using in useCallback deps) ----
   const subtotal = cart.reduce((sum, i) => sum + i.totalPrice, 0);
   const discountAmt = +(subtotal * discountPct / 100).toFixed(2);
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - discountAmt).toFixed(2);
 
-  // add to cart from modal
-  const addToCart = () => {
-    const addonsCost = modalProduct.selectedAddons.reduce((s, a) => s + a.price, 0);
-    const sizeCost = modalProduct.size.price;
-    const price = (modalProduct.price + addonsCost + sizeCost) * modalProduct.quantity;
-    setCart((p) => [
-      ...p,
-      { ...modalProduct, quantity: modalProduct.quantity, size: modalProduct.size, selectedAddons: modalProduct.selectedAddons, notes: modalProduct.notes, totalPrice: price }
-    ]);
-    setShowModal(false);
-  };
+  useEffect(() => {
+    const amount = Number(total || 0);
+    setQrPayment((prev) => {
+      if (Number(prev.amount || 0) === amount) return prev;
+      return { ...prev, amount };
+    });
+  }, [total]);
 
-  // Broadcast helper
-  const broadcastCart = (payload) => {
-    if (customerWinRef.current && !customerWinRef.current.closed) {
-      try {
-        customerWinRef.current.postMessage(payload, window.location.origin);
-      } catch (e) {}
+  useEffect(() => {
+    if (cart.length === 0) {
+      setQrPayment((prev) => {
+        if (
+          prev.status === "idle" &&
+          !prev.reference &&
+          !prev.payload &&
+          Number(prev.amount || 0) === Number(total || 0)
+        ) {
+          return prev;
+        }
+        return {
+          status: "idle",
+          reference: null,
+          payload: null,
+          amount: Number(total || 0),
+        };
+      });
     }
-    try { localStorage.setItem('pos_cart', JSON.stringify({ ...payload, _t: Date.now() })); } catch(e) {}
-  };
+  }, [cart.length, total]);
+
+  const handleQrReady = useCallback(
+    (info) => {
+      if (!info) {
+        setQrPayment({
+          status: "idle",
+          reference: null,
+          payload: null,
+          amount: Number(total || 0),
+        });
+        return;
+      }
+      setQrPayment({
+        status: info.status || "waiting",
+        reference: info.reference || null,
+        payload: info.payload || null,
+        amount: Number(total || 0),
+      });
+    },
+    [total]
+  );
+
+  const handleQrStatusChange = useCallback(
+    (next) => {
+      if (!next) {
+        setQrPayment({
+          status: "idle",
+          reference: null,
+          payload: null,
+          amount: Number(total || 0),
+        });
+        return;
+      }
+      setQrPayment((prev) => ({
+        status: next.status || prev.status || "idle",
+        reference: next.reference ?? prev.reference ?? null,
+        payload: next.payload ?? prev.payload ?? null,
+        amount: Number(total || 0),
+      }));
+    },
+    [total]
+  );
+
+  // ---- server-backed finalizeTransaction ----
+  const finalizeTransaction = useCallback(async (paymentInfo = {}) => {
+    if (cart.length === 0) {
+      alert('Cart is empty.');
+      return;
+    }
+
+    const methodLabel = paymentInfo.method || paymentMethod || 'Cash';
+    const normalizedMethod =
+      methodLabel === 'Card'
+        ? 'CARD'
+        : methodLabel === 'QRS'
+          ? 'QR'
+          : 'CASH';
+
+    const tendered = Number(
+      paymentInfo.tendered ?? paymentInfo.amount ?? total
+    );
+
+    const orderPayload = {
+      type: 'WALKIN',
+      items: cart.map((item) => ({
+        productId: item.id,
+        name: item.name,
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 1),
+        size: item.size
+          ? { label: item.size.label || item.size.name || '', price: Number(item.size.price || 0) }
+          : null,
+        addons: Array.isArray(item.selectedAddons)
+          ? item.selectedAddons.map((addon) => ({
+              label: addon.label || addon.name || '',
+              price: Number(addon.price || 0),
+            }))
+          : [],
+        notes: item.notes || '',
+      })),
+      discountPct: Number(discountPct || 0),
+      discountValue: 0,
+      discountType: discountType || null,
+      couponCode: couponCode || null,
+      couponValue: 0,
+      taxRate: 0.12,
+      payment: {
+        method: normalizedMethod,
+        tendered,
+        amount: Number(total),
+        ref:
+          paymentInfo.authCode ||
+          paymentInfo.reference ||
+          paymentInfo.ref ||
+          null,
+        details: paymentInfo || null,
+      },
+    };
+
+    try {
+      const created = await createOrder(orderPayload);
+      const mappedTx = mapOrderToTx(created);
+      const uiOrder = mapOrderToUiOrder(created);
+
+      const ownsOrder = !currentUserId || uiOrder.cashierId === currentUserId;
+      setOrders((prev) => {
+        const next = prev.filter(
+          (o) =>
+            (o.orderDbId ?? o.id) !== (uiOrder.orderDbId ?? uiOrder.id) &&
+            o.orderID !== uiOrder.orderID
+        );
+        return ownsOrder ? [uiOrder, ...next] : next;
+      });
+      setTransactions((prev) => {
+        const remaining = prev.filter((t) => t.id !== mappedTx.id);
+        return !currentUserId || mappedTx.cashierId === currentUserId
+          ? [mappedTx, ...remaining]
+          : remaining;
+      });
+
+      // update inventory UI
+      try {
+        applyTransaction(
+          cart.map((item) => ({
+            id: item.id,
+            name: item.name,
+            qty: Number(item.quantity || 1),
+          }))
+        );
+      } catch (_e) {}
+
+      const paymentSummary = {
+        method: methodLabel,
+        tendered,
+        change: Number((tendered - total).toFixed(2)),
+        total,
+        ref:
+          paymentInfo.authCode ||
+          paymentInfo.reference ||
+          paymentInfo.ref ||
+          null,
+      };
+      setLastPaymentInfo(paymentSummary);
+      setSelectedTransaction(mappedTx);
+      setShowReceiptModal(true);
+      setShowOrderSuccess(true);
+
+      setCart([]);
+      setPaymentMethod('');
+      setDiscountType('');
+      setDiscountPct(0);
+      setCouponCode('');
+      setQrPayment({
+        status: "idle",
+        reference: null,
+        payload: null,
+        amount: 0,
+      });
+
+      await refreshOrdersAndVoids();
+    } catch (error) {
+      console.error('Failed to finalize transaction:', error);
+      alert(error?.message || 'Failed to complete transaction.');
+    }
+  }, [
+    cart,
+    discountPct,
+    discountType,
+    couponCode,
+    total,
+    paymentMethod,
+    applyTransaction,
+    refreshOrdersAndVoids,
+    currentUserId,
+  ]);
+
+  const buildCustomerPayload = useCallback(() => {
+    const amount = Number(qrPayment.amount ?? total ?? 0);
+    return {
+      cart,
+      subtotal,
+      tax,
+      total,
+      discountPct,
+      discountAmt,
+      discountType,
+      couponCode,
+      paymentMethod,
+      qrPayment: {
+        status: qrPayment.status || "idle",
+        reference: qrPayment.reference || null,
+        payload: qrPayment.payload || null,
+        amount,
+      },
+    };
+  }, [
+    cart,
+    subtotal,
+    tax,
+    total,
+    discountPct,
+    discountAmt,
+    discountType,
+    couponCode,
+    paymentMethod,
+    qrPayment,
+  ]);
+
+  const broadcastCart = useCallback(
+    (override) => {
+      const payload = override || buildCustomerPayload();
+      if (customerWinRef.current && !customerWinRef.current.closed) {
+        try {
+          customerWinRef.current.postMessage(payload, window.location.origin);
+        } catch (_e) {}
+      }
+    },
+    [buildCustomerPayload]
+  );
 
   // open/focus customer view
-  const openCustomerView = () => {
-    const url = window.location.origin + '/customer-view';
+  const openCustomerView = useCallback(() => {
+    const payload = buildCustomerPayload();
+    const url = window.location.origin + "/customer-view";
     if (!customerWinRef.current || customerWinRef.current.closed) {
       customerWinRef.current = window.open(
         url,
-        'customerView',
-        'width=420,height=780,toolbar=no,menubar=no'
+        "customerView",
+        "width=420,height=780,toolbar=no,menubar=no"
       );
-      setTimeout(() => broadcastCart({ cart, subtotal, tax, total, discountPct }), 300);
+      setTimeout(() => broadcastCart(payload), 300);
     } else {
       customerWinRef.current.focus();
-      broadcastCart({ cart, subtotal, tax, total, discountPct });
+      broadcastCart(payload);
     }
-  };
+  }, [buildCustomerPayload, broadcastCart]);
 
-  // clear logs helper
-  const clearAllLogs = (opts = { confirm: true }) => {
-    if (opts.confirm && !window.confirm('Clear ALL orders, transactions, and void logs? This is irreversible. A backup will be downloaded. Continue?')) return;
-
-    try {
-      const backup = {
-        orders: JSON.parse(localStorage.getItem('orders') || '[]'),
-        transactions: JSON.parse(localStorage.getItem('transactions') || '[]'),
-        voidLogs: JSON.parse(localStorage.getItem('voidLogs') || '[]'),
-        exportedAt: new Date().toISOString()
-      };
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pos_backup_' + new Date().toISOString().replace(/[:.]/g,'-') + '.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Backup failed', e);
-    }
-
-    try {
-      localStorage.setItem('orders', '[]');
-      localStorage.setItem('transactions', '[]');
-      localStorage.setItem('voidLogs', '[]');
-
-      setOrders([]);
-      setTransactions([]);
-      setVoidLogs([]);
-
-      setShowHistoryModal(false);
-      setShowVoidDetailModal(false);
-      setShowReceiptModal(false);
-
-      alert('Orders, transactions, and void logs cleared. Backup (if created) was downloaded.');
-    } catch (e) {
-      console.error('Failed to clear logs', e);
-      alert('Failed to clear logs. See console for details.');
-    }
-  };
-
-  // ensure broadcast on every cart change
+  // ensure broadcast on every cart/payment change
   useEffect(() => {
-    broadcastCart({ cart, subtotal, tax, total, discountPct });
-  }, [cart, subtotal, tax, total, discountPct]);
+    broadcastCart();
+  }, [broadcastCart]);
 
   // Reset active category when moving away from Menu/Items
   useEffect(() => {
-    if (!(activeTab === "Menu" || activeTab === "Items")) {
+    if (!(activeTab === "Menu" || activeTab === "Status")) {
       setActiveCategory(null);
     }
   }, [activeTab]);
@@ -339,289 +802,296 @@ export default function POSMain() {
     }
   }, [cart.length]);
 
-  // PAYMENT FLOW (unchanged)
-  const initiatePayment = () => {
-    if (!paymentMethod) {
-      alert("Please choose a payment method first.");
-      return;
-    }
-    if (paymentMethod === "Cash") setShowCashModal(true);
-    else if (paymentMethod === "Card") setShowCardModal(true);
-    else if (paymentMethod === "QRS") setShowQRModal(true);
-    else alert("Unknown payment method.");
-  };
+  // --- VOID FLOW (server-backed) ---
+  const triggerVoid = useCallback(
+    (type, txOrIndex = null, maybeIndex = null) => {
+      let tx = null;
+      let index = null;
 
-  // finalize transaction — now includes discountType & couponCode in transaction and paymentDetails
-  const finalizeTransaction = (paymentInfo = {}) => {
-    if (cart.length === 0) { alert("Cart is empty."); return; }
-
-    const subtotalCalc = cart.reduce((sum, item) => {
-      const base = item.price ?? 0;
-      const sizeUp = item.size?.price ?? 0;
-      const addons = (item.selectedAddons || []).reduce((a, x) => a + (x.price || 0), 0);
-      return sum + (base + sizeUp + addons) * (item.quantity || 1);
-    }, 0);
-
-    const computedDiscountAmt = +(subtotalCalc * (discountPct / 100)).toFixed(2);
-    const taxCalc = +(subtotalCalc * 0.12).toFixed(2);
-    const totalCalc = +(subtotalCalc + taxCalc - computedDiscountAmt).toFixed(2);
-
-    const orderID = generateOrderID();
-    const transactionID = generateTransactionID();
-
-    // Normalize payment info
-    let tendered, change;
-    if (paymentInfo.method === "Cash") {
-      tendered = paymentInfo.tendered;
-      change = paymentInfo.change;
-    } else {
-      tendered = totalCalc;
-      change = 0;
-    }
-
-    // include discountType and couponCode that are current in POSMain state
-    const newTransaction = {
-      id: transactionID,
-      transactionID,
-      orderID,
-      items: cart.map((item) => ({ ...item, voided: false })),
-      subtotal: subtotalCalc,
-      discountPct,
-      discountAmt: computedDiscountAmt,
-      discountType: discountType || "",    // persisted
-      couponCode: couponCode || "",        // persisted
-      tax: taxCalc,
-      total: totalCalc,
-      method: paymentInfo.method || paymentMethod || "N/A",
-      paymentDetails: { ...paymentInfo, tendered, change, coupon: couponCode || paymentInfo?.coupon || null },
-      tendered,
-      change,
-      cashier: userName || "N/A",
-      date: new Date().toLocaleString(),
-      voided: false,
-    };
-
-    // persist transactions
-    const existing = JSON.parse(localStorage.getItem("transactions") || "[]");
-    const updatedTransactions = [newTransaction, ...existing];
-    localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
-    setTransactions(updatedTransactions);
-
-    const newOrder = {
-      id: orderID,
-      orderID,
-      transactionID,
-      items: cart.map(item => ({ ...item, voided: false })),
-      status: "pending",
-      date: new Date().toLocaleString(),
-      discountType: discountType || "",
-      couponCode: couponCode || ""
-    };
-
-    // persist orders
-    const existingOrders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const updatedOrders = [...existingOrders, newOrder];
-    localStorage.setItem("orders", JSON.stringify(updatedOrders));
-    setOrders(updatedOrders);
-
-    // Apply stock changes to InventoryContext
-    try {
-      // create an array of { name, qty } — InventoryContext supports name matching
-      const orderedItems = cart.map(it => ({ name: it.name, qty: Number(it.quantity || 1) }));
-      applyTransaction(orderedItems);
-    } catch (e) {
-      console.error("Failed to apply transaction to inventory:", e);
-    }
-
-    // Build a normalized payment summary to show in Order Success
-    const paymentSummary = {
-      method: paymentInfo.method || paymentMethod || "N/A",
-      tendered,
-      change,
-      total: totalCalc,
-      // preserve other useful fields if present
-      ...(paymentInfo.cardNumberMasked ? { cardNumberMasked: paymentInfo.cardNumberMasked } : {}),
-      ...(paymentInfo.authCode ? { authCode: paymentInfo.authCode } : {}),
-      ...(paymentInfo.reference ? { reference: paymentInfo.reference } : {}),
-      ...(paymentInfo.payload ? { payload: paymentInfo.payload } : {})
-    };
-
-    setCart([]);
-    setPaymentMethod("");
-    setShowOrderSuccess(true);
-    setLastPaymentInfo(paymentSummary); // normalized and always contains tendered/change
-    setSelectedTransaction(newTransaction);
-
-    setShowCashModal(false);
-    setShowCardModal(false);
-    setShowQRModal(false);
-
-    try { if (customerWinRef.current && !customerWinRef.current.closed) customerWinRef.current.close(); } catch(e){}
-    customerWinRef.current = null;
-
-    // Reset the auto-open flag so next transaction can auto-popup again
-    setCustomerViewOpened(false);
-  };
-
-  // --- VOID FLOW IMPLEMENTATION (unchanged) ---
-  const triggerVoid = (type, indexOrTx = null) => {
-    if (indexOrTx && typeof indexOrTx === 'object' && indexOrTx.id) {
-      setVoidContext({ type, tx: indexOrTx, index: null });
-    } else {
-      const txFromHistory = historyContext?.tx || selectedTransaction || null;
-      setVoidContext({ type, tx: txFromHistory, index: typeof indexOrTx === 'number' ? indexOrTx : null });
-    }
-    setShowFirstAuth(true);
-    setShowReasonModal(false);
-    setShowFinalAuth(false);
-    setPendingVoidReason("");
-  };
-
-  const onFirstAuthConfirm = (passwordEntered) => {
-    if (passwordEntered !== basePassword) {
-      alert("Wrong manager password.");
-      return;
-    }
-    setShowFirstAuth(false);
-    setShowReasonModal(true);
-  };
-
-  const onReasonSubmit = (reason) => {
-    setPendingVoidReason(reason);
-    setShowReasonModal(false);
-    setShowFinalAuth(true);
-  };
-
-  const onFinalAuthConfirm = (passwordEntered) => {
-    if (passwordEntered !== basePassword) {
-      alert("Wrong manager password.");
-      return;
-    }
-    confirmVoid(pendingVoidReason);
-    setShowFinalAuth(false);
-    setPendingVoidReason("");
-  };
-
-  const confirmVoid = (reason = "No reason provided") => {
-    const { type, tx, index } = voidContext || {};
-    if (!tx) {
-      alert("No transaction selected for void.");
-      setShowFirstAuth(false);
-      setShowReasonModal(false);
-      setShowFinalAuth(false);
-      setVoidContext({ type: null, index: null, tx: null });
-      setPendingVoidReason("");
-      return;
-    }
-
-    // (void logic unchanged) ...
-    const currentTxs = JSON.parse(localStorage.getItem("transactions") || "[]");
-    const updatedTransactions = currentTxs.map(t => {
-      if (t.id !== tx.id) return t;
-      const updatedItems = t.items.map((it, idx) =>
-        (type === "transaction" || idx === index) ? { ...it, voided: true } : it
-      );
-      const subtotal = updatedItems
-        .filter(it => !it.voided)
-        .reduce((sum, it) => {
-          const base = typeof it.price === "number" ? it.price : 0;
-          const sizeUp = it.size?.price || 0;
-          const addons = (it.selectedAddons || []).reduce((a, x) => a + (x.price || 0), 0);
-          return sum + (base + sizeUp + addons) * it.quantity;
-        }, 0);
-      const discountAmt = +(subtotal * (t.discountPct || 0) / 100).toFixed(2);
-      const tax = +(subtotal * 0.12).toFixed(2);
-      const total = +(subtotal + tax - discountAmt).toFixed(2);
-      return {
-        ...t,
-        items: updatedItems,
-        voided: type === "transaction" ? true : t.voided,
-        subtotal,
-        discountAmt,
-        tax,
-        total,
-      };
-    });
-
-    localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
-    setTransactions(updatedTransactions);
-
-    const currentOrders = JSON.parse(localStorage.getItem("orders") || "[]");
-    const updatedOrders = currentOrders.map(order => {
-      if (order.transactionID !== tx.transactionID) return order;
-      if (type === "transaction") {
-        return {
-          ...order,
-          voided: true,
-          status: "cancelled",
-          items: order.items.map(it => ({ ...it, voided: true }))
-        };
-      } else {
-        const txItem = tx.items[index];
-        const updatedItems = order.items.map(it => {
-          const isMatch = it.name === txItem.name
-            && (it.size?.label || "") === (txItem.size?.label || "")
-            && it.price === txItem.price
-            && !it.voided;
-          return isMatch ? { ...it, voided: true } : it;
-        });
-        const allVoided = updatedItems.length > 0 && updatedItems.every(i => i.voided);
-        return {
-          ...order,
-          items: updatedItems,
-          ...(allVoided ? { status: "cancelled", voided: true } : {})
-        };
+      if (txOrIndex && typeof txOrIndex === "object") {
+        tx = txOrIndex;
+      } else if (typeof txOrIndex === "number") {
+        index = txOrIndex;
       }
-    });
 
-    localStorage.setItem("orders", JSON.stringify(updatedOrders));
-    setOrders(updatedOrders);
+      if (typeof maybeIndex === "number") {
+        index = maybeIndex;
+      } else if (maybeIndex && typeof maybeIndex === "object") {
+        tx = maybeIndex;
+      }
 
-    const existingLogs = JSON.parse(localStorage.getItem("voidLogs") || "[]");
-    const existing = existingLogs.find(v => v.txId === tx.id);
-    const newVoidedItem = tx.items[index] ? { ...tx.items[index] } : null;
-    const newVoidedDetailed =
-      type === "transaction" ? tx.items.map(it => ({ ...it })) : [...(existing?.voidedItemsDetailed || []), newVoidedItem].filter(Boolean);
-    const uniqueDetailedItems = Array.from(
-      new Map(newVoidedDetailed.map(it => {
-        const key = `${it.name}-${it.size?.label || "N/A"}-${it.notes || ""}-${(it.selectedAddons || []).map(a => a.label).join(",")}`;
-        return [key, it];
-      })).values()
-    );
-    const voidedItemNames = uniqueDetailedItems.map(i => i.name);
-    const newLog = {
-      voidId: existing?.voidId || generateVoidID(),
-      txId: existing?.txId || tx.id,
-      transactionId: tx.transactionID,
-      cashier: userName,
-      manager: "Admin",
-      reason: reason || "No reason provided",
-      dateTime: new Date().toLocaleString(),
-      type: type === "transaction" ? "Full Transaction Void" : "Item Void",
-      fullyVoided: type === "transaction",
-      voidedItems: Array.from(new Set(voidedItemNames)),
-      voidedItemsDetailed: uniqueDetailedItems,
-    };
-    const updatedLogs = existing ? existingLogs.map(v => (v.txId === tx.id ? newLog : v)) : [newLog, ...existingLogs];
-    localStorage.setItem("voidLogs", JSON.stringify(updatedLogs));
-    setVoidLogs(updatedLogs);
+      if (!tx) {
+        tx = historyContext?.tx || selectedTransaction || null;
+      }
 
-    if (historyContext?.type === "detail" && historyContext.tx?.id === tx.id) {
-      const refreshedTx = updatedTransactions.find(t => t.id === tx.id);
-      setHistoryContext({ type: "detail", tx: refreshedTx });
-    }
-    if (historyContext?.type === "orderDetail" && historyContext.order?.transactionID === tx.transactionID) {
-      const refreshedOrder = updatedOrders.find(o => o.transactionID === tx.transactionID);
-      setHistoryContext({ type: "orderDetail", order: refreshedOrder });
-    }
+      if (!tx) {
+        showToast({
+          message: "No transaction selected for void.",
+          type: "warning",
+          ttl: 2600,
+        });
+        return;
+      }
 
-    setShowFirstAuth(false);
-    setShowReasonModal(false);
-    setShowFinalAuth(false);
-    setVoidContext({ type: null, index: null, tx: null });
-    setPendingVoidReason("");
-    setShowHistoryModal(false);
-  };
+      const cashierLabel = currentUser?.fullName || userName;
+
+      const txForModal = tx ? { ...tx, cashier: cashierLabel } : tx;
+
+      setVoidContext({ type, tx: txForModal, index });
+      setManagerAuth(null);
+      setShowReasonModal(false);
+      setShowManagerAuth(true);
+    },
+    [historyContext, selectedTransaction, showToast, currentUser, userName]
+  );
+
+  const handleHistoryVoidRequest = useCallback(
+    (tx, itemIndex) => {
+      if (!tx) return;
+      setShowHistoryModal(false);
+      if (typeof itemIndex === "number") {
+        triggerVoid("item", tx, itemIndex);
+      } else {
+        triggerVoid("transaction", tx);
+      }
+    },
+    [triggerVoid]
+  );
+
+  const confirmVoid = useCallback(
+    async (reason = "No reason provided", itemIds = []) => {
+      const { type, tx, index } = voidContext || {};
+
+      if (!tx) {
+        showToast({
+          message: "No transaction selected for void.",
+          type: "warning",
+          ttl: 2600,
+        });
+        setShowReasonModal(false);
+        setShowManagerAuth(false);
+        setManagerAuth(null);
+        setVoidContext({ type: null, index: null, tx: null });
+        return;
+      }
+
+      if (!managerAuth?.token) {
+        showToast({
+          message: "Manager approval is required before voiding.",
+          type: "warning",
+          ttl: 3000,
+        });
+        setShowReasonModal(false);
+        setShowManagerAuth(true);
+        return;
+      }
+
+      const cleanedReason = (reason || "No reason provided").trim() || "No reason provided";
+      const payload = {
+        type: type === "transaction" ? "TRANSACTION" : "ITEM",
+        reason: cleanedReason,
+        notes: null,
+      };
+
+      let orderItemIds = Array.isArray(itemIds) ? itemIds.filter(Boolean) : [];
+
+      if (type === "item" && !orderItemIds.length && typeof index === "number") {
+        const fallbackId = tx.items?.[index]?.orderItemId ?? tx.items?.[index]?.id ?? null;
+        if (fallbackId != null) {
+          orderItemIds = [fallbackId];
+        }
+      }
+
+      if (type === "item") {
+        if (!orderItemIds.length) {
+          showToast({
+            message: "Select at least one item to void.",
+            type: "warning",
+            ttl: 2800,
+          });
+          setShowReasonModal(true);
+          return;
+        }
+        payload.items = orderItemIds.map((id) => ({ orderItemId: Number(id) }));
+      }
+
+      try {
+        const orderIdentifier =
+          tx.orderDbId ??
+          tx.orderId ??
+          tx.orderID ??
+          tx.id;
+
+        if (orderIdentifier == null) {
+          throw new Error("Unable to determine the order to void.");
+        }
+
+        const updatedOrder = await voidOrderWithToken(orderIdentifier, payload, managerAuth.token);
+        const mappedTx = mapOrderToTx(updatedOrder);
+        const uiOrder = mapOrderToUiOrder(updatedOrder);
+
+        setOrders((prev) => {
+          let found = false;
+          const next = prev.map((order) => {
+            const matches =
+              order.orderID === uiOrder.orderID ||
+              (order.orderDbId ?? order.id) === (uiOrder.orderDbId ?? uiOrder.id);
+            if (matches) {
+              found = true;
+              return { ...order, ...uiOrder };
+            }
+            return order;
+          });
+          return found ? next : [uiOrder, ...next];
+        });
+        setTransactions((prev) =>
+          prev.map((transaction) =>
+            transaction.id === mappedTx.id ? mappedTx : transaction
+          )
+        );
+
+        const normalizedLogs = Array.isArray(updatedOrder.voidLogs)
+          ? updatedOrder.voidLogs.map((log) => normalizeVoidLog(log)).filter(Boolean)
+          : [];
+        if (normalizedLogs.length) {
+          setVoidLogs((prev) => {
+            const existingIds = new Set(normalizedLogs.map((log) => log.voidId));
+            const remaining = prev.filter((log) => !existingIds.has(log.voidId));
+            const merged = [...normalizedLogs, ...remaining];
+            return filterVoidLogsForUser(merged, currentUserId);
+          });
+        }
+
+        await refreshOrdersAndVoids();
+
+        if (historyContext?.type === "detail" && historyContext.tx?.id === mappedTx.id) {
+          setHistoryContext({ type: "detail", tx: mappedTx });
+        }
+        if (
+          historyContext?.type === "orderDetail" &&
+          (
+            historyContext.order?.orderID === uiOrder.orderID ||
+            (historyContext.order?.orderDbId ?? historyContext.order?.id) ===
+              (uiOrder.orderDbId ?? uiOrder.id)
+          )
+        ) {
+          setHistoryContext({ type: "orderDetail", order: uiOrder });
+        }
+
+        showToast({
+          message: "Void processed successfully.",
+          type: "success",
+          ttl: 2800,
+        });
+      } catch (error) {
+        console.error("Failed to void transaction:", error);
+        showToast({
+          message: error?.message || "Failed to void transaction.",
+          type: "error",
+          ttl: 3200,
+        });
+      } finally {
+        setShowReasonModal(false);
+        setShowManagerAuth(false);
+        setManagerAuth(null);
+        setVoidContext({ type: null, index: null, tx: null });
+        setShowHistoryModal(false);
+      }
+    },
+    [
+      voidContext,
+      managerAuth,
+      refreshOrdersAndVoids,
+      historyContext,
+      showToast,
+      currentUserId,
+    ]
+  );
+
+  const handleManagerAuthConfirm = useCallback(
+    async ({ identifier, password }) => {
+      const trimmedId = String(identifier || "").trim();
+      const trimmedPassword = String(password || "");
+
+      if (!trimmedId || !trimmedPassword) {
+        showToast({
+          message: "Enter a manager's credentials to continue.",
+          type: "warning",
+          ttl: 2600,
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch(`${BASE_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: trimmedId,
+            schoolId: trimmedId,
+            password: trimmedPassword,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || "Manager authentication failed.");
+        }
+
+        const managerUser = data?.user;
+        if (!managerUser) {
+          throw new Error("Manager account not found.");
+        }
+
+        const managerRole = String(managerUser.role || "").toUpperCase();
+        const isSameUser = currentUser?.id && managerUser.id === currentUser.id;
+        const isSuperAdmin = managerRole === "SUPER_ADMIN";
+
+        if (managerRole === "CASHIER" && !isSuperAdmin) {
+          throw new Error("Only a manager or super admin can approve voids.");
+        }
+
+        if (isSameUser && !isSuperAdmin) {
+          throw new Error("Another manager must approve this void.");
+        }
+
+        setManagerAuth({ token: data.token, user: managerUser });
+        setShowManagerAuth(false);
+        setShowReasonModal(true);
+
+        showToast({
+          message: `Manager approval granted by ${managerUser.fullName || managerUser.username || "manager"}.`,
+          type: "success",
+          ttl: 2600,
+        });
+      } catch (error) {
+        console.error("Manager authentication failed:", error);
+        showToast({
+          message: error?.message || "Manager authentication failed.",
+          type: "error",
+          ttl: 3200,
+        });
+      }
+    },
+    [currentUser, showToast]
+  );
+
+  const onReasonSubmit = useCallback(
+    (reason, itemIds = []) => {
+      const trimmed = (reason || "").trim();
+      if (!trimmed) {
+        showToast({
+          message: "Please enter a reason for voiding.",
+          type: "warning",
+          ttl: 2600,
+        });
+        return;
+      }
+      setShowReasonModal(false);
+      confirmVoid(trimmed, itemIds);
+    },
+    [confirmVoid, showToast]
+  );
 
   useEffect(() => {
     if (activeTab === "Discount") {
@@ -630,11 +1100,7 @@ export default function POSMain() {
     }
   }, [activeTab]);
 
-  const updateOrderStatus = (orderID, newStatus) => {
-    setOrders(prev => prev.map(o => o.orderID === orderID ? { ...o, status: newStatus } : o));
-  };
-
-  const categoriesEnabled = activeTab === "Menu" || activeTab === "Status";
+  const categoriesEnabled = activeTab === "Menu" || activeTab === "Status";
 
   return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
@@ -643,7 +1109,7 @@ export default function POSMain() {
         {/* HEADER */}
         <Header
           userName={userName}
-           profilePic={profilePic}
+          profilePic={profilePic}
           onProfileClick={() => setShowProfileModal(true)}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
@@ -668,12 +1134,12 @@ export default function POSMain() {
             <TabsPanel
               activeTab={activeTab}
               onTabSelect={(key) => {
-                 if (key === "Discount") {
+                if (key === "Discount") {
                   setShowDiscountModal(true);
                   return;
-                 }
-                 setActiveTab(key);
-                 setSearchTerm("");
+                }
+                setActiveTab(key);
+                setSearchTerm("");
               }}
             />
 
@@ -681,7 +1147,7 @@ export default function POSMain() {
             <div className="flex-1 flex overflow-hidden">
               {/* MENU */}
               {activeTab === "Menu" && (
-                <div className="flex-1 overflow-y-auto pt-2 px-6 pb-6 scrollbar">
+                <div className="flex-1 overflow-y-auto pt-2 px-6 pb-6 no-scrollbar">
                   <ProductGrid products={filteredProducts} onSelect={openProductModal} />
                 </div>
               )}
@@ -722,17 +1188,16 @@ export default function POSMain() {
                   historyContext={historyContext}
                   setHistoryContext={setHistoryContext}
                   transactions={transactions}
+                  shopDetails={shopDetails}
                 />
               )}
 
               {/* Items Availability */}
               {activeTab === "Status" && (
                 <ItemsTab
-                  placeholders={placeholders}
+                  products={combinedProducts}
                   activeCategory={activeCategory}
                   searchTerm={searchTerm}
-                  itemAvailability={itemAvailability}         // left for compatibility but not authoritative now
-                  setItemAvailability={setItemAvailability}
                 />
               )}
             </div>
@@ -746,32 +1211,37 @@ export default function POSMain() {
         subtotal={subtotal}
         discountPct={discountPct}
         discountAmt={discountAmt}
-        discountType={discountType}   // PASSING discountType now
-        couponCode={couponCode}       // PASSING couponCode now
+        discountType={discountType}
+        couponCode={couponCode}
         tax={tax}
         total={total}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}
         openEditModal={openEditModal}
         removeCartItem={removeCartItem}
-        initiatePayment={initiatePayment}
+        initiatePayment={() => {
+          if (!paymentMethod) {
+            alert("Please choose a payment method first.");
+            return;
+          }
+          if (paymentMethod === "Cash") setShowCashModal(true);
+          else if (paymentMethod === "Card") setShowCardModal(true);
+          else if (paymentMethod === "QRS") setShowQRModal(true);
+          else alert("Unknown payment method.");
+        }}
         setShowHistoryModal={setShowHistoryModal}
         transactions={transactions}
         openCustomerView={openCustomerView}
-        // expose triggerVoid so other components can start void flow (if they want)
-        triggerVoid={(type, idxOrTx) => triggerVoid(type, idxOrTx)}
+        triggerVoid={triggerVoid}
       />
 
       {/* History & Void Modal */}
-      {showHistoryModal && (
-        <HistoryModal
-          transactions={transactions}
-          setShowHistoryModal={setShowHistoryModal}
-          setVoidContext={setVoidContext}
-          setShowFirstAuth={() => setShowFirstAuth(true)}
-          setShowVoidPassword={() => setShowFirstAuth(true)}
-        />
-      )}
+      <HistoryModal
+        open={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        transactions={transactions}
+        onRequestVoid={handleHistoryVoidRequest}
+      />
 
       {/* Receipt Modal */}
       {showReceiptModal && selectedTransaction && (
@@ -782,26 +1252,27 @@ export default function POSMain() {
         />
       )}
 
-      {/* First-level Manager Password Modal */}
-      <VoidPasswordModal
-        isOpen={showFirstAuth}
-        onClose={() => { setShowFirstAuth(false); }}
-        onConfirm={(passwordEntered) => onFirstAuthConfirm(passwordEntered)}
+      {/* Manager Authentication Modal */}
+      <ManagerAuthModal
+        isOpen={showManagerAuth}
+        onClose={() => {
+          setShowManagerAuth(false);
+          setManagerAuth(null);
+          setVoidContext({ type: null, index: null, tx: null });
+        }}
+        onConfirm={handleManagerAuthConfirm}
       />
 
       {/* Reason + Detail Modal */}
       <VoidReasonModal
         isOpen={showReasonModal}
-        onClose={() => { setShowReasonModal(false); }}
+        onClose={() => {
+          setShowReasonModal(false);
+          setManagerAuth(null);
+          setVoidContext({ type: null, index: null, tx: null });
+        }}
         voidContext={voidContext}
-        onSubmit={(reason) => onReasonSubmit(reason)}
-      />
-
-      {/* Final-level Manager Password Modal */}
-      <VoidPasswordModal
-        isOpen={showFinalAuth}
-        onClose={() => { setShowFinalAuth(false); }}
-        onConfirm={(passwordEntered) => onFinalAuthConfirm(passwordEntered)}
+        onSubmit={onReasonSubmit}
       />
 
       {/* Void Detail Modal (existing viewer) */}
@@ -819,17 +1290,52 @@ export default function POSMain() {
         editingIndex={editingCartIndex}
         onClose={() => setShowModal(false)}
         onAdd={({ quantity, size, addons, notes }) => {
-          const addonsCost = addons.reduce((s,a) => s + a.price, 0);
-          const sizeCost   = size.price;
-          const price      = (modalProduct.price + addonsCost + sizeCost) * quantity;
-          setCart(prev => [...prev, { ...modalProduct, quantity, size, selectedAddons: addons, notes, totalPrice: price }]);
+          const addonList = Array.isArray(addons) ? addons : [];
+          const addonsCost = addonList.reduce(
+            (sum, addon) => sum + Number(addon?.price || 0),
+            0
+          );
+          const sizeCost = size ? Number(size.price || 0) : 0;
+          const qty = Number(quantity || 1);
+          const basePrice = Number(modalProduct.price || 0);
+          const price = (basePrice + addonsCost + sizeCost) * qty;
+          setCart((prev) => [
+            ...prev,
+            {
+              ...modalProduct,
+              quantity: qty,
+              size,
+              selectedAddons: addonList,
+              notes,
+              totalPrice: price,
+            },
+          ]);
           setModalEdited(false);
         }}
         onApply={({ quantity, size, addons, notes }, idx) => {
-          const addonsCost = addons.reduce((s,a) => s + a.price, 0);
-          const sizeCost   = size.price;
-          const price      = (modalProduct.price + addonsCost + sizeCost) * quantity;
-          setCart(prev => prev.map((item,i) => i === idx ? { ...item, quantity, size, selectedAddons: addons, notes, totalPrice: price } : item));
+          const addonList = Array.isArray(addons) ? addons : [];
+          const addonsCost = addonList.reduce(
+            (sum, addon) => sum + Number(addon?.price || 0),
+            0
+          );
+          const sizeCost = size ? Number(size.price || 0) : 0;
+          const qty = Number(quantity || 1);
+          const basePrice = Number(modalProduct.price || 0);
+          const price = (basePrice + addonsCost + sizeCost) * qty;
+          setCart((prev) =>
+            prev.map((item, i) =>
+              i === idx
+                ? {
+                    ...item,
+                    quantity: qty,
+                    size,
+                    selectedAddons: addonList,
+                    notes,
+                    totalPrice: price,
+                  }
+                : item
+            )
+          );
           setModalEdited(false);
         }}
         onRemove={idx => setCart(prev => prev.filter((_,i) => i !== idx))}
@@ -851,7 +1357,14 @@ export default function POSMain() {
       {/* Payment Modals */}
       <CashPaymentModal isOpen={showCashModal} total={total} onClose={() => setShowCashModal(false)} onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)} />
       <CardPaymentModal isOpen={showCardModal} total={total} onClose={() => setShowCardModal(false)} onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)} onFailure={(info) => alert("Card payment failed: " + (info?.reason || "Unknown"))} />
-      <QRSPaymentModal isOpen={showQRModal} total={total} onClose={() => setShowQRModal(false)} onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)} />
+      <QRSPaymentModal
+        isOpen={showQRModal}
+        total={total}
+        onClose={() => setShowQRModal(false)}
+        onSuccess={(paymentInfo) => finalizeTransaction(paymentInfo)}
+        onReady={handleQrReady}
+        onStatusChange={handleQrStatusChange}
+      />
 
       {/* Order Success Modal */}
       <OrderSuccessModal
@@ -870,9 +1383,17 @@ export default function POSMain() {
         show={showProfileModal}
         userName={userName}
         schoolId={schoolId}
+        avatarUrl={avatarUrl}
+        analytics={profileAnalytics}
+        onAvatarUpload={handleAvatarUpload}
+        onChangePassword={handleChangePassword}
+        onSwitchRole={handleSwitchRole}
+        onSignOut={handleSignOut}
         onClose={() => setShowProfileModal(false)}
-        onClearLogs={clearAllLogs}
       />
     </div>
   );
 }
+
+
+

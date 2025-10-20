@@ -1,6 +1,26 @@
+// src/components/modals/OrderDetailModal.jsx
 import React, { useState, useEffect } from "react";
 import { placeholders } from "../../utils/data";
 import statusIcon from "../../assets/status.png";
+import { useInventory } from "../../contexts/InventoryContext";
+
+const collectSpecialInstructions = (item) => {
+  if (!item || typeof item !== "object") return "";
+  return (
+    [
+      item.notes,
+      item.specialInstructions,
+      item.instructions,
+      item.customerNote,
+      item.remark,
+      item.remarks,
+    ]
+      .map((candidate) =>
+        typeof candidate === "string" ? candidate.trim() : candidate ?? ""
+      )
+      .find((candidate) => Boolean(candidate)) || ""
+  );
+};
 
 export default function OrderDetailModal({
   historyContext,
@@ -8,6 +28,8 @@ export default function OrderDetailModal({
   onStatusChange,
   orders = []   // <-- accept orders prop (default empty)
 }) {
+  const { inventory = [] } = useInventory(); // <-- call hook
+
   // historyContext may hold a snapshot `order` or we may have a transactionID/orderID
   const snapshotOrder = historyContext?.order;
   const lookupKey = snapshotOrder?.transactionID || snapshotOrder?.orderID || historyContext?.transactionID || historyContext?.orderID;
@@ -27,18 +49,29 @@ export default function OrderDetailModal({
   if (!order) return null;
 
   // Group items by category
-  const categorizedItems = {};
-  Object.keys(placeholders).forEach(category => {
-    categorizedItems[category] = [];
+  // build name->category lookup using inventory first, then placeholders
+  const nameToCategory = {};
+  (inventory || []).forEach(it => {
+    if (it.name) nameToCategory[it.name.toLowerCase()] = it.category || nameToCategory[it.name.toLowerCase()] || "Uncategorized";
+  });
+  Object.entries(placeholders).forEach(([cat, list]) => {
+    (list || []).forEach(p => {
+      if (p.name && !nameToCategory[p.name.toLowerCase()]) {
+        nameToCategory[p.name.toLowerCase()] = cat;
+      }
+    });
   });
 
+  // initialize categories present in lookup (or fallback to 'Uncategorized')
+  const categorizedItems = {};
+  Object.values(nameToCategory).forEach(cat => { if (!categorizedItems[cat]) categorizedItems[cat] = []; });
+  if (!categorizedItems["Uncategorized"]) categorizedItems["Uncategorized"] = [];
+
   order.items.forEach(item => {
-    for (const [cat, items] of Object.entries(placeholders)) {
-      if (items.some(p => p.name === item.name)) {
-        categorizedItems[cat].push(item);
-        break;
-      }
-    }
+    const key = (item.name || "").toLowerCase();
+    const cat = nameToCategory[key] || "Uncategorized";
+    if (!categorizedItems[cat]) categorizedItems[cat] = [];
+    categorizedItems[cat].push(item);
   });
 
   const statusLabels = {
@@ -117,10 +150,12 @@ export default function OrderDetailModal({
               <div key={category}>
                 <h3 className="font-semibold text-md mt-4 mb-1">{category}</h3>
                 {items.map((item, i) => {
-                  const sizeUp = item?.size?.price || 0;
+                  const sizeUp = Number(item?.size?.price || 0);
                   const sizeLabel = item?.size?.label || "N/A";
-                  const addons = item.selectedAddons || [];
+                  const addons = item.selectedAddons || item.addons || [];
                   const addonLabels = addons.map(a => a.label).join(", ") || "None";
+                  const specialInstructions = collectSpecialInstructions(item);
+                  const quantity = Number(item.quantity ?? item.qty ?? 0);
 
                   const isVoided = !!item.voided;
 
@@ -138,11 +173,13 @@ export default function OrderDetailModal({
                       <div className="text-sm flex justify-between">
                         <span>Add-ons:</span><span className={isVoided ? "line-through text-gray-500" : ""}>{addonLabels}</span>
                       </div>
-                      <div className="text-sm flex justify-between">
-                        <span>Quantity:</span><span className={isVoided ? "line-through text-gray-500" : ""}>{item.quantity}</span>
+                       <div className="text-sm flex justify-between">
+                         <span>Quantity:</span><span className={isVoided ? "line-through text-gray-500" : ""}>{quantity}</span>
                       </div>
-                      {item.notes && (
-                        <div className={`text-sm italic ${isVoided ? "line-through text-gray-500" : ""}`}>Notes: {item.notes}</div>
+                      {specialInstructions && (
+                        <div className={`text-sm italic ${isVoided ? "line-through text-gray-500" : ""}`}>
+                          Special Instructions: {specialInstructions}
+                        </div>
                       )}
                     </div>
                   );

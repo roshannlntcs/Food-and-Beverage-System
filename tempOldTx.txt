@@ -1,0 +1,80 @@
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import images from "../utils/images";
+
+export default function TransactionsPanel({
+  transactions,
+  voidLogs,
+  onTransactionSelect,
+  onVoidSelect
+}) {
+  // --- Helper: normalize to YYYY-MM-DD ---
+  const normalizeDate = (d) => {
+    const dateObj = new Date(d);
+    if (isNaN(dateObj)) return "";
+    return dateObj.toISOString().split("T")[0];
+  };
+
+  // ─── Transaction Filters ─────────────────────────
+  const [showTxFilter, setShowTxFilter] = useState(false);
+  const [txFrom, setTxFrom]             = useState("");
+  const [txTo, setTxTo]                 = useState("");
+  const [txMethod, setTxMethod]         = useState("");
+  const [txVoidFilter, setTxVoidFilter] = useState("all"); // all, full, items, none
+  const [txSort, setTxSort]             = useState("oldest");
+  const txFilterRef = useRef();
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (showTxFilter && txFilterRef.current && !txFilterRef.current.contains(e.target)) {
+        setShowTxFilter(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showTxFilter]);
+
+  const filteredTx = useMemo(() => {
+    let list = [...transactions];
+    list = list.filter(t => {
+      const txDate = normalizeDate(t.date);
+      if (!txDate) return false;
+
+      if (txFrom && txTo && txFrom === txTo) {
+        if (txDate !== txFrom) return false;
+      } else {
+        if (txFrom && txDate < txFrom) return false;
+        if (txTo && txDate > txTo) return false;
+      }
+
+      if (txMethod && t.method !== txMethod) return false;
+
+      // ─── New Void Filter Logic ─────────────────
+      if (txVoidFilter === "full" && !t.voided) return false;
+      if (txVoidFilter === "items" && !(t.items?.some(i => i.voided) && !t.voided)) return false;
+      if (txVoidFilter === "none" && (t.voided || t.items?.some(i => i.voided))) return false;
+
+      return true;
+    });
+
+    list.sort((a, b) => {
+      const dA = new Date(a.date);
+      const dB = new Date(b.date);
+      if (txSort === "newest") return dB - dA;
+      if (txSort === "oldest") return dA - dB;
+      if (txSort === "high") return b.total - a.total;
+      if (txSort === "low") return a.total - b.total;
+      return 0;
+    });
+
+    return list;
+  }, [transactions, txFrom, txTo, txMethod, txVoidFilter, txSort]);
+
+  const resetTxFilters = () => {
+    setTxFrom(""); setTxTo(""); setTxMethod(""); setTxVoidFilter("all"); setTxSort("oldest");
+  };
+
+  // ─── Void Filters ───────────────────────────────
+  const [showVoidFilter, setShowVoidFilter] = useState(false);
+  const [voidFrom, setVoidFrom]             = useState("");
+  const [voidTo, setVoidTo]                 = useState("");
+  const [voidSort, setVoidSort]             = useState("newest");

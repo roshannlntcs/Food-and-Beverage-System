@@ -1,7 +1,31 @@
 import React, { useState } from "react";
 import ReceiptModal from "./ReceiptModal";
+import { shopDetails as defaultShopDetails } from "../../utils/data";
 
-export default function TransactionDetailModal({ historyContext, setHistoryContext, transactions, shopDetails }) {
+const collectSpecialInstructions = (item) => {
+  if (!item || typeof item !== "object") return "";
+  return (
+    [
+      item.notes,
+      item.specialInstructions,
+      item.instructions,
+      item.customerNote,
+      item.remark,
+      item.remarks,
+    ]
+      .map((candidate) =>
+        typeof candidate === "string" ? candidate.trim() : candidate ?? ""
+      )
+      .find((candidate) => Boolean(candidate)) || ""
+  );
+};
+
+export default function TransactionDetailModal({
+  historyContext,
+  setHistoryContext,
+  transactions,
+  shopDetails = defaultShopDetails,
+}) {
   const [showReceipt, setShowReceipt] = useState(false);
 
   const txId = historyContext?.txId || historyContext?.tx?.id;
@@ -65,6 +89,7 @@ export default function TransactionDetailModal({ historyContext, setHistoryConte
               const addonsTotal = selectedAddons.reduce((a, x) => a + (x.price || 0), 0);
               const addonNames = selectedAddons.map(a => a.label).join(", ") || "None";
               const lineTotal = (base + sizeUp + addonsTotal) * (it.quantity || 1);
+              const specialInstructions = collectSpecialInstructions(it);
 
               return (
                 <div
@@ -89,8 +114,8 @@ export default function TransactionDetailModal({ historyContext, setHistoryConte
                     <span>Quantity</span>
                     <span>{it.quantity}</span>
                   </div>
-                  {it.notes && (
-                    <div className="text-sm italic">Notes: {it.notes}</div>
+                  {specialInstructions && (
+                    <div className="text-sm italic">Special Instructions: {specialInstructions}</div>
                   )}
                   <div className="mt-1 text-sm font-semibold flex justify-between">
                     <span>Line Total:</span>

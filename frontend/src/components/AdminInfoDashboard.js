@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaUser, FaChevronDown } from 'react-icons/fa';
+import { useAuth } from '../contexts/AuthContext';
 
 const AdminInfo = () => {
-  const adminName = localStorage.getItem('fullName') || 'Admin';
-  const profileImage = localStorage.getItem('profileImage'); // save image URL here if available
+  const { currentUser, logout } = useAuth() || {};
+  const adminName = currentUser?.fullName || 'Admin';
+  const profileImage = currentUser?.avatarUrl || null;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -40,8 +42,13 @@ const AdminInfo = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('loggedInAdmin');
-    window.location.href = '/admin-login';
+    if (logout) {
+      logout().finally(() => {
+        window.location.href = "/admin-login";
+      });
+      return;
+    }
+    window.location.href = "/admin-login";
   };
 
   return (
@@ -124,3 +131,5 @@ const AdminInfo = () => {
 };
 
 export default AdminInfo;
+
+

@@ -1,0 +1,121 @@
+  // open/focus customer view
+  const openCustomerView = () => {
+    const url = window.location.origin + '/customer-view';
+    if (!customerWinRef.current || customerWinRef.current.closed) {
+      customerWinRef.current = window.open(
+        url,
+        'customerView',
+        'width=420,height=780,toolbar=no,menubar=no'
+      );
+      setTimeout(() => broadcastCart({ cart, subtotal, tax, total, discountPct }), 300);
+    } else {
+      customerWinRef.current.focus();
+      broadcastCart({ cart, subtotal, tax, total, discountPct });
+    }
+  };
+
+  // ensure broadcast on every cart change
+  useEffect(() => {
+    broadcastCart({ cart, subtotal, tax, total, discountPct });
+  }, [cart, subtotal, tax, total, discountPct]);
+
+  // Reset active category when moving away from Menu/Items
+  useEffect(() => {
+    if (!(activeTab === "Menu" || activeTab === "Items")) {
+      setActiveCategory(null);
+    }
+  }, [activeTab]);
+
+  // Reset customerViewOpened when cart becomes empty
+  useEffect(() => {
+    if (cart.length === 0) {
+      setCustomerViewOpened(false);
+    }
+  }, [cart.length]);
+
+  // --- VOID FLOW (server-backed) ---
+  const triggerVoid = (type, indexOrTx = null) => {
+    if (indexOrTx && typeof indexOrTx === 'object' && indexOrTx.id) {
+      setVoidContext({ type, tx: indexOrTx, index: null });
+    } else {
+      const txFromHistory = historyContext?.tx || selectedTransaction || null;
+      setVoidContext({ type, tx: txFromHistory, index: typeof indexOrTx === 'number' ? indexOrTx : null });
+    }
+    setShowFirstAuth(true);
+    setShowReasonModal(false);
+    setShowFinalAuth(false);
+    setPendingVoidReason("");
+  };
+
+  const onFirstAuthConfirm = (passwordEntered) => {
+    if (passwordEntered !== basePassword) {
+      alert("Wrong manager password.");
+      return;
+    }
+    setShowFirstAuth(false);
+    setShowReasonModal(true);
+  };
+
+  const onReasonSubmit = (reason) => {
+    setPendingVoidReason(reason);
+    setShowReasonModal(false);
+    setShowFinalAuth(true);
+  };
+
+  const onFinalAuthConfirm = (passwordEntered) => {
+    if (passwordEntered !== basePassword) {
+      alert("Wrong manager password.");
+      return;
+    }
+    confirmVoid(pendingVoidReason);
+    setShowFinalAuth(false);
+    setPendingVoidReason("");
+  };
+
+  const confirmVoid = useCallback(async (reason = "No reason provided") => {
+    const { type, tx, index } = voidContext || {};
+
+    if (!tx) {
+      alert("No transaction selected for void.");
+      setShowFirstAuth(false);
+      setShowReasonModal(false);
+      setShowFinalAuth(false);
+      setVoidContext({ type: null, index: null, tx: null });
+      setPendingVoidReason("");
+      return;
+    }
+
+    const payload = {
+      type: type === "transaction" ? "TRANSACTION" : "ITEM",
+      reason: reason || "No reason provided",
+      notes: null,
+      items:
+        type === "item" && tx.items?.[index]?.orderItemId
+          ? [{ orderItemId: Number(tx.items[index].orderItemId) }]
+          : undefined,
+    };
+
+    try {
+      const updatedOrder = await voidOrderApi(tx.id, payload);
+      const mapped = mapOrderToTx(updatedOrder);
+
+      setOrders((prev) =>
+        prev.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+      );
+      setTransactions((prev) =>
+        prev.map((transaction) =>
+          transaction.id === mapped.id ? mapped : transaction
+        )
+      );
+
+      await refreshOrdersAndVoids();
+
+      if (historyContext?.type === "detail" && historyContext.tx?.id === mapped.id) {
+        setHistoryContext({ type: "detail", tx: mapped });
+      }
+      if (
+        historyContext?.type === "orderDetail" &&
+        historyContext.order?.id === updatedOrder.id
+      ) {
+        setHistoryContext({ type: "orderDetail", order: updatedOrder });
+      }

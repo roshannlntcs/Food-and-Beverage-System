@@ -1,22 +1,44 @@
 import React, { useState } from "react";
 
+const ROLE_OPTIONS = [
+  { value: "cashier", label: "Cashier" },
+  { value: "admin", label: "Admin" },
+];
+
 const AddUserModal = ({ isOpen, onClose, onSave }) => {
   const [form, setForm] = useState({
     schoolId: "",
+    username: "",
     fullName: "",
     password: "",
     program: "",
     section: "",
     sex: "",
-    role: "student",
+    role: "cashier",
   });
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((prev) => {
+      if (name === "schoolId") {
+        const shouldSyncUsername =
+          !prev.username ||
+          prev.username === "" ||
+          prev.username === prev.schoolId;
+        return {
+          ...prev,
+          schoolId: value,
+          username: shouldSyncUsername ? value : prev.username,
+        };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleSubmit = () => {
     if (
+      !form.schoolId ||
+      !form.username ||
       !form.schoolId ||
       !form.fullName ||
       !form.password ||
@@ -31,12 +53,13 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
     onClose();
     setForm({
       schoolId: "",
+      username: "",
       fullName: "",
       password: "",
       program: "",
       section: "",
       sex: "",
-      role: "student",
+      role: "cashier",
     });
   };
 
@@ -64,6 +87,14 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
               name="schoolId"
               placeholder="School ID"
               value={form.schoolId}
+              onChange={handleChange}
+              className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
+            />
+            <input
+              type="text"
+              name="username"
+              placeholder="Username"
+              value={form.username}
               onChange={handleChange}
               className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
             />
@@ -115,8 +146,11 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
               onChange={handleChange}
               className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400"
             >
-              <option value="student">Student</option>
-              <option value="admin">Admin</option>
+              {ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

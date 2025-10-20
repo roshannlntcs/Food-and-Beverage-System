@@ -4,7 +4,8 @@ export default function LogsModal({
   logs,
   filterDate,
   setFilterDate,
-  onClose
+  onClose,
+  loading = false,
 }) {
   const filteredLogs = logs.filter(log =>
     !filterDate || log.datetime.startsWith(filterDate)
@@ -41,6 +42,13 @@ export default function LogsModal({
               </tr>
             </thead>
             <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan="9" className="text-center p-4 text-gray-500">
+                    Loading logs&hellip;
+                  </td>
+                </tr>
+              )}
               {filteredLogs.map((log, i) => (
                 <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="p-2">{log.datetime}</td>
@@ -56,7 +64,7 @@ export default function LogsModal({
               ))}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan="10" className="text-center p-4 text-gray-500">
+                  <td colSpan="9" className="text-center p-4 text-gray-500">
                     No logs found.
                   </td>
                 </tr>

@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+// frontend/src/pages/admin/Inventory.js
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
-import { FaSearch, FaPen, FaTrash } from 'react-icons/fa'; 
-import DeleteConfirmModal from '../../components/modals/DeleteConfirmModal';
+import { FaSearch, FaPen } from 'react-icons/fa';
 import AdminInfo from '../../components/AdminInfo';
 import AddItemModal from '../../components/modals/add-item-modal';
 import EditItemModal from '../../components/modals/edit-item-modal';
@@ -14,102 +14,164 @@ import ShowEntries from '../../components/ShowEntries';
 import Pagination from '../../components/Pagination';
 import { useCategories } from '../../contexts/CategoryContext';
 import { useInventory } from '../../contexts/InventoryContext';
+import { fetchInventoryLogs } from '../../api/inventory';
+const DEFAULT_STOCK = 100;
+const PESO = '\u20B1';
 
-const LOGS_KEY = 'inventoryLogs';
-const EMPTY_ARRAY = Object.freeze([]);
-const NOOP = () => {};
+const deriveStatusFromQuantity = (qty) => {
+  if (!Number.isFinite(qty)) return 'Available';
+  if (qty <= 0) return 'Unavailable';
+  if (qty <= 10) return 'Low Stock';
+  return 'Available';
+};
+
+const pesoFormatter = new Intl.NumberFormat('en-PH', {
+  style: 'currency',
+  currency: 'PHP',
+  minimumFractionDigits: 2,
+});
+
+const formatCurrency = (value) => pesoFormatter.format(Number(value || 0));
+
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString();
+};
+
+const normalizeOptionArray = (list) =>
+  Array.isArray(list)
+    ? list
+        .map((entry) =>
+          typeof entry === 'string'
+            ? { label: entry.trim(), price: 0 }
+            : {
+                label: (entry.label || '').trim(),
+                price: Number(entry.price ?? 0),
+              }
+        )
+        .filter((entry) => entry.label)
+    : [];
+
+const describeOptions = (list) =>
+  Array.isArray(list) && list.length
+    ? list
+        .map((entry) =>
+          typeof entry === 'string'
+            ? entry
+            : `${entry.label}${entry.price ? ` (${PESO}${Number(entry.price).toFixed(2)})` : ''}`
+        )
+        .join(', ')
+    : '—';
 
 export default function Inventory() {
-  const [adminName] = useState(localStorage.getItem('fullName') || 'Admin');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);   
-  const [deleteTarget, setDeleteTarget] = useState(null);          
-  const { inventory = [], addItem, updateItem, removeItem, getEffectiveStatus } = useInventory();
+  const { inventory = [], addItem, updateItem, getEffectiveStatus } = useInventory();
 
-
-  // CHANGED: initialize from storage
-  const [logs, setLogs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(LOGS_KEY) || '[]'); }
-    catch { return []; }
-  });
-
-  // CHANGED: persist to storage whenever logs change
-  useEffect(() => {
-    try { localStorage.setItem(LOGS_KEY, JSON.stringify(logs)); }
-    catch {}
-  }, [logs]);
-
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
-  const [newItem, setNewItem] = useState({
-    name: '', price: '', category: '', quantity: '', status: 'Available',
-    allergens: '', addons: [], description: '', sizes: []
+  const createEmptyItem = () => ({
+    id: '',
+    name: '',
+    price: '',
+    category: '',
+    quantity: String(DEFAULT_STOCK),
+    status: deriveStatusFromQuantity(DEFAULT_STOCK),
+    allergens: '',
+    addons: [],
+    description: '',
+    sizes: [],
+    image: ''
   });
+
+  const [newItem, setNewItem] = useState(createEmptyItem);
+
   const [filterDate, setFilterDate] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isEditSuccess, setIsEditSuccess] = useState(false);
-
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-
-  // pagination state
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-
-  // AddCategory modal visibility
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
 
-  // categories
-const categoriesCtx = useCategories();                           
-const ctxCategoriesRaw = categoriesCtx?.categories ?? EMPTY_ARRAY; 
-const addCategory = categoriesCtx?.addCategory ?? NOOP;            
+  const { categories = [], addCategory } = useCategories() || {};
 
-
-  const uniqueCategories = [...new Set((inventory || []).map(item => item.category))].filter(Boolean);
-  
-  const uniqueStatuses = useMemo(() => {
-  const baseline = ['Available', 'Unavailable', 'Low Stock'];
-  const dynamic = Array.from(new Set(
-    (inventory || [])
-      .map(it => (it.status || '').trim())
-      .filter(Boolean)
-  ));
-  const rest = dynamic.filter(s => !baseline.includes(s));
-  return [...baseline, ...rest];
-  }, [inventory]);
+  const ctxCategoryKeys = (categories || []).map(c => c.name);
+  const uniqueCategories = [...new Set((inventory || []).map(i => i.category))].filter(Boolean);
 
   const mergedCategoryKeys = useMemo(() => {
     const seen = new Map();
-    ctxCategoriesRaw.forEach(c => {
-      const key = typeof c === 'string' ? c.trim() : c?.key?.trim();
-      if (!key) return;
-      const lower = key.toLowerCase();
-      if (!seen.has(lower)) seen.set(lower, key);
+    ctxCategoryKeys.forEach(key => {
+      const k = String(key).trim();
+      if (!k) return;
+      const lower = k.toLowerCase();
+      if (!seen.has(lower)) seen.set(lower, k);
     });
-    uniqueCategories.forEach(c => {
-      const key = (c || '').trim();
-      const lower = key.toLowerCase();
-      if (!seen.has(lower)) seen.set(lower, key);
+    uniqueCategories.forEach(key => {
+      const k = String(key || '').trim();
+      if (!k) return;
+      const lower = k.toLowerCase();
+      if (!seen.has(lower)) seen.set(lower, k);
     });
     return Array.from(seen.values());
-  }, [ctxCategoriesRaw, uniqueCategories]);
+  }, [ctxCategoryKeys, uniqueCategories]);
 
-  const matchesStatus = (item) => {
-  if (selectedStatus === '') return true;
-  return getEffectiveStatus(item) === selectedStatus; // respects manual status and Low Stock threshold
-};
+  const refreshLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const response = await fetchInventoryLogs({ take: 200 });
+      const list = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+        ? response
+        : [];
+      const mapped = list.map((log) => ({
+        datetime: formatDateTime(log.createdAt),
+        action: log.action || '-',
+        admin: log.user?.fullName || log.user?.username || '-',
+        product: log.productName || '-',
+        stock:
+          log.stock === null || log.stock === undefined
+            ? '-'
+            : `${log.stock} pcs`,
+        oldPrice:
+          log.oldPrice === null || log.oldPrice === undefined
+            ? '-'
+            : formatCurrency(log.oldPrice),
+        newPrice:
+          log.newPrice === null || log.newPrice === undefined
+            ? '-'
+            : formatCurrency(log.newPrice),
+        category: log.category || '-',
+        detail: log.detail || '-',
+      }));
+      setLogs(mapped);
+    } catch (error) {
+      console.error('Failed to load inventory logs:', error);
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
 
-const filteredInventory = (inventory || []).filter(item =>
-  item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-  (selectedCategory === '' || item.category === selectedCategory) &&
-  matchesStatus(item)
-);
+  useEffect(() => {
+    refreshLogs().catch(() => {});
+  }, [refreshLogs]);
 
+  const filteredInventory = (inventory || []).filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (selectedCategory === '' || item.category === selectedCategory) &&
+    (selectedStatus === '' || getEffectiveStatus(item) === selectedStatus)
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredInventory.length / entriesPerPage));
   const paginatedInventory = filteredInventory.slice(
@@ -117,195 +179,156 @@ const filteredInventory = (inventory || []).filter(item =>
     currentPage * entriesPerPage
   );
 
-  const formatDateTime = () => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const min = String(now.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
-  };
-
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newItem.name || !newItem.category || newItem.price === '' || newItem.quantity === '') {
-      setErrorMessage('Please fill out all required fields: Name, Category, Price, and Quantity.');
+      setErrorMessage('Fill Name, Category, Price, Quantity.');
+      setShowErrorModal(true);
+      return;
+    }
+    const price = Number(newItem.price);
+    const qty = parseInt(newItem.quantity, 10);
+    if (!Number.isFinite(price) || Number.isNaN(qty)) {
+      setErrorMessage('Invalid price or stock.');
       setShowErrorModal(true);
       return;
     }
 
-    const price = parseFloat(newItem.price);
-    const quantity = parseInt(newItem.quantity);
+    if (addCategory) await addCategory(newItem.category);
 
-    if (isNaN(price) || isNaN(quantity)) {
-      setErrorMessage('Invalid value for price or stock.');
-      setShowErrorModal(true);
-      return;
-    }
+    const normalizedSizes = normalizeOptionArray(newItem.sizes);
+    const normalizedAddons = normalizeOptionArray(newItem.addons);
+    const status = deriveStatusFromQuantity(qty);
+    const id =
+      newItem.id && newItem.id.trim()
+        ? newItem.id.trim()
+        : (typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`);
 
-    const newItemData = {
-      ...newItem,
+    const payload = {
+      id,
+      name: newItem.name,
       price,
-      quantity,
-      sizes: newItem.sizes || [],
+      category: newItem.category,
+      quantity: qty,
+      status,
+      allergens: newItem.allergens || '',
+      sizes: normalizedSizes,
+      addons: normalizedAddons,
+      description: newItem.description || '',
+      image: newItem.image || '',
     };
 
     try {
-      addItem(newItemData);
+      await addItem(payload);
     } catch (e) {
-      console.error("addItem failed", e);
-      setErrorMessage("Failed to add item.");
+      setErrorMessage(e?.message || 'Failed to add item.');
       setShowErrorModal(true);
       return;
     }
 
-    setLogs(prev => [
-      ...prev,
-      {
-        datetime: formatDateTime(),
-        action: "Add",
-        admin: adminName,
-        product: newItemData.name,
-        field: "New Product",
-        stock: `${newItemData.quantity} pcs`,
-        oldPrice: "",
-        newPrice: `₱${newItemData.price}`,
-        category: newItemData.category,
-        detail: `Added new item: ${newItemData.name}`
-      }
-    ]);
+    refreshLogs().catch(() => {});
 
     setShowAddModal(false);
-    setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available', sizes: [] });
+    setNewItem(createEmptyItem());
     setIsEditSuccess(false);
     setShowSaveModal(true);
   };
 
-  const handleEditItem = () => {
+  const handleEditItem = async () => {
     if (!selectedItemId) return;
+    const current = (inventory || []).find(it => it.id === selectedItemId);
+    if (!current) return;
 
-    const oldItem = (inventory || []).find(it => it.id === selectedItemId);
-    if (!oldItem) return;
+    const price = Number(newItem.price);
+    const qty = parseInt(newItem.quantity, 10);
+    if (!Number.isFinite(price) || Number.isNaN(qty)) {
+      setErrorMessage('Invalid price or stock.');
+      setShowErrorModal(true);
+      return;
+    }
 
-    const updatedItemPatch = {
+    if (addCategory && newItem.category) await addCategory(newItem.category);
+
+    const normalizedSizes = normalizeOptionArray(newItem.sizes);
+    const normalizedAddons = normalizeOptionArray(newItem.addons);
+    const status = deriveStatusFromQuantity(qty);
+
+    const patch = {
       name: newItem.name,
-      price: parseFloat(newItem.price),
+      price,
       category: newItem.category,
-      quantity: parseInt(newItem.quantity),
-      status: newItem.status,
+      quantity: qty,
+      status,
       allergens: newItem.allergens || '',
-      addons: newItem.addons || [],
+      addons: normalizedAddons,
       description: newItem.description || '',
-      sizes: newItem.sizes || []
+      sizes: normalizedSizes,
+      image: newItem.image !== undefined ? newItem.image : current.image || '',
     };
 
-    const formatSizes = (sizes) => {
-      return sizes.map(s =>
-        typeof s === 'string'
-          ? s
-          : `${s.label}${s.price ? ` (₱${s.price})` : ''}`
-      ).join(', ');
-    };
-
-    let changes = [];
-    if (oldItem.name !== updatedItemPatch.name) {
-      changes.push(`name from "${oldItem.name}" to "${updatedItemPatch.name}"`);
-    }
-    if (oldItem.price !== updatedItemPatch.price) {
-      changes.push(`price from ₱${oldItem.price} to ₱${updatedItemPatch.price}`);
-    }
-    if (oldItem.quantity !== updatedItemPatch.quantity) {
-      changes.push(`quantity from ${oldItem.quantity} to ${updatedItemPatch.quantity}`);
-    }
-    if (oldItem.category !== updatedItemPatch.category) {
-      changes.push(`category from "${oldItem.category}" to "${updatedItemPatch.category}"`);
-    }
-    if (oldItem.status !== updatedItemPatch.status) {
-      changes.push(`status from "${oldItem.status}" to "${updatedItemPatch.status}"`);
-    }
-    if (oldItem.allergens !== updatedItemPatch.allergens) {
-      changes.push(`allergens changed`);
-    }
-    if (JSON.stringify(oldItem.addons) !== JSON.stringify(updatedItemPatch.addons)) {
-      changes.push(`addons changed`);
-    }
-    if (oldItem.description !== updatedItemPatch.description) {
-      changes.push(`description`);
-    }
-    if (JSON.stringify(oldItem.sizes) !== JSON.stringify(updatedItemPatch.sizes)) {
-      changes.push(`sizes from "${formatSizes(oldItem.sizes)}" to "${formatSizes(updatedItemPatch.sizes)}"`);
-    }
-
-    const detailText = changes.length > 0
-      ? `Updated ${changes.join(', ')}`
-      : `No changes made`;
-
+    let updated;
     try {
-      updateItem(selectedItemId, updatedItemPatch);
+      updated = await updateItem(selectedItemId, patch);
     } catch (e) {
-      console.error("updateItem failed", e);
+      setErrorMessage(e?.message || 'Failed to update item.');
+      setShowErrorModal(true);
+      return;
     }
 
-    const editCatLower = (updatedItemPatch.category || '').toLowerCase();
-    const existsEdit = mergedCategoryKeys.some(k => k.toLowerCase() === editCatLower);
-    if (updatedItemPatch.category && !existsEdit) {
-      try {
-        addCategory({ key: updatedItemPatch.category, icon: '/assets/default-category.png' });
-      } catch (e) {}
-    }
+    refreshLogs().catch(() => {});
 
-    setLogs(prev => [
-      ...prev,
-      {
-        datetime: formatDateTime(),
-        action: "Update",
-        admin: adminName || '—',
-        product: updatedItemPatch.name || '',
-        field: "Edited Fields",
-        stock: `${updatedItemPatch.quantity ?? 0} pcs`,
-        oldPrice: updatedItemPatch.price ? `₱${oldItem.price}` : '',
-        newPrice: updatedItemPatch.price ? `₱${updatedItemPatch.price}` : '',
-        category: updatedItemPatch.category || '',
-        detail: detailText
-      }
-    ]);
+    const result = updated || { id: selectedItemId, ...patch };
+    const stringifySizes = (sizes) =>
+      (sizes || [])
+        .map((s) =>
+          typeof s === 'string'
+            ? s
+            : `${s.label}${s.price ? ` (${PESO}${Number(s.price).toFixed(2)})` : ''}`
+        )
+        .join(', ');
+
+    const changes = [];
+    if (current.name !== result.name) {
+      changes.push(`name "${current.name}" -> "${result.name}"`);
+    }
+    if (current.price !== result.price) {
+      changes.push(
+        `price ${formatCurrency(current.price)} -> ${formatCurrency(result.price)}`
+      );
+    }
+    if (current.quantity !== result.quantity) {
+      changes.push(`quantity ${current.quantity} -> ${result.quantity}`);
+    }
+    if ((current.category || '') !== (result.category || '')) {
+      changes.push(`category "${current.category || ''}" -> "${result.category || ''}"`);
+    }
+    if ((current.status || '') !== (result.status || '')) {
+      changes.push(`status "${current.status || ''}" -> "${result.status || ''}"`);
+    }
+    if ((current.allergens || '') !== (result.allergens || '')) {
+      changes.push('allergens changed');
+    }
+    if (JSON.stringify(current.addons) !== JSON.stringify(result.addons)) {
+      changes.push('addons changed');
+    }
+    if ((current.description || '') !== (result.description || '')) {
+      changes.push('description changed');
+    }
+    if (JSON.stringify(current.sizes) !== JSON.stringify(result.sizes)) {
+      changes.push(
+        `sizes "${stringifySizes(current.sizes)}" -> "${stringifySizes(result.sizes)}"`
+      );
+    }
+    if ((current.image || '') !== (result.image || '')) {
+      changes.push('image changed');
+    }
 
     setShowEditModal(false);
     setIsEditSuccess(true);
     setShowSaveModal(true);
   };
 
-  // delete handler (now used from the table row)
-  const handleDeleteItem = async (id, name, category) => {
-    if (!id) return;
-    try {
-      await removeItem(id);
-
-      setLogs(prev => [
-        ...prev,
-        {
-          datetime: formatDateTime(),
-          action: "Delete",
-          admin: adminName,
-          product: name || "",
-          field: "Item",
-          stock: "",
-          oldPrice: "",
-          newPrice: "",
-          category: category || "",
-          detail: `Deleted item: ${name || id}`
-        }
-      ]);
-
-      setShowEditModal(false);
-    } catch (e) {
-      console.error("removeItem failed", e);
-      setErrorMessage("Failed to delete item.");
-      setShowErrorModal(true);
-    }
-  };
-
-  
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
@@ -331,31 +354,43 @@ const filteredInventory = (inventory || []).filter(item =>
             {selectedCategory && (
               <div className="text-sm text-gray-700 flex items-center">
                 Filter: <span className="font-semibold ml-1">{selectedCategory}</span>
-                <button
-                  onClick={() => setSelectedCategory('')}
-                  className="ml-2 text-blue-600 hover:underline"
-                >
-                  Clear
-                </button>
+                <button onClick={() => setSelectedCategory('')} className="ml-2 text-blue-600 hover:underline">Clear</button>
               </div>
             )}
+
+            <button
+              onClick={() => setShowCategoryFilter(true)}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100"
+            >
+              Filter Category
+            </button>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white"
+            >
+              <option value="">All Statuses</option>
+              <option value="Available">Available</option>
+              <option value="Low Stock">Low Stock</option>
+              <option value="Unavailable">Unavailable</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAddCategoryModal(true)}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-sm font-semibold border border-yellow-500 rounded-full"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 shadow text-sm font-semibold border border-yellow-500 rounded-full"
             >
               + Add Category
             </button>
-
             <button
               onClick={() => {
-                setNewItem({ name: '', price: '', category: '', quantity: '', status: 'Available' });
+                setNewItem(createEmptyItem());
                 setSelectedItemId(null);
                 setShowAddModal(true);
               }}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-sm font-semibold border border-yellow-500 rounded-full"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 shadow text-sm font-semibold border border-yellow-500 rounded-full"
             >
               + Add Item
             </button>
@@ -370,130 +405,60 @@ const filteredInventory = (inventory || []).filter(item =>
                   <th className="p-3">No.</th>
                   <th className="p-3">Name</th>
                   <th className="p-3">Price</th>
-                  <th className="p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-semibold">Category</span>
-                      <div className="relative inline-block">
-                        <select
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
-                          style={{ width: '24px' }}
-                        >
-                          <option value="">All</option>
-                          {mergedCategoryKeys.map((cat, i) => (
-                            <option key={i} value={cat}>{cat}</option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </th>
+                  <th className="p-3">Category</th>
                   <th className="p-3">Allergens</th>
                   <th className="p-3">Add-ons</th>
                   <th className="p-3">Description</th>
                   <th className="p-3">Sizes</th>
                   <th className="p-3 text-center">Stock</th>
-                  <th className="p-3">
-                    <div className="flex items-center gap-2 justify-center">
-                      <span className="text-white font-semibold">Status</span>
-                      <div className="relative inline-block">
-                        <select
-                          value={selectedStatus}
-                          onChange={(e) => setSelectedStatus(e.target.value)}
-                          className="appearance-none bg-[#8B0000] text-white pr-6 pl-2 py-1 rounded text-sm font-medium border-none cursor-pointer"
-                          style={{ width: '24px' }}
-                        >
-                          <option value="">All</option>
-                          {uniqueStatuses.map((st, i) => (
-                            <option key={i} value={st}>{st}</option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute top-1/2 right-2 transform -translate-y-1/2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </th>
-
-                  <th className="p-3 text-center">Actions</th> 
+                  <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Edit</th>
                 </tr>
               </thead>
-
               <tbody>
                 {paginatedInventory.map((item, index) => (
                   <tr key={item.id || index} className="bg-[#fdfdfd] border-b hover:bg-[#f1f1f1]">
                     <td className="p-3">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="p-3">{item.name}</td>
-                    <td className="p-3">₱{Number(item.price || 0).toFixed(2)}</td>
-                    <td className="p-3">{item.category}</td>
-                    <td className="p-3">{item.allergens || ''}</td>
-                    <td className="p-3">
-                      {Array.isArray(item.addons)
-                        ? item.addons.map(a =>
-                            typeof a === 'string'
-                              ? a
-                              : `${a.label}${a.price ? ` (₱${a.price})` : ''}`
-                          ).join(', ')
-                        : ''}
-                    </td>
-                    <td className="p-3">{item.description || ''}</td>
-                    <td className="p-3">
-                      {Array.isArray(item.sizes)
-                        ? item.sizes.map(size =>
-                            typeof size === 'string'
-                              ? size
-                              : `${size.label}${size.price ? ` (₱${size.price})` : ''}`
-                          ).join(', ')
-                        : ''}
-                    </td>
-                    <td className="p-3 text-center">{item.quantity}</td>
+                    <td className="p-3">{formatCurrency(item.price)}</td>
+                    <td className="p-3">{item.category || '—'}</td>
+                    <td className="p-3">{item.allergens || '—'}</td>
+                    <td className="p-3">{describeOptions(item.addons)}</td>
+                    <td className="p-3">{item.description || '—'}</td>
+                    <td className="p-3">{describeOptions(item.sizes)}</td>
+                    <td className="p-3 text-center">{item.quantity ?? 0}</td>
                     <td className="p-3 text-center">
-                      <span className={`px-3 py-1 text-sm font-medium rounded-full ${item.status === 'Available' ? 'bg-green-500' : 'bg-red-500'} text-white`}>
-                        {item.status}
+                      <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                        getEffectiveStatus(item) === 'Available' ? 'bg-green-500' :
+                        getEffectiveStatus(item) === 'Low Stock' ? 'bg-orange-400' : 'bg-red-600'
+                      } text-white`}>
+                        {getEffectiveStatus(item)}
                       </span>
                     </td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-center gap-4">
-                        <FaPen
-                          title="Edit"
-                          className="text-red-600 cursor-pointer"
-                          onClick={() => {
-                            setSelectedItemId(item.id);
-                            setNewItem({
-                              id: item.id,
-                              name: item.name,
-                              price: item.price,
-                              category: item.category,
-                              quantity: item.quantity,
-                              status: item.status,
-                              allergens: item.allergens,
-                              addons: item.addons,
-                              description: item.description,
-                              sizes: item.sizes || []
-                            });
-                            setShowEditModal(true);
-                          }}
-                        />
-                         <FaTrash
-                            title="Delete"
-                            className="text-red-600 cursor-pointer"
-                            onClick={() => {
-                              setDeleteTarget({ id: item.id, name: item.name, category: item.category });
-                              setShowDeleteModal(true);
-                            }}
-                          />
-                      </div>
+                    <td className="p-3 text-center">
+                      <FaPen
+                        className="text-red-600 cursor-pointer mx-auto"
+                        onClick={() => {
+                          setSelectedItemId(item.id);
+                          setNewItem({
+                            id: item.id,
+                            name: item.name,
+                            price: item.price ?? '',
+                            category: item.category,
+                            quantity: String(item.quantity ?? ''),
+                            status: deriveStatusFromQuantity(Number(item.quantity ?? 0)),
+                            allergens: item.allergens || '',
+                            addons: normalizeOptionArray(item.addons),
+                            description: item.description || '',
+                            sizes: normalizeOptionArray(item.sizes),
+                            image: item.image || ''
+                          });
+                          setShowEditModal(true);
+                        }}
+                      />
                     </td>
                   </tr>
                 ))}
-
                 {paginatedInventory.length === 0 && (
                   <tr>
                     <td colSpan="11" className="text-center p-4 text-gray-500">No items found.</td>
@@ -504,23 +469,16 @@ const filteredInventory = (inventory || []).filter(item =>
           </div>
         </div>
 
-        {/* footer controls */}
         <div className="mt-4 flex justify-between items-center">
           <ShowEntries
             entriesPerPage={entriesPerPage}
             setEntriesPerPage={(n) => { setEntriesPerPage(n); setCurrentPage(1); }}
             setCurrentPage={setCurrentPage}
           />
-
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            setCurrentPage={setCurrentPage}
-          />
-
+          <Pagination currentPage={currentPage} totalPages={totalPages} setCurrentPage={setCurrentPage} />
           <button
             onClick={() => setShowLogsModal(true)}
-            className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full text-sm"
+            className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shadow border border-yellow-500 rounded-full text-sm"
           >
             View Logs
           </button>
@@ -533,6 +491,8 @@ const filteredInventory = (inventory || []).filter(item =>
             uniqueCategories={mergedCategoryKeys}
             onClose={() => setShowAddModal(false)}
             onSave={handleAddItem}
+            showErrorModal={showErrorModal}
+            deriveStatus={deriveStatusFromQuantity}
           />
         )}
 
@@ -543,6 +503,7 @@ const filteredInventory = (inventory || []).filter(item =>
             uniqueCategories={mergedCategoryKeys}
             onClose={() => setShowEditModal(false)}
             onSave={handleEditItem}
+            deriveStatus={deriveStatusFromQuantity}
           />
         )}
 
@@ -550,10 +511,7 @@ const filteredInventory = (inventory || []).filter(item =>
           <CategoryFilterModal
             selectedCategory={selectedCategory}
             uniqueCategories={mergedCategoryKeys}
-            onSelect={(cat) => {
-              setSelectedCategory(cat === 'All' ? '' : cat);
-              setShowCategoryFilter(false);
-            }}
+            onSelect={(cat) => { setSelectedCategory(cat === 'All' ? '' : cat); setShowCategoryFilter(false); }}
             onClose={() => setShowCategoryFilter(false)}
           />
         )}
@@ -564,70 +522,38 @@ const filteredInventory = (inventory || []).filter(item =>
             filterDate={filterDate}
             setFilterDate={setFilterDate}
             onClose={() => setShowLogsModal(false)}
+            loading={logsLoading}
           />
         )}
+
         {showSaveModal && (
-          <ItemSaveSuccessModal
-            onClose={() => setShowSaveModal(false)}
-            isEdit={isEditSuccess}
-          />
+          <ItemSaveSuccessModal onClose={() => setShowSaveModal(false)} isEdit={isEditSuccess} />
         )}
         {showErrorModal && (
-          <ValidationErrorModal
-            message={errorMessage}
-            onClose={() => setShowErrorModal(false)}
-          />
+          <ValidationErrorModal message={errorMessage} onClose={() => setShowErrorModal(false)} />
         )}
 
         {showAddCategoryModal && (
           <AddCategoryModal
             onClose={() => setShowAddCategoryModal(false)}
-            onAdded={(newCat, iconPath) => {
-              const clean = (newCat || "").trim();
-              if (!clean) return setShowAddCategoryModal(false);
-
-              try {
-                addCategory({ key: clean, icon: iconPath || "/assets/default-category.png" });
-              } catch (e) {}
-
-              setLogs((prevLogs) => [
-                ...prevLogs,
-                {
-                  datetime: formatDateTime(),
-                  action: "Add",
-                  admin: adminName,
-                  product: "—",
-                  field: "Category",
-                  stock: "—",
-                  oldPrice: "",
-                  newPrice: "",
-                  category: clean,
-                  detail: `Added new category: "${clean}"`
-                }
-              ]);
-
-              setShowAddCategoryModal(false);
-            }}
-          />
-        )}
-
-        {showDeleteModal && (
-              <DeleteConfirmModal
-                itemName={deleteTarget?.name}
-                onCancel={() => {
-                  setShowDeleteModal(false);
-                  setDeleteTarget(null);
-                }}
-                onConfirm={async () => {
-                  if (deleteTarget?.id) {
-                    await handleDeleteItem(deleteTarget.id, deleteTarget.name, deleteTarget.category);
-                  }
-                  setShowDeleteModal(false);
-                  setDeleteTarget(null);
-                }}
-              />
-            )}
-
+            onAdded={async (payload) => {
+              const clean = String(
+                typeof payload === 'string' ? payload : payload?.name || ''
+              ).trim();
+              if (!clean) {
+                setShowAddCategoryModal(false);
+                return;
+              }
+            try {
+              await addCategory({ name: clean, icon: payload?.icon || null });
+            } catch (error) {
+              console.error('Failed to add category:', error);
+            }
+            refreshLogs().catch(() => {});
+            setShowAddCategoryModal(false);
+          }}
+        />
+      )}
       </div>
     </div>
   );

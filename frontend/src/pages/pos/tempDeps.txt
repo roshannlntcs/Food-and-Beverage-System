@@ -1,0 +1,6 @@
+    discountType,
+    couponCode,
+    total,
+    paymentMethod,
+    applyTransaction,
+    refreshOrdersAndVoids,

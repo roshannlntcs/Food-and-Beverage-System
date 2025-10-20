@@ -1,15 +1,31 @@
-// src/components/Header.jsx
+﻿// src/components/Header.jsx
 import React from "react";
 import logo from "../assets/logo-pos2.png";
 import avatar from "../assets/avatar-ph.png";
 
+const formatRole = (role) => {
+  if (!role) return "Cashier";
+  return role
+    .toString()
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .split(" ")
+    .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ""))
+    .join(" ")
+    .trim();
+};
+
 export default function Header({
   userName,
   profilePic,
+  roleLabel = "Cashier",
   onProfileClick,
   searchTerm,
   onSearchChange,
 }) {
+  const resolvedProfilePic = profilePic || avatar;
+  const displayRole = formatRole(roleLabel);
+
   return (
     <header className="bg-[#800000] text-white flex justify-between items-center px-6 py-4 h-20 shadow-md border-b border-gray-200">
       {/* Left: Logo + Title */}
@@ -36,14 +52,14 @@ export default function Header({
         onClick={onProfileClick}
         className="flex items-center space-x-2 bg-[#FFC72C] px-3 py-1.5 rounded-full shadow hover:scale-105 transition-transform duration-150"
       >
-         <img
-          src={profilePic}
+        <img
+          src={resolvedProfilePic}
           alt="Profile"
           className="w-10 h-10 rounded-full object-cover border border-gray-300"
         />
         <div className="text-left leading-tight">
           <div className="font-bold text-sm text-black">{userName}</div>
-          <div className="text-xs text-black">Cashier</div>
+          <div className="text-xs text-black">{displayRole}</div>
         </div>
       </button>
     </header>

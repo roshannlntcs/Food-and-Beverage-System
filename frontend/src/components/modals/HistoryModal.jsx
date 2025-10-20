@@ -1,12 +1,33 @@
-// src/components/modals/HistoryModal.jsx
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import images from "../../utils/images";
 
+const pesoFormatter = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  minimumFractionDigits: 2,
+});
+
+const formatMoney = (value) => pesoFormatter.format(Number(value || 0));
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+};
+
+const toDateKey = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().split("T")[0];
+};
+
 export default function HistoryModal({
-  transactions,
-  setShowHistoryModal,
-  setVoidContext,
-  setShowVoidPassword
+  open,
+  onClose,
+  transactions = [],
+  onRequestVoid,
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
@@ -14,83 +35,79 @@ export default function HistoryModal({
   const [method, setMethod] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [voidFilter, setVoidFilter] = useState("all");
+
   const filterRef = useRef(null);
 
-  // --- Close filter menu on outside click ---
   useEffect(() => {
-    function handleClickOutside(event) {
+    if (!showFilters) return undefined;
+    const handleClick = (event) => {
       if (filterRef.current && !filterRef.current.contains(event.target)) {
         setShowFilters(false);
       }
-    }
-    if (showFilters) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
     };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, [showFilters]);
 
-  // --- Date helper: normalize to YYYY-MM-DD ---
-  const normalizeDate = (d) => {
-    const dateObj = new Date(d);
-    if (isNaN(dateObj)) return "";
-    return dateObj.toISOString().split("T")[0]; // e.g. "2025-08-19"
-  };
-
-  // Filtering + sorting
-  const filteredTx = useMemo(() => {
-    let list = [...transactions];
-
-    // filter by date range
-    if (dateFrom || dateTo) {
-      list = list.filter((tx) => {
-        const txDate = normalizeDate(tx.date); // normalize transaction date
-        if (!txDate) return false;
-
-        if (dateFrom && dateTo && dateFrom === dateTo) {
-          // exact date match
-          return txDate === dateFrom;
-        }
-        if (dateFrom && txDate < dateFrom) return false;
-        if (dateTo && txDate > dateTo) return false;
-        return true;
-      });
+  useEffect(() => {
+    if (!open) {
+      setShowFilters(false);
     }
+  }, [open]);
 
-    // filter by method
-    if (method !== "All") {
-      list = list.filter((tx) => tx.method === method);
-    }
+  const filteredTransactions = useMemo(() => {
+    let list = Array.isArray(transactions) ? [...transactions] : [];
 
-    // filter by void status
-    if (voidFilter === "fullyVoided") {
-      list = list.filter((tx) => tx.voided === true);
-    } else if (voidFilter === "itemVoided") {
-      list = list.filter(
-        (tx) => tx.voided !== true && tx.items.some((it) => it.voided === true)
-      );
-    } else if (voidFilter === "noVoid") {
-      list = list.filter(
-        (tx) => tx.voided !== true && tx.items.every((it) => !it.voided)
-      );
-    }
+    list = list.filter((tx) => {
+      const dateKey = toDateKey(tx.createdAt || tx.date);
 
-    // sorting
-    if (sortBy === "newest") {
-      list.sort((a, b) => new Date(b.date) - new Date(a.date));
-    } else if (sortBy === "oldest") {
-      list.sort((a, b) => new Date(a.date) - new Date(b.date));
-    } else if (sortBy === "highest") {
-      list.sort((a, b) => b.total - a.total);
-    } else if (sortBy === "lowest") {
-      list.sort((a, b) => a.total - b.total);
-    }
+      if (dateFrom && dateTo && dateFrom === dateTo) {
+        if (dateKey !== dateFrom) return false;
+      } else {
+        if (dateFrom && (!dateKey || dateKey < dateFrom)) return false;
+        if (dateTo && (!dateKey || dateKey > dateTo)) return false;
+      }
+
+      if (
+        method !== "All" &&
+        String(tx.method || "").toUpperCase() !== method.toUpperCase()
+      ) {
+        return false;
+      }
+
+      if (voidFilter === "fullyVoided" && !tx.voided) return false;
+      if (
+        voidFilter === "itemVoided" &&
+        !(Array.isArray(tx.items) && tx.items.some((item) => item.voided) && !tx.voided)
+      ) {
+        return false;
+      }
+      if (
+        voidFilter === "noVoid" &&
+        (tx.voided || (Array.isArray(tx.items) && tx.items.some((item) => item.voided)))
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    list.sort((a, b) => {
+      const aTime = new Date(a.createdAt || a.date || 0).getTime();
+      const bTime = new Date(b.createdAt || b.date || 0).getTime();
+      if (sortBy === "oldest") return aTime - bTime;
+      if (sortBy === "highest") {
+        return Number(b.total || 0) - Number(a.total || 0);
+      }
+      if (sortBy === "lowest") {
+        return Number(a.total || 0) - Number(b.total || 0);
+      }
+      return bTime - aTime;
+    });
 
     return list;
-  }, [transactions, dateFrom, dateTo, method, sortBy, voidFilter]);
+  }, [transactions, dateFrom, dateTo, method, voidFilter, sortBy]);
 
-  // --- Reset all filters ---
   const resetFilters = () => {
     setDateFrom("");
     setDateTo("");
@@ -99,35 +116,46 @@ export default function HistoryModal({
     setVoidFilter("all");
   };
 
+  if (!open) return null;
+
+  const handleClose = () => {
+    setShowFilters(false);
+    onClose?.();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl w-[28rem] h-[80vh] flex flex-col overflow-hidden relative">
-        {/* Header */}
         <div className="bg-[#800000] px-6 py-4 border-b flex justify-between items-center relative">
           <h2 className="text-xl text-white font-bold">Transaction History</h2>
           <div className="flex items-center space-x-3">
             <button
+              type="button"
               onClick={() => setShowFilters((prev) => !prev)}
               className="text-white hover:opacity-80"
               title="Filter & Sort"
             >
-              <img src={images["filterw.png"]} alt="Filter" className="w-5 h-5" />
+              <img
+                src={images["filterw.png"] || images["filter.png"]}
+                alt="Filter"
+                className="w-5 h-5"
+              />
             </button>
             <button
-              onClick={() => setShowHistoryModal(false)}
-              className="text-gray-200 hover:text-white"
+              type="button"
+              onClick={handleClose}
+              className="text-gray-200 hover:text-white text-xl leading-none"
+              aria-label="Close history"
             >
-              ✕
+              &times;
             </button>
           </div>
 
-          {/* Filter dropdown */}
           {showFilters && (
             <div
               ref={filterRef}
               className="absolute top-full right-6 mt-2 w-64 bg-white border rounded-lg shadow-lg p-4 z-50 text-sm space-y-3"
             >
-              {/* Date range */}
               <div>
                 <label className="font-medium text-gray-700 block mb-1">
                   Date From:
@@ -150,25 +178,22 @@ export default function HistoryModal({
                   className="w-full border rounded px-2 py-1"
                 />
               </div>
-
-              {/* Payment Method */}
               <div>
                 <label className="font-medium text-gray-700 block mb-1">
-                  Payment Method:
+                  Method:
                 </label>
                 <select
                   value={method}
                   onChange={(e) => setMethod(e.target.value)}
                   className="w-full border rounded px-2 py-1"
                 >
-                  <option>All</option>
-                  <option>Cash</option>
-                  <option>Card</option>
-                  <option>QRS</option>
+                  <option value="All">All</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CARD">Card</option>
+                  <option value="QR">QR</option>
+                  <option value="QRS">QRS</option>
                 </select>
               </div>
-
-              {/* Void Status */}
               <div>
                 <label className="font-medium text-gray-700 block mb-1">
                   Void Status:
@@ -178,14 +203,12 @@ export default function HistoryModal({
                   onChange={(e) => setVoidFilter(e.target.value)}
                   className="w-full border rounded px-2 py-1"
                 >
-                  <option value="all">All Transactions</option>
-                  <option value="fullyVoided">Fully Voided</option>
-                  <option value="itemVoided">Has Voided Items</option>
-                  <option value="noVoid">No Void</option>
+                  <option value="all">All</option>
+                  <option value="fullyVoided">Transaction Voids</option>
+                  <option value="itemVoided">Item Voids</option>
+                  <option value="noVoid">No Voids</option>
                 </select>
               </div>
-
-              {/* Sorting */}
               <div>
                 <label className="font-medium text-gray-700 block mb-1">
                   Sort By:
@@ -201,10 +224,9 @@ export default function HistoryModal({
                   <option value="lowest">Lowest Amount</option>
                 </select>
               </div>
-
-              {/* Reset button */}
               <div className="pt-2">
                 <button
+                  type="button"
                   onClick={resetFilters}
                   className="w-full px-3 py-2 rounded-lg border text-center text-sm hover:bg-gray-100"
                 >
@@ -215,93 +237,108 @@ export default function HistoryModal({
           )}
         </div>
 
-        {/* Scrollable list */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {filteredTx.map(
-            (tx) =>
-              !tx.isVoidLog && (
-                <div
-                  key={tx.id}
-                  className={`p-4 rounded-lg border ${
-                    tx.voided
-                      ? "bg-gray-100 opacity-60"
-                      : "hover:shadow-md transition-shadow duration-150"
-                  }`}
-                >
-                  {/* Transaction header */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="font-semibold">
-                        {tx.voided ? `${tx.id} (Voided)` : tx.id}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {tx.date} • {tx.method}
-                      </div>
-                    </div>
-                    {!tx.voided && (
-                      <button
-                        onClick={() => {
-                          setVoidContext({ type: "transaction", tx });
-                          setShowVoidPassword(true);
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <img
-                          src={images["void-trans.png"]}
-                          alt="Void Tx"
-                          className="w-5 h-5"
-                        />
-                      </button>
-                    )}
-                  </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 no-scrollbar">
+          {filteredTransactions.length === 0 && (
+            <div className="text-center text-gray-500 text-sm">
+              No transactions match the selected filters.
+            </div>
+          )}
 
-                  {/* Line items */}
-                  <div className="space-y-1">
-                    {tx.items.map((item, idx) => (
+          {filteredTransactions.map((tx) => {
+            const methodLabel = String(tx.method || "Cash").toUpperCase();
+            const logDate = tx.createdAt || tx.date;
+            const items = Array.isArray(tx.items) ? tx.items : [];
+
+            return (
+              <div
+                key={tx.id || tx.transactionID}
+                className={`p-4 rounded-lg border ${
+                  tx.voided
+                    ? "bg-gray-100 opacity-70"
+                    : "hover:shadow-md transition-shadow duration-150"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <div className="font-semibold">
+                      {tx.transactionID || tx.id}
+                      {tx.voided ? " (Voided)" : ""}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {formatDateTime(logDate)} &middot; {methodLabel}
+                    </div>
+                  </div>
+                  {!tx.voided && onRequestVoid && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestVoid(tx)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Void entire transaction"
+                    >
+                      <img
+                        src={images["void-trans.png"] || images["void.png"]}
+                        alt="Void transaction"
+                        className="w-5 h-5"
+                      />
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  {items.map((item, idx) => {
+                    const lineTotal =
+                      Number(item.totalPrice ?? 0) ||
+                      Number(item.price || 0) * Number(item.quantity || 1);
+                    const unitPrice =
+                      lineTotal && item.quantity
+                        ? lineTotal / Number(item.quantity || 1)
+                        : Number(item.price || 0);
+                    const disabled = item.voided || tx.voided;
+
+                    return (
                       <div
-                        key={idx}
-                        className="flex justify-between items-center"
+                        key={`${item.id || item.orderItemId || idx}`}
+                        className="flex justify-between items-center text-sm"
                       >
                         <div
                           className={
-                            item.voided ? "line-through text-gray-500" : ""
+                            disabled ? "line-through text-gray-500" : ""
                           }
                         >
-                          {item.name} x{item.quantity} @ ₱
-                          {(item.totalPrice / item.quantity).toFixed(2)}
+                          {item.name} &times; {item.quantity} @{" "}
+                          {formatMoney(unitPrice)}
                         </div>
-                        {!item.voided && !tx.voided && (
+                        {!disabled && onRequestVoid && (
                           <button
-                            onClick={() => {
-                              setVoidContext({ type: "item", tx, index: idx });
-                              setShowVoidPassword(true);
-                            }}
+                            type="button"
+                            onClick={() => onRequestVoid(tx, idx)}
                             className="text-red-600 hover:text-red-800"
+                            title="Void this item"
                           >
                             <img
-                              src={images["void-item.png"]}
-                              alt="Void Item"
+                              src={images["void-item.png"] || images["void.png"]}
+                              alt="Void item"
                               className="w-4 h-4"
                             />
                           </button>
                         )}
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Total */}
-                  <div className="mt-4 text-right text-sm font-medium">
-                    Total: ₱{tx.total.toFixed(2)}
-                  </div>
+                    );
+                  })}
                 </div>
-              )
-          )}
+
+                <div className="mt-4 text-right text-sm font-medium">
+                  Total: {formatMoney(tx.total)}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Sticky footer */}
         <div className="px-6 py-2 border-t bg-white flex justify-end">
           <button
-            onClick={() => setShowHistoryModal(false)}
+            type="button"
+            onClick={handleClose}
             className="px-4 py-2 rounded-lg border hover:bg-gray-100"
           >
             Close
@@ -311,3 +348,4 @@ export default function HistoryModal({
     </div>
   );
 }
+

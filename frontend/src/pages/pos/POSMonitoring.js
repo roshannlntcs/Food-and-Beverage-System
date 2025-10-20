@@ -1,249 +1,290 @@
-import React, { useState, useEffect } from "react";
+// src/pages/pos/POSMonitoring.js
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
-import { FaSearch, FaTrash, FaTimes } from "react-icons/fa";
 import AdminInfo from "../../components/AdminInfo";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
+import { FaSearch } from "react-icons/fa";
+import { fetchOrders } from "../../api/orders";
+import { mapOrderToTx } from "../../utils/mapOrder";
+import ReceiptModal from "../../components/modals/ReceiptModal";
+import { shopDetails } from "../../utils/data";
 
-const POSMonitoring = () => {
-  const [transactions, setTransactions] = useState([]);
+export default function POSMonitoring() {
+  const navigate = useNavigate();
+  const [rows, setRows] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDate, setFilterDate] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [userQuery, setUserQuery] = useState("");
   const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+const pesoFormatter = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  minimumFractionDigits: 2,
+});
+
+const formatCurrency = (value) => pesoFormatter.format(Number(value || 0));
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+};
 
   useEffect(() => {
-    const loadData = () => {
-      const saved = JSON.parse(localStorage.getItem("transactions") || "[]");
-      setTransactions(saved);
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetchOrders({ take: 100 });
+        const list = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.orders)
+          ? response.orders
+          : Array.isArray(response)
+          ? response
+          : [];
+        if (!active) return;
+        const mapped = list.map(mapOrderToTx).sort((a, b) => {
+          const aTime = new Date(a.createdAt || a.date || 0).getTime();
+          const bTime = new Date(b.createdAt || b.date || 0).getTime();
+          return aTime - bTime;
+        });
+        setRows(mapped);
+      } catch (error) {
+        console.error("Failed to load orders for POS monitoring:", error);
+        if (active) setRows([]);
+      }
+    })();
+    return () => {
+      active = false;
     };
-    loadData();
-    window.addEventListener("storage", loadData);
-    return () => window.removeEventListener("storage", loadData);
   }, []);
 
-  const filteredTransactions = transactions.filter((tx) => {
-    const matchesSearch =
-      (tx.transactionID || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (tx.cashier || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (tx.method || "").toLowerCase().includes(searchQuery.toLowerCase());
+  const userOptions = useMemo(() => {
+    const seen = new Set();
+    rows.forEach((tx) => {
+      const name = String(tx?.cashier || "").trim();
+      if (name) {
+        seen.add(name);
+      }
+    });
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
 
-    const matchesDate = filterDate === "" || (tx.date && tx.date.startsWith(filterDate));
+  const filteredData = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const userFilter = userQuery.trim().toLowerCase();
+    return rows.filter((t) => {
+      const idMatch = String(t.transactionID || "").toLowerCase().includes(q);
+      const cashierMatch = !userFilter || String(t.cashier || "").toLowerCase().includes(userFilter);
+      const createdStamp = t.createdAt || t.date || null;
+      const dateObj = createdStamp ? new Date(createdStamp) : null;
+      const dayKey =
+        dateObj && !Number.isNaN(dateObj.getTime())
+          ? dateObj.toISOString().split("T")[0]
+          : "";
+      const dateMatch = !filterDate || dayKey === filterDate;
+      return idMatch && cashierMatch && dateMatch;
+    });
+  }, [rows, searchQuery, filterDate, userQuery]);
 
-    return matchesSearch && matchesDate;
-  });
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const currentPageData = filteredData.slice(startIndex, startIndex + entriesPerPage);
 
-  const indexOfLastEntry = currentPage * entriesPerPage;
-  const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
-  const currentEntries = filteredTransactions.slice(indexOfFirstEntry, indexOfLastEntry);
-  const totalPages = Math.ceil(filteredTransactions.length / entriesPerPage);
+  const renderItems = (items = []) => {
+    if (!Array.isArray(items) || !items.length) {
+      return <span>-</span>;
+    }
+    return (
+      <div className="flex flex-col gap-1">
+        {items.map((item, index) => {
+          const name = item?.name || `Item ${index + 1}`;
+          const quantity = item?.quantity ?? item?.qty ?? 0;
+          return (
+            <div key={`${item?.orderItemId || item?.id || index}`} className="flex justify-between gap-4">
+              <span className="truncate">{name}</span>
+              <span className="text-gray-600 whitespace-nowrap">x{quantity || 0}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
-  const deleteTransaction = (id) => {
-    const updated = transactions.filter((tx) => tx.id !== id);
-    setTransactions(updated);
-    localStorage.setItem("transactions", JSON.stringify(updated));
+  const handleDeleteClick = (event, tx) => {
+    event.stopPropagation();
+    window.alert(
+      `Deleting transactions from monitoring is currently restricted.\nPlease use the void workflow in the POS to remove ${tx?.transactionID || "this transaction"}.`
+    );
   };
 
   return (
+    <>
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
       <div className="ml-20 p-6 w-full">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Transactions</h1>
-          <AdminInfo />
+          <h1 className="text-3xl font-bold">POS Monitoring</h1>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate("/pos/sales-report")}
+              className="px-4 py-2 text-sm font-semibold bg-[#800000] text-white rounded-lg shadow hover:bg-[#a40000] transition-colors"
+            >
+              Sales Report
+            </button>
+            <AdminInfo />
+          </div>
         </div>
 
-        {/* Search & Calendar Row */}
-        <div className="flex justify-between items-center mb-3 flex-wrap gap-3">
-          <div className="flex items-center border rounded-md px-4 py-2 w-full sm:w-96 bg-white">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
+              <FaSearch className="text-gray-500 mr-2" />
+              <input
+                type="text"
+                placeholder="Search Transaction ID"
+                className="outline-none w-full text-sm"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+
+            <div className="flex items-center border rounded-md px-4 py-2 w-72 bg-white">
+              <FaSearch className="text-gray-500 mr-2" />
+              <input
+                type="text"
+                list="pos-monitoring-cashiers"
+                placeholder="Filter by cashier"
+                className="outline-none w-full text-sm"
+                value={userQuery}
+                onChange={(e) => {
+                  setUserQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+              {userQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserQuery("");
+                    setCurrentPage(1);
+                  }}
+                  className="ml-2 text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <input
-              type="text"
-              placeholder="Search Transaction, Cashier or Payment"
-              className="outline-none w-full text-sm"
-              value={searchQuery}
+              type="date"
+              className="border rounded-md px-3 py-2 text-sm bg-white"
+              value={filterDate}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
+                setFilterDate(e.target.value);
                 setCurrentPage(1);
               }}
             />
-            <FaSearch className="text-gray-500 text-sm" />
           </div>
-
-          <input
-            type="date"
-            value={filterDate}
-            onChange={(e) => {
-              setFilterDate(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="border rounded px-3 py-2 text-gray-700 shadow-sm text-sm"
-          />
+          <datalist id="pos-monitoring-cashiers">
+            {userOptions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+          <ShowEntries entriesPerPage={entriesPerPage} setEntriesPerPage={setEntriesPerPage} />
         </div>
 
-        {/* Table */}
-        <div className="border rounded-md overflow-hidden bg-white">
-          <div className="max-h-[500px] overflow-y-auto">
-            <table className="w-full table-auto border-collapse text-sm">
-              <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
-                <tr className="text-left">
-                  <th className="p-3 w-[40px]">No.</th>
-                  <th className="p-3 w-[120px]">Date</th>
-                  <th className="p-3 w-[160px]">Transaction ID</th>
-                  <th className="p-3 w-[100px] text-center">Cashier</th>
-                  <th className="p-3 w-[100px] text-center">Payment</th>
-                  <th className="p-3 w-[300px]">Items</th>
-                  <th className="p-3 w-[100px]">Subtotal</th>
-                  <th className="p-3 w-[100px]">Discount</th>
-                  <th className="p-3 w-[100px]">Tax</th>
-                  <th className="p-3 w-[100px]">Total</th>
-                  <th className="p-3 w-[80px] text-center">Action</th>
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-3 text-center w-16">No.</th>
+                <th className="text-left p-3 w-48">Date</th>
+                <th className="text-left p-3">Transaction ID</th>
+                <th className="text-left p-3">Cashier</th>
+                <th className="text-left p-3">Method</th>
+                <th className="text-left p-3">Items</th>
+                <th className="text-right p-3">Subtotal</th>
+                <th className="text-right p-3">Discount</th>
+                <th className="text-right p-3">Tax</th>
+                <th className="text-right p-3">Total</th>
+                <th className="text-center p-3 w-24">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentPageData.map((t, idx) => (
+                <tr
+                  key={t.id}
+                  className="border-t hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setSelectedTransaction(t);
+                    setShowReceiptModal(true);
+                  }}
+                >
+                  <td className="p-3 text-center">{startIndex + idx + 1}</td>
+                  <td className="p-3">{formatDateTime(t.createdAt || t.date)}</td>
+                  <td className="p-3 font-medium">{t.transactionID}</td>
+                  <td className="p-3">{t.cashier}</td>
+                  <td className="p-3">{t.method}</td>
+                  <td className="p-3 align-top">
+                    {renderItems(t.items)}
+                  </td>
+                  <td className="p-3 text-right">{formatCurrency(t.subtotal)}</td>
+                  <td className="p-3 text-right">
+                    {formatCurrency(
+                      t.discountAmt ?? t.discount ?? 0
+                    )}
+                  </td>
+                  <td className="p-3 text-right">{formatCurrency(t.tax ?? 0)}</td>
+                  <td className="p-3 text-right font-semibold">
+                    {formatCurrency(t.total)}
+                  </td>
+                  <td className="p-3 text-center">
+                    <button
+                      type="button"
+                      className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-600 hover:bg-red-200 transition"
+                      onClick={(event) => handleDeleteClick(event, t)}
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {currentEntries.length > 0 ? (
-                  currentEntries.map((tx, i) => (
-                    <tr key={i} className="border-b hover:bg-gray-50 align-top">
-                      <td className="p-3">{indexOfFirstEntry + i + 1}</td>
-                      <td className="p-3">{tx.date}</td>
-                      <td
-                        className="p-3 text-blue-600 cursor-pointer underline"
-                        onClick={() => setSelectedTransaction(tx)}
-                      >
-                        {tx.transactionID}
-                      </td>
-                      <td className="p-3 text-center">{tx.cashier}</td>
-                      <td className="p-3 text-center">{tx.method}</td>
-                      <td className="p-3 break-words whitespace-normal">
-                        {tx.items?.map((i) => `${i.name} x${i.quantity}`).join(", ")}
-                      </td>
-                      <td className="p-3">₱{tx.subtotal?.toFixed(2)}</td>
-                      <td className="p-3">₱{tx.discountAmt?.toFixed(2)}</td>
-                      <td className="p-3">₱{tx.tax?.toFixed(2)}</td>
-                      <td className="p-3 font-semibold">₱{tx.total?.toFixed(2)}</td>
-                      <td className="p-3 text-center">
-                        <button
-                          onClick={() => deleteTransaction(tx.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <FaTrash />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="11" className="p-4 text-center text-gray-500">
-                      No transactions found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              ))}
+              {!currentPageData.length && (
+                <tr><td className="p-6 text-center text-gray-500" colSpan={11}>No records</td></tr>
+              )}
+            </tbody>
+          </table>
+          <div className="p-3 border-t flex justify-end">
+            <Pagination
+              currentPage={currentPage}
+              totalEntries={filteredData.length}
+              entriesPerPage={entriesPerPage}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
-
-        {/* Bottom Controls */}
-        <div className="flex flex-col md:flex-row items-center justify-between mt-4 gap-4">
-          <ShowEntries
-            entriesPerPage={entriesPerPage}
-            setEntriesPerPage={setEntriesPerPage}
-            setCurrentPage={setCurrentPage}
-          />
-
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            setCurrentPage={setCurrentPage}
-          />
-
-          <button
-            onClick={() => window.location.assign("/pos/sales-report")}
-            className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold shadow border border-yellow-500 rounded-full text-sm"
-          >
-            View Sales Reports
-          </button>
-        </div>
-      </div>
-
-     {/* Receipt Modal */}
-{selectedTransaction && (
-  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-    <div className="bg-white rounded-lg w-[400px] p-6 shadow-lg">
-      <div className="flex justify-end mb-2">
-        
-      </div>
-      <div className="text-center mb-4">
-        <img src="/splice.png" alt="Splice Logo" className="mx-auto h-16 mb-2" />
-        <p className="text-gray-600 text-sm">Transaction Receipt</p>
-      </div>
-      <div className="text-sm text-gray-700 space-y-1 mb-4">
-        <p><strong>Transaction ID:</strong> {selectedTransaction.transactionID}</p>
-        <p><strong>Date:</strong> {selectedTransaction.date}</p>
-        <p><strong>Cashier:</strong> {selectedTransaction.cashier}</p>
-        <p><strong>Payment Method:</strong> {selectedTransaction.method}</p>
-      </div>
-      <table className="w-full text-sm mb-6">
-        <thead>
-          <tr>
-            <th className="text-left py-1">Item</th>
-            <th className="text-center py-1 w-12">Qty</th>
-            <th className="text-right py-1">Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          {selectedTransaction.items?.map((item, idx) => (
-            <tr key={idx}>
-              <td className="py-1">{item.name}</td>
-              <td className="text-center py-1">{item.quantity}</td>
-              <td className="text-right py-1">₱{(item.price * item.quantity).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="text-sm space-y-1 mb-2 mt-6">
-        <div className="flex justify-between">
-          <span>Subtotal:</span>
-          <span>₱{selectedTransaction.subtotal?.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Discount:</span>
-          <span>-₱{selectedTransaction.discountAmt?.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Tax:</span>
-          <span>₱{selectedTransaction.tax?.toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between font-bold text-lg">
-          <span>Total:</span>
-          <span>₱{selectedTransaction.total?.toFixed(2)}</span>
-        </div>
-      </div>
-      <p className="text-center text-gray-500 text-xs mt-4">
-        Thank you for your purchase!
-      </p>
-
-      {/* ✅ Buttons at the bottom */}
-      <div className="flex justify-center gap-4 mt-6">
-        <button
-          onClick={() => window.print()}
-          className="bg-yellow-500 text-black px-5 py-2 rounded-full hover:bg-yellow-600"
-        >
-          Print
-        </button>
-        <button
-          onClick={() => setSelectedTransaction(null)}
-          className=" bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800"
-        >
-          Close
-        </button>
       </div>
     </div>
-  </div>
-)}
-
-    </div>
+    <ReceiptModal
+        open={showReceiptModal}
+        onClose={() => {
+          setShowReceiptModal(false);
+          setSelectedTransaction(null);
+        }}
+        transaction={selectedTransaction}
+        amountPaid={selectedTransaction?.tendered ?? selectedTransaction?.paymentDetails?.tendered ?? selectedTransaction?.total ?? 0}
+        changeDue={selectedTransaction?.change ?? selectedTransaction?.paymentDetails?.change ?? 0}
+        shopDetails={shopDetails}
+      />
+    </>
   );
-};
-
-export default POSMonitoring;
+}

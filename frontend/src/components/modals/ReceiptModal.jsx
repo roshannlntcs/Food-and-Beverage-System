@@ -1,7 +1,30 @@
 // src/components/modals/ReceiptModal.jsx
 import React from "react";
+import { shopDetails as defaultShopDetails } from "../../utils/data";
 
-export default function ReceiptModal({ transaction, onClose, shopDetails }) {
+const collectSpecialInstructions = (item) => {
+  if (!item || typeof item !== "object") return "";
+  return (
+    [
+      item.notes,
+      item.specialInstructions,
+      item.instructions,
+      item.customerNote,
+      item.remark,
+      item.remarks,
+    ]
+      .map((candidate) =>
+        typeof candidate === "string" ? candidate.trim() : candidate ?? ""
+      )
+      .find((candidate) => Boolean(candidate)) || ""
+  );
+};
+
+export default function ReceiptModal({
+  transaction,
+  onClose,
+  shopDetails = defaultShopDetails,
+}) {
   if (!transaction) return null;
 
   const pd = transaction.paymentDetails || {};
@@ -95,6 +118,7 @@ export default function ReceiptModal({ transaction, onClose, shopDetails }) {
             const addonNames = selectedAddons.map(a => a.label).join(", ") || "";
             const qty = item.quantity || 1;
             const lineTotal = (base + sizeUp + addonsTotal) * qty;
+            const specialInstructions = collectSpecialInstructions(item);
 
             return (
               <div key={idx} className="space-y-0.5">
@@ -108,8 +132,10 @@ export default function ReceiptModal({ transaction, onClose, shopDetails }) {
                     <span>₱{addonsTotal.toFixed(2)}</span>
                   </div>
                 )}
-                {item.notes && (
-                  <div className="pl-2 italic text-xs">Notes: {item.notes}</div>
+                {specialInstructions && (
+                  <div className="pl-2 italic text-xs">
+                    Special Instructions: {specialInstructions}
+                  </div>
                 )}
               </div>
             );
