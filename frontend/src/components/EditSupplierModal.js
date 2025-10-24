@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
-// Save Success Modal for Edit Supplier
 const SaveSuccessModal = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-lg w-[350px] text-center p-6">
-        {/* Green Check Icon */}
         <div className="flex justify-center mb-4">
           <div className="bg-green-100 p-4 rounded-full">
             <svg
@@ -34,36 +32,65 @@ const SaveSuccessModal = ({ onClose }) => {
   );
 };
 
+const defaultSupplier = {
+  id: null,
+  name: "",
+  contactPerson: "",
+  phone: "",
+  email: "",
+  address: "",
+  products: "",
+  status: "ACTIVE",
+};
+
 const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
-  const [supplier, setSupplier] = useState({
-    name: "",
-    contactPerson: "",
-    phone: "",
-    email: "",
-    address: "",
-    products: "",
-    status: "Active",
-  });
+  const [supplier, setSupplier] = useState(defaultSupplier);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (supplierData) {
-      setSupplier(supplierData);
+      setSupplier({
+        ...defaultSupplier,
+        ...supplierData,
+        status: String(supplierData.status || "ACTIVE").toUpperCase(),
+      });
     }
   }, [supplierData]);
 
-  const handleSave = () => {
-    if (!supplier.name || !supplier.contactPerson) {
-      alert("Name and Contact Person are required");
+  const handleSave = async () => {
+    const name = supplier.name.trim();
+    const contactPerson = supplier.contactPerson.trim();
+    if (!name || !contactPerson) {
+      setError("Name and Contact Person are required.");
       return;
     }
-    onSave(supplier);        // update data
-    setShowSuccess(true);    // show success modal
+
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        ...supplier,
+        name,
+        contactPerson,
+        status: supplier.status || "ACTIVE",
+      });
+      setShowSuccess(true);
+    } catch (err) {
+      setError(err.message || "Failed to update supplier.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
-    onClose(); // close main edit modal after success modal closes
+    onClose();
+  };
+
+  const updateField = (field, value) => {
+    setSupplier((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -82,9 +109,8 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                   type="text"
                   className="flex-1 border rounded px-3 py-2"
                   value={supplier.name}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, name: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("name", e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -93,9 +119,8 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                   type="text"
                   className="flex-1 border rounded px-3 py-2"
                   value={supplier.contactPerson}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, contactPerson: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("contactPerson", e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -104,9 +129,8 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                   type="text"
                   className="flex-1 border rounded px-3 py-2"
                   value={supplier.phone}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, phone: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("phone", e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -115,9 +139,8 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                   type="email"
                   className="flex-1 border rounded px-3 py-2"
                   value={supplier.email}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, email: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("email", e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -126,9 +149,8 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                   type="text"
                   className="flex-1 border rounded px-3 py-2"
                   value={supplier.address}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, address: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("address", e.target.value)}
                 />
               </div>
               <div className="flex items-start gap-4">
@@ -136,9 +158,8 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                 <textarea
                   className="flex-1 border rounded px-3 py-2 h-[70px] resize-none"
                   value={supplier.products}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, products: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("products", e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-4">
@@ -146,28 +167,32 @@ const EditSupplierModal = ({ supplierData, onClose, onSave }) => {
                 <select
                   className="flex-1 border rounded px-3 py-2"
                   value={supplier.status}
-                  onChange={(e) =>
-                    setSupplier({ ...supplier, status: e.target.value })
-                  }
+                  disabled={saving}
+                  onChange={(e) => updateField("status", e.target.value)}
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
                 </select>
               </div>
+              {error && (
+                <p className="text-sm text-red-600 text-center pt-2">{error}</p>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 px-10 pb-6">
               <button
                 onClick={onClose}
-                className="bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800"
+                className="bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 disabled:opacity-60"
+                disabled={saving}
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="bg-yellow-500 text-black px-6 py-2 rounded-full hover:bg-yellow-600"
+                className="bg-yellow-500 text-black px-6 py-2 rounded-full hover:bg-yellow-600 disabled:opacity-60"
+                disabled={saving}
               >
-                Save
+                {saving ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

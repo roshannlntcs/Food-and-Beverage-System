@@ -11,6 +11,7 @@ export const fetchInventoryLogs = async (params = {}) => {
   if (params.search) query.set('search', params.search);
   if (params.userId) query.set('userId', String(params.userId));
   if (params.productId) query.set('productId', params.productId);
+  if (params.withSuppliers) query.set('withSuppliers', 'true');
 
   const qs = query.toString();
   return api(qs ? `/inventory/logs?${qs}` : '/inventory/logs');

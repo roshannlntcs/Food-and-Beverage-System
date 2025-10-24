@@ -1,4 +1,4 @@
-﻿// frontend/src/contexts/InventoryContext.jsx
+// frontend/src/contexts/InventoryContext.jsx
 import React, {
   createContext,
   useCallback,

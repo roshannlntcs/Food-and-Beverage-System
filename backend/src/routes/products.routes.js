@@ -2,6 +2,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { z } = require('zod');
+const { recordInventoryLog } = require('../lib/inventory');
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -24,39 +25,6 @@ async function resolveCategoryId({ categoryId, category }) {
   if (existing) return existing.id;
   const created = await prisma.category.create({ data: { name } });
   return created.id;
-}
-
-async function recordInventoryLog(
-  tx,
-  {
-    productId,
-    productName,
-    action,
-    detail,
-    stock,
-    oldPrice,
-    newPrice,
-    category,
-    userId,
-  }
-) {
-  try {
-    await tx.inventoryLog.create({
-      data: {
-        productId: productId || null,
-        productName,
-        action,
-        detail: detail || null,
-        stock: stock ?? null,
-        oldPrice: oldPrice ?? null,
-        newPrice: newPrice ?? null,
-        category: category || null,
-        userId: userId ?? null,
-      },
-    });
-  } catch (error) {
-    console.error('Failed to record inventory log:', error);
-  }
 }
 
 // Map DB product to response shape (include category name)

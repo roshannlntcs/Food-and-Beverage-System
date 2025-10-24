@@ -34,6 +34,7 @@ export default function LogsModal({
                 <th className="p-2 text-left">Action</th>
                 <th className="p-2 text-left">Admin</th>
                 <th className="p-2 text-left">Product</th>
+                <th className="p-2 text-left">Supplier</th>
                 <th className="p-2 text-left">Stock</th>
                 <th className="p-2 text-left">Old Price</th>
                 <th className="p-2 text-left">New Price</th>
@@ -44,7 +45,7 @@ export default function LogsModal({
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan="9" className="text-center p-4 text-gray-500">
+                  <td colSpan="10" className="text-center p-4 text-gray-500">
                     Loading logs&hellip;
                   </td>
                 </tr>
@@ -55,6 +56,7 @@ export default function LogsModal({
                   <td className="p-2">{log.action}</td>
                   <td className="p-2">{log.admin}</td>
                   <td className="p-2">{log.product}</td>
+                  <td className="p-2 whitespace-pre-line">{log.supplier}</td>
                   <td className="p-2">{log.stock}</td>
                   <td className="p-2">{log.oldPrice}</td>
                   <td className="p-2">{log.newPrice}</td>
@@ -64,7 +66,7 @@ export default function LogsModal({
               ))}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan="9" className="text-center p-4 text-gray-500">
+                  <td colSpan="10" className="text-center p-4 text-gray-500">
                     No logs found.
                   </td>
                 </tr>

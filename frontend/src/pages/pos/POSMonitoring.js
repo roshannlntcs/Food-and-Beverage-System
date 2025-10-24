@@ -5,7 +5,7 @@ import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
-import { FaSearch } from "react-icons/fa";
+import { FaSearch, FaTimes } from "react-icons/fa";
 import { fetchOrders } from "../../api/orders";
 import { mapOrderToTx } from "../../utils/mapOrder";
 import ReceiptModal from "../../components/modals/ReceiptModal";
@@ -178,8 +178,9 @@ const formatDateTime = (value) => {
                     setUserQuery("");
                     setCurrentPage(1);
                   }}
-                  className="ml-2 text-xs text-gray-500 hover:text-gray-700"
+                  className="ml-2 flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
                 >
+                  <FaTimes />
                   Clear
                 </button>
               )}

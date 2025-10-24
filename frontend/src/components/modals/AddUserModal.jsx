@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 
 const ROLE_OPTIONS = [
   { value: "cashier", label: "Cashier" },

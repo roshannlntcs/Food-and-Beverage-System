@@ -39,6 +39,12 @@ enum SupplierStatus {
   INACTIVE
 }
 
+enum SupplierLogType {
+  DELIVERY
+  STATUS_CHANGE
+  NOTE
+}
+
 enum VoidType {
   TRANSACTION
   ITEM
@@ -65,6 +71,7 @@ model User {
   voidLogsCashier   VoidLog[]          @relation("VoidLogCashier")
   voidLogsManager   VoidLog[]          @relation("VoidLogManager")
   inventoryLogs     InventoryLog[]
+  supplierLogs      SupplierLog[]
 }
 
 model Category {
@@ -94,6 +101,7 @@ model Product {
   category    Category?  @relation(fields: [categoryId], references: [id])
   orderItems  OrderItem[]
   logs        InventoryLog[]
+  supplierLogs SupplierLog[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -193,6 +201,7 @@ model InventoryLog {
   userId        Int?
   user          User?    @relation(fields: [userId], references: [id])
   createdAt     DateTime @default(now())
+  supplierLogs  SupplierLog[]
 }
 
 model Supplier {
@@ -207,4 +216,25 @@ model Supplier {
   status        SupplierStatus @default(ACTIVE)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  logs          SupplierLog[]
+}
+
+model SupplierLog {
+  id             Int              @id @default(autoincrement())
+  supplierId     Int
+  supplier       Supplier         @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  type           SupplierLogType
+  productId      String?
+  product        Product?         @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productName    String?
+  quantity       Int?
+  unitCost       Float?
+  status         SupplierStatus?
+  notes          String?
+  metadata       Json?
+  inventoryLogId Int?
+  inventoryLog   InventoryLog?    @relation(fields: [inventoryLogId], references: [id], onDelete: SetNull)
+  recordedById   Int?
+  recordedBy     User?            @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
 }

@@ -150,9 +150,9 @@ export default function POSMain() {
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [pendingOrderId, setPendingOrderId] = useState(null);
 
   const [editingCartIndex, setEditingCartIndex] = useState(null);
-  const [modalEdited, setModalEdited] = useState(false);
 
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountType, setDiscountType] = useState("");
@@ -444,7 +444,6 @@ export default function POSMain() {
     });
     setEditingCartIndex(index);
     setShowModal(true);
-    setModalEdited(false);
   };
 
   const removeCartItem = (index) => {
@@ -472,7 +471,6 @@ export default function POSMain() {
     });
     setShowModal(true);
     setEditingCartIndex(null);
-    setModalEdited(false);
 
     // Auto-open customer view only the first time for this transaction
     try {
@@ -482,41 +480,77 @@ export default function POSMain() {
       }
     } catch (e) {}
   };
-
-  const applyCartItemChanges = () => {
-    const addonList = Array.isArray(modalProduct.selectedAddons)
-      ? modalProduct.selectedAddons
-      : [];
-    const addonsCost = addonList.reduce(
-      (sum, addon) => sum + Number(addon?.price || 0),
-      0
-    );
-    const sizeCost = modalProduct.size
-      ? Number(modalProduct.size.price || 0)
-      : 0;
-    const quantity = Number(modalProduct.quantity || 1);
-    const price = (Number(modalProduct.price || 0) + addonsCost + sizeCost) * quantity;
-
-    setCart(prev => prev.map((item, idx) => {
-      if (idx === editingCartIndex) {
-        return {
-          ...modalProduct,
-          addons: modalProduct.selectedAddons,
-          totalPrice: price,
-        };
-      }
-      return item;
-    }));
-    setShowModal(false);
-    setEditingCartIndex(null);
-    setModalEdited(false);
-  };
+
 
   // ---- totals (compute BEFORE using in useCallback deps) ----
   const subtotal = cart.reduce((sum, i) => sum + i.totalPrice, 0);
   const discountAmt = +(subtotal * discountPct / 100).toFixed(2);
   const tax = +(subtotal * 0.12).toFixed(2);
   const total = +(subtotal + tax - discountAmt).toFixed(2);
+
+  const buildPendingOrder = useCallback(
+    (id) => {
+      const now = new Date();
+      return {
+        id,
+        orderDbId: null,
+        orderID: id,
+        transactionID: id,
+        cashierId: currentUserId,
+        items: cart.map((item, index) => ({
+          id: `${item.id || "item"}-${index}`,
+          name: item.name,
+          quantity: Number(item.quantity || 1),
+          price: Number(item.price ?? item.totalPrice ?? 0),
+          selectedAddons: Array.isArray(item.selectedAddons)
+            ? item.selectedAddons
+            : [],
+          addons: Array.isArray(item.selectedAddons)
+            ? item.selectedAddons
+            : [],
+          size: item.size || null,
+          notes: item.notes || "",
+          voided: false,
+        })),
+        subtotal,
+        total,
+        status: "pending",
+        voided: false,
+        discountType,
+        couponCode,
+        date: now.toLocaleString(),
+        createdAt: now.toISOString(),
+        cashier: getUserDisplayName(currentUser),
+      };
+    },
+    [cart, subtotal, total, discountType, couponCode, currentUser, currentUserId]
+  );
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      if (pendingOrderId) {
+        setOrders((prev) => prev.filter((order) => order.orderID !== pendingOrderId));
+        setPendingOrderId(null);
+      }
+      return;
+    }
+
+    const seed = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const id = pendingOrderId || `PEND-${seed}`;
+    const placeholder = buildPendingOrder(id);
+
+    setOrders((prev) => {
+      const exists = prev.some((order) => order.orderID === id);
+      if (exists) {
+        return prev.map((order) =>
+          order.orderID === id ? { ...order, ...placeholder } : order
+        );
+      }
+      return [placeholder, ...prev];
+    });
+
+    if (!pendingOrderId) setPendingOrderId(id);
+  }, [cart, buildPendingOrder, pendingOrderId]);
 
   useEffect(() => {
     const amount = Number(total || 0);
@@ -646,6 +680,13 @@ export default function POSMain() {
     };
 
     try {
+      if (pendingOrderId) {
+        setOrders((prev) =>
+          prev.filter((order) => order.orderID !== pendingOrderId)
+        );
+        setPendingOrderId(null);
+      }
+
       const created = await createOrder(orderPayload);
       const mappedTx = mapOrderToTx(created);
       const uiOrder = mapOrderToUiOrder(created);
@@ -720,6 +761,7 @@ export default function POSMain() {
     applyTransaction,
     refreshOrdersAndVoids,
     currentUserId,
+    pendingOrderId,
   ]);
 
   const buildCustomerPayload = useCallback(() => {
@@ -1100,7 +1142,8 @@ export default function POSMain() {
     }
   }, [activeTab]);
 
-  const categoriesEnabled = activeTab === "Menu" || activeTab === "Status";
+  const categoriesEnabled = activeTab === "Menu" || activeTab === "Status";
+
 
   return (
     <div className="flex h-screen bg-[#F6F3EA] font-poppins text-black">
@@ -1310,7 +1353,6 @@ export default function POSMain() {
               totalPrice: price,
             },
           ]);
-          setModalEdited(false);
         }}
         onApply={({ quantity, size, addons, notes }, idx) => {
           const addonList = Array.isArray(addons) ? addons : [];
@@ -1336,7 +1378,6 @@ export default function POSMain() {
                 : item
             )
           );
-          setModalEdited(false);
         }}
         onRemove={idx => setCart(prev => prev.filter((_,i) => i !== idx))}
       />

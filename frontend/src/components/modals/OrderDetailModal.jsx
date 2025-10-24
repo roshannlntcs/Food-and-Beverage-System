@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { placeholders } from "../../utils/data";
 import statusIcon from "../../assets/status.png";
 import { useInventory } from "../../contexts/InventoryContext";
+import { updateOrderStatus } from "../../api/orders";
+import { mapUiStatusToOrder } from "../../utils/mapOrder";
 
 const collectSpecialInstructions = (item) => {
   if (!item || typeof item !== "object") return "";
@@ -41,10 +43,42 @@ export default function OrderDetailModal({
 
   const [newStatus, setNewStatus] = useState(order?.status || "");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (order) setNewStatus(order.status);
   }, [order]);
+
+  useEffect(() => {
+    if (!order) return;
+    if (order.status !== "pending") {
+      setNewStatus(order.status);
+      return;
+    }
+
+    if (!order.orderDbId) {
+      setNewStatus("ongoing");
+      onStatusChange?.(order.orderID, "ongoing");
+      return;
+    }
+
+    let cancelled = false;
+    const advanceStatus = async () => {
+      try {
+        await updateOrderStatus(order.orderDbId, "READY");
+        if (cancelled) return;
+        setNewStatus("ongoing");
+        onStatusChange?.(order.orderID, "ongoing");
+      } catch (error) {
+        console.error("Failed to auto-update order to ongoing:", error);
+      }
+    };
+
+    advanceStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [order, onStatusChange]);
 
   if (!order) return null;
 
@@ -150,7 +184,6 @@ export default function OrderDetailModal({
               <div key={category}>
                 <h3 className="font-semibold text-md mt-4 mb-1">{category}</h3>
                 {items.map((item, i) => {
-                  const sizeUp = Number(item?.size?.price || 0);
                   const sizeLabel = item?.size?.label || "N/A";
                   const addons = item.selectedAddons || item.addons || [];
                   const addonLabels = addons.map(a => a.label).join(", ") || "None";
@@ -198,13 +231,36 @@ export default function OrderDetailModal({
             Close
           </button>
           <button
-            onClick={() => {
-              onStatusChange(order.orderID, newStatus);
-              setHistoryContext(null);
+            onClick={async () => {
+              if (saving) return;
+              const prismaStatus = mapUiStatusToOrder(newStatus);
+              if (!prismaStatus) {
+                alert("Unsupported status selected.");
+                return;
+              }
+
+              if (!order.orderDbId) {
+                onStatusChange?.(order.orderID, newStatus);
+                setHistoryContext(null);
+                return;
+              }
+
+              try {
+                setSaving(true);
+                await updateOrderStatus(order.orderDbId, prismaStatus);
+                onStatusChange?.(order.orderID, newStatus);
+                setHistoryContext(null);
+              } catch (error) {
+                console.error("Failed to update order status:", error);
+                alert(error?.message || "Failed to update order status. Please try again.");
+              } finally {
+                setSaving(false);
+              }
             }}
+            disabled={saving}
             className="flex-1 py-2 bg-[#800000] text-white rounded-lg font-semibold hover:font-bold"
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>

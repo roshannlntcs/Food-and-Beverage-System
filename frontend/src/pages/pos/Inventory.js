@@ -63,7 +63,48 @@ const describeOptions = (list) =>
             : `${entry.label}${entry.price ? ` (${PESO}${Number(entry.price).toFixed(2)})` : ''}`
         )
         .join(', ')
-    : '—';
+    : 'â€”';
+
+const describeSupplierLink = (link) => {
+  if (!link) return '';
+
+  const supplierName = link.supplier?.name || 'Supplier';
+  const parts = [supplierName];
+
+  if (link.type === 'DELIVERY') {
+    const detailPieces = [];
+    if (Number.isFinite(link.quantity)) detailPieces.push(`qty ${link.quantity}`);
+    if (Number.isFinite(link.unitCost)) detailPieces.push(`unit ${formatCurrency(link.unitCost)}`);
+    parts.push(`Delivery${detailPieces.length ? ` (${detailPieces.join(', ')})` : ''}`);
+  } else if (link.type === 'STATUS_CHANGE') {
+    const previous = link.metadata?.previousStatus || link.metadata?.prevStatus;
+    const next = link.metadata?.nextStatus || link.metadata?.status || link.supplier?.status;
+    const statusDetail =
+      previous && next ? `${previous} â†’ ${next}` : next ? `Now ${next}` : 'Status change';
+    parts.push(statusDetail);
+  } else {
+    parts.push(link.type || 'Log');
+  }
+
+  if (link.notes) {
+    parts.push(link.notes);
+  } else if (Array.isArray(link.metadata?.changes) && link.metadata.changes.length) {
+    const changeLabels = link.metadata.changes
+      .map((change) => change?.field || '')
+      .filter(Boolean);
+    if (changeLabels.length) parts.push(`Updated: ${changeLabels.join(', ')}`);
+  }
+
+  return parts.filter(Boolean).join(' â€” ');
+};
+
+const summarizeSupplierLinks = (links) => {
+  if (!Array.isArray(links) || !links.length) return '';
+  const lines = links
+    .map((link) => describeSupplierLink(link))
+    .filter((line) => line && line.trim().length);
+  return lines.join('\n');
+};
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,7 +169,7 @@ export default function Inventory() {
   const refreshLogs = useCallback(async () => {
     setLogsLoading(true);
     try {
-      const response = await fetchInventoryLogs({ take: 200 });
+      const response = await fetchInventoryLogs({ take: 200, withSuppliers: true });
       const list = Array.isArray(response?.data)
         ? response.data
         : Array.isArray(response)
@@ -153,6 +194,7 @@ export default function Inventory() {
             : formatCurrency(log.newPrice),
         category: log.category || '-',
         detail: log.detail || '-',
+        supplier: summarizeSupplierLinks(log.suppliers) || '-',
       }));
       setLogs(mapped);
     } catch (error) {
@@ -421,10 +463,10 @@ export default function Inventory() {
                     <td className="p-3">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="p-3">{item.name}</td>
                     <td className="p-3">{formatCurrency(item.price)}</td>
-                    <td className="p-3">{item.category || '—'}</td>
-                    <td className="p-3">{item.allergens || '—'}</td>
+                    <td className="p-3">{item.category || 'â€”'}</td>
+                    <td className="p-3">{item.allergens || 'â€”'}</td>
                     <td className="p-3">{describeOptions(item.addons)}</td>
-                    <td className="p-3">{item.description || '—'}</td>
+                    <td className="p-3">{item.description || 'â€”'}</td>
                     <td className="p-3">{describeOptions(item.sizes)}</td>
                     <td className="p-3 text-center">{item.quantity ?? 0}</td>
                     <td className="p-3 text-center">

@@ -1,4 +1,4 @@
-﻿// src/components/Header.jsx
+// src/components/Header.jsx
 import React from "react";
 import logo from "../assets/logo-pos2.png";
 import avatar from "../assets/avatar-ph.png";
@@ -17,13 +17,12 @@ const formatRole = (role) => {
 
 export default function Header({
   userName,
-  profilePic,
+  profilePic = avatar,
   roleLabel = "Cashier",
   onProfileClick,
   searchTerm,
   onSearchChange,
 }) {
-  const resolvedProfilePic = profilePic || avatar;
   const displayRole = formatRole(roleLabel);
 
   return (
@@ -53,7 +52,7 @@ export default function Header({
         className="flex items-center space-x-2 bg-[#FFC72C] px-3 py-1.5 rounded-full shadow hover:scale-105 transition-transform duration-150"
       >
         <img
-          src={resolvedProfilePic}
+          src={profilePic}
           alt="Profile"
           className="w-10 h-10 rounded-full object-cover border border-gray-300"
         />

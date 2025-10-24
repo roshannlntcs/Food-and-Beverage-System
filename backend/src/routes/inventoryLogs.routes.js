@@ -12,6 +12,29 @@ const InventoryLogQuery = z.object({
   search: z.string().optional(),
   userId: z.coerce.number().int().optional(),
   productId: z.string().optional(),
+  withSuppliers: z
+    .union([z.literal('true'), z.literal('false'), z.boolean()])
+    .optional()
+    .transform((value) => {
+      if (typeof value === 'boolean') return value;
+      return value === 'true';
+    }),
+});
+
+const shapeSupplierLink = (link) => ({
+  id: link.id,
+  type: link.type,
+  quantity: link.quantity,
+  unitCost: link.unitCost,
+  notes: link.notes || null,
+  metadata: link.metadata || null,
+  supplier: link.supplier
+    ? {
+        id: link.supplier.id,
+        name: link.supplier.name,
+        status: link.supplier.status,
+      }
+    : null,
 });
 
 const shapeLog = (log) => ({
@@ -32,6 +55,9 @@ const shapeLog = (log) => ({
         username: log.user.username,
       }
     : null,
+  suppliers: Array.isArray(log.supplierLogs)
+    ? log.supplierLogs.map(shapeSupplierLink)
+    : [],
 });
 
 router.get('/', async (req, res) => {
@@ -63,9 +89,18 @@ router.get('/', async (req, res) => {
 
     const take = query.take || 50;
 
+    const include = { user: true };
+    if (query.withSuppliers) {
+      include.supplierLogs = {
+        include: {
+          supplier: true,
+        },
+      };
+    }
+
     const logs = await prisma.inventoryLog.findMany({
       where,
-      include: { user: true },
+      include,
       orderBy: { createdAt: 'desc' },
       take,
       ...(query.cursor

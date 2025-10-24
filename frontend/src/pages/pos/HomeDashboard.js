@@ -1,7 +1,6 @@
 // src/pages/pos/HomeDashboard.js
 import React, { useState } from "react";
 import Sidebar from "../../components/Sidebar";
-import AdminInfo from "../../components/AdminInfo";
 import AdminInfoDashboard2 from "../../components/AdminInfoDashboard2";
 import {
   BarChart,

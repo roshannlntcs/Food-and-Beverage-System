@@ -1,13 +1,13 @@
 // src/components/admin/AddCategoryModal.jsx
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
+
+const DEFAULT_ICON = "/assets/default-category.png";
 
 export default function AddCategoryModal({ onClose, onAdded }) {
   const [categoryName, setCategoryName] = useState("");
   const [iconFile, setIconFile] = useState(null);
   const [iconPreview, setIconPreview] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  const DEFAULT_ICON = useMemo(() => "/assets/default-category.png", []);
 
   const fileToDataUrl = (file) =>
     new Promise((resolve, reject) => {

@@ -1,8 +1,4 @@
-// src/utils/data.js
-export { getImage } from '../utils/images'; // delegate to the single resolver
-
-
-// 2. Menu placeholders (copy these straight from your old POSMain.jsx)
+// src/utils/data.js\n// 2. Menu placeholders (copy these straight from your old POSMain.jsx)
 export const placeholders = {
     "Main Dish": [
       {
@@ -41,7 +37,7 @@ export const placeholders = {
         price:       115,
         image:       "chicken-adobo.jpg",
         sizes:       [{ label: "Regular", price: 0 }, { label: "Double Chicken", price: 40 }],
-        addons:      [{ label: "Hard‑Boiled Egg", price: 10 }],
+        addons:      [{ label: "HardÃ¢â‚¬â€˜Boiled Egg", price: 10 }],
         notes:       "",
         allergens:   "Soy, Egg"
       },
@@ -273,7 +269,7 @@ export const placeholders = {
       },
       {
         name:        "Grilled Corn",
-        description: "Charcoal‑grilled corn with butter.",
+        description: "CharcoalÃ¢â‚¬â€˜grilled corn with butter.",
         price:       45,
         image:       "grilled-corn.jpg",
         sizes:       [{ label: "Single", price: 0 }],
@@ -356,7 +352,7 @@ export const placeholders = {
       },
       {
         name:        "Beef Kare-Kare Soup",
-        description: "Peanut‑flavored oxtail soup.",
+        description: "PeanutÃ¢â‚¬â€˜flavored oxtail soup.",
         price:       140,
         image:       "kare-kare.jpg",
         sizes:       [{ label: "Bowl", price: 0 }],
@@ -419,7 +415,7 @@ export const placeholders = {
     "Dessert": [
       {
         name:        "Leche Flan",
-        description: "Creamy caramel‑topped custard.",
+        description: "Creamy caramelÃ¢â‚¬â€˜topped custard.",
         price:       50,
         image:       "leche-flan.jpg",
         sizes:       [{ label: "Single", price: 0 }],
@@ -459,7 +455,7 @@ export const placeholders = {
       },
       {
         name:        "Turon",
-        description: "Banana‑spring roll with brown sugar.",
+        description: "BananaÃ¢â‚¬â€˜spring roll with brown sugar.",
         price:       55,
         image:       "turon.jpg",
         sizes:       [{ label: "2 pcs", price: 0 }, { label: "4 pcs", price: 15 }],
@@ -592,7 +588,7 @@ export const placeholders = {
       },
       {
         name:        "Sprite",
-        description: "Lemon‑lime soda, ice‑cold.",
+        description: "LemonÃ¢â‚¬â€˜lime soda, iceÃ¢â‚¬â€˜cold.",
         price:       40,
         image:       "sprite.jpg",
         sizes:       [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
@@ -602,7 +598,7 @@ export const placeholders = {
       },
       {
         name:        "Royal",
-        description: "Sweet grape‑flavored soda.",
+        description: "Sweet grapeÃ¢â‚¬â€˜flavored soda.",
         price:       40,
         image:       "royal.jpg",
         sizes:       [{ label: "330ml", price: 0 }, { label: "500ml", price: 10 }],
@@ -646,8 +642,10 @@ export const allItemsFlat = Object.entries(placeholders).flatMap(([category, ite
   }))
 );
 
-export default {
+const data = {
   placeholders,
   shopDetails,
   allItemsFlat,
 };
+
+export default data;

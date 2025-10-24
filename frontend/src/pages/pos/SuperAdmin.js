@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import Sidebar from "../../components/Sidebar";

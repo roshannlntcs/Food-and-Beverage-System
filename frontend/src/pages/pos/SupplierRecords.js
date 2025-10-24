@@ -1,5 +1,5 @@
 // src/pages/admin/SupplierRecords.jsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import AdminInfo from "../../components/AdminInfo";
 import { FaSearch, FaPen } from "react-icons/fa";
@@ -7,220 +7,466 @@ import AddSupplierModal from "../../components/AddSupplierModal";
 import EditSupplierModal from "../../components/EditSupplierModal";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
-import { useAuth } from "../../contexts/AuthContext";
+import {
+  listSuppliers,
+  createSupplier,
+  updateSupplier,
+  listSupplierLogs,
+  listSupplierLogsBySupplier,
+  createSupplierLog,
+} from "../../api/suppliers";
+import { api } from "../../api/client";
 
-const SUPPLIER_LOGS_KEY = "supplierLogs";
+const STATUS_LABELS = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+};
 
-// All default to Active
-const initialSuppliers = [
-  { name: "Davao Fresh Supplies", contactPerson: "Maria Santos", phone: "09171234567", email: "davaofresh@example.com", address: "Davao City", products: "Eggs, Chicken", status: "Active" },
-  { name: "Panabo Meats", contactPerson: "Jose Dela Cruz", phone: "09281234567", email: "panabomeats@example.com", address: "Panabo City", products: "Beef, Pork", status: "Active" },
-  { name: "Tagum Agro Supplies", contactPerson: "Liza Moreno", phone: "09391234567", email: "tagumagro@example.com", address: "Tagum City", products: "Vegetables, Spices", status: "Active" },
-  { name: "Mintal Livestock", contactPerson: "Carlos Mendoza", phone: "09551234567", email: "mintallive@example.com", address: "Mintal, Davao City", products: "Chicken, Duck", status: "Active" },
-  { name: "Toril Groceries", contactPerson: "Jenny Abad", phone: "09661234567", email: "torilgrocery@example.com", address: "Toril, Davao City", products: "Fruits, Canned Goods", status: "Active" },
-  { name: "Calinan Egg Supply", contactPerson: "Ronnie Cruz", phone: "09184561234", email: "calinanegg@example.com", address: "Calinan, Davao City", products: "Eggs", status: "Active" },
-  { name: "Agdao Market Bulk", contactPerson: "Elaine Yu", phone: "09999992345", email: "agdao_bulk@example.com", address: "Agdao, Davao City", products: "Meat, Vegetables", status: "Active" },
-  { name: "Ecoland Dairy", contactPerson: "Francis Dy", phone: "09213456789", email: "ecolanddairy@example.com", address: "Ecoland, Davao City", products: "Milk, Yogurt", status: "Active" },
-  { name: "Bajada Farms", contactPerson: "Althea Tan", phone: "09112223344", email: "bajadafarms@example.com", address: "Bajada, Davao City", products: "Organic Chicken", status: "Active" },
-  { name: "SM Wholesale", contactPerson: "Janice Ong", phone: "09199887766", email: "smwholesale@example.com", address: "Lanang, Davao City", products: "Various Goods", status: "Active" },
-  { name: "Matina Traders", contactPerson: "Arthur G.", phone: "09988776655", email: "matinatraders@example.com", address: "Matina, Davao City", products: "Spices, Oil", status: "Active" },
-  { name: "Tagum Veggies Depot", contactPerson: "Rowena L.", phone: "09173334455", email: "tagumveggies@example.com", address: "Tagum City", products: "Lettuce, Tomatoes", status: "Active" },
-  { name: "Panabo Cold Storage", contactPerson: "Dexter Lim", phone: "09334455667", email: "panabocold@example.com", address: "Panabo City", products: "Frozen Goods", status: "Active" },
-  { name: "Gaisano Bulk Center", contactPerson: "Clarence Uy", phone: "09215557788", email: "gaisanobulk@example.com", address: "Davao City", products: "Dry Goods, Beverages", status: "Active" },
-  { name: "Sasa Fisheries", contactPerson: "Irene Mendoza", phone: "09097773344", email: "sasafish@example.com", address: "Sasa, Davao City", products: "Fish, Shrimp", status: "Active" },
-];
+const formatStatus = (value) => STATUS_LABELS[value] || value || "Unknown";
+
+const safeTrim = (value) => (typeof value === "string" ? value.trim() : value);
+
+const normalizeSupplierPayload = (form) => {
+  const status = String(form.status || "ACTIVE").toUpperCase();
+  return {
+    name: safeTrim(form.name) || "",
+    contactPerson: safeTrim(form.contactPerson) || null,
+    phone: safeTrim(form.phone) || null,
+    email: safeTrim(form.email) || null,
+    address: safeTrim(form.address) || null,
+    products: safeTrim(form.products) || null,
+    notes: safeTrim(form.notes) || null,
+    status,
+  };
+};
+
+const formatDateTime = (input) => {
+  if (!input) return "â€”";
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return input;
+  return date.toLocaleString();
+};
+
+const formatLogType = (type) => {
+  switch (type) {
+    case "DELIVERY":
+      return "Delivery";
+    case "STATUS_CHANGE":
+      return "Status Change";
+    case "NOTE":
+      return "Note";
+    default:
+      return type ? type.replace(/_/g, " ") : "â€”";
+  }
+};
+
+const describeMetadata = (metadata) => {
+  if (!metadata || typeof metadata !== "object") return "";
+  return Object.entries(metadata)
+    .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`)
+    .join("\n");
+};
+
+const describeLogDetails = (log) => {
+  const lines = [];
+  if (log.notes) lines.push(log.notes);
+  if (typeof log.quantity === "number") lines.push(`Quantity: ${log.quantity}`);
+  if (typeof log.unitCost === "number") {
+    lines.push(`Unit Cost: PHP ${Number(log.unitCost).toFixed(2)}`);
+  }
+  if (log.inventoryLog?.stock !== undefined && log.inventoryLog?.stock !== null) {
+    lines.push(`Stock After: ${log.inventoryLog.stock}`);
+  }
+  const metadataText = describeMetadata(log.metadata);
+  if (metadataText) lines.push(metadataText);
+  return lines.join("\n");
+};
+
+const createInitialLogForm = (supplierId = "") => ({
+  type: "DELIVERY",
+  supplierId,
+  productId: "",
+  quantity: "",
+  unitCost: "",
+  notes: "",
+});
 
 const SupplierRecords = () => {
-  const [suppliers, setSuppliers] = useState(initialSuppliers);
+  const [suppliers, setSuppliers] = useState([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(true);
+  const [supplierError, setSupplierError] = useState(null);
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showLogsModal, setShowLogsModal] = useState(false);
-
-  // initialize logs from storage
-  const [logs, setLogs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(SUPPLIER_LOGS_KEY) || "[]"); }
-    catch { return []; }
-  });
-
-  // persist logs on change
-  useEffect(() => {
-    try { localStorage.setItem(SUPPLIER_LOGS_KEY, JSON.stringify(logs)); }
-    catch {}
-  }, [logs]);
-
-  // de-dupe guard for double-calls (StrictMode, double submit, etc.)
-  const lastLogKeyRef = useRef("");
-  const appendLog = (entry) => {
-    const key = `${entry.action}|${entry.supplier}|${entry.detail}`;
-    if (lastLogKeyRef.current === key) return;
-    lastLogKeyRef.current = key;
-    setLogs(prev => [...prev, { ...entry }]);
-    // release key shortly so legitimate identical next action later can log
-    setTimeout(() => {
-      if (lastLogKeyRef.current === key) lastLogKeyRef.current = "";
-    }, 1000);
-  };
-
-  const [selectedSupplierIndex, setSelectedSupplierIndex] = useState(null);
-  const [newSupplier, setNewSupplier] = useState({
-    name: "",
-    contactPerson: "",
-    phone: "",
-    email: "",
-    address: "",
-    products: "",
-    status: "Active",
-  });
-
+  const [editingSupplier, setEditingSupplier] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
-  const { currentUser } = useAuth() || {};
-  const adminName = currentUser?.fullName || "Admin";
+  const [showLogsModal, setShowLogsModal] = useState(false);
+  const [logFilterSupplierId, setLogFilterSupplierId] = useState("all");
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState(null);
+  const [logsNextCursor, setLogsNextCursor] = useState(null);
 
-  const nowStr = () =>
-    new Date().toISOString().slice(0, 16).replace("T", " ");
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState(null);
 
-  const handleAddSupplier = (supplier) => {
-    const toSave = { ...supplier, status: supplier?.status || "Active" };
-    setSuppliers(prev => [...prev, toSave]);
+  const [logForm, setLogForm] = useState(createInitialLogForm());
+  const [logSubmitting, setLogSubmitting] = useState(false);
+  const [logSubmitError, setLogSubmitError] = useState(null);
 
-    appendLog({
-      datetime: nowStr(),
-      action: "Add",
-      admin: adminName,
-      supplier: toSave.name,
-      detail: `Added new supplier:
-Name: ${toSave.name}
-Contact Person: ${toSave.contactPerson}
-Phone: ${toSave.phone}
-Email: ${toSave.email}
-Address: ${toSave.address}
-Products: ${toSave.products}
-Status: ${toSave.status}`,
-    });
-  };
-
-  const handleEditSupplier = (updatedSupplier) => {
-    // compute next state and changes outside of setState to avoid side effects duplication
-    const next = [...suppliers];
-    const old = next[selectedSupplierIndex];
-    const curr = {
-      ...updatedSupplier,
-      status: updatedSupplier?.status || "Active",
-    };
-    next[selectedSupplierIndex] = curr;
-
-    const changes = [];
-    for (const key of Object.keys(old)) {
-      if ((old[key] ?? "") !== (curr[key] ?? "")) {
-        changes.push(`${key}: "${old[key] ?? ""}" → "${curr[key] ?? ""}"`);
-      }
+  const loadSuppliers = async () => {
+    setLoadingSuppliers(true);
+    try {
+      const response = await listSuppliers();
+      const list = Array.isArray(response?.suppliers) ? [...response.suppliers] : [];
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      setSuppliers(list);
+      setSupplierError(null);
+      setCurrentPage(1);
+    } catch (error) {
+      setSupplierError(error.message || "Failed to load suppliers.");
+    } finally {
+      setLoadingSuppliers(false);
     }
-
-    setSuppliers(next);
-
-    appendLog({
-      datetime: nowStr(),
-      action: "Update",
-      admin: adminName,
-      supplier: curr.name,
-      detail: changes.length > 0 ? changes.join("\n") : "No changes made",
-    });
   };
 
-  const filteredSuppliers = suppliers.filter((supplier) => {
-    const searchTerm = search.toLowerCase();
-    return (
-      supplier.name.toLowerCase().includes(searchTerm) ||
-      supplier.contactPerson.toLowerCase().includes(searchTerm) ||
-      supplier.phone.toLowerCase().includes(searchTerm) ||
-      supplier.email.toLowerCase().includes(searchTerm)
-    );
-  });
+  useEffect(() => {
+    loadSuppliers();
+  }, []);
+
+  useEffect(() => {
+    if (!showLogsModal) return;
+    if (products.length || productsLoading) return;
+    const fetchProducts = async () => {
+      setProductsLoading(true);
+      try {
+        const list = await api("/products?includeInactive=true", "GET");
+        setProducts(Array.isArray(list) ? list : []);
+        setProductsError(null);
+      } catch (error) {
+        setProductsError(error.message || "Failed to load products.");
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, [showLogsModal, products.length, productsLoading]);
+
+  useEffect(() => {
+    if (showLogsModal) {
+      const supplierId = logFilterSupplierId !== "all" ? String(logFilterSupplierId) : "";
+      setLogForm(createInitialLogForm(supplierId));
+    } else {
+      setLogForm(createInitialLogForm());
+      setLogs([]);
+      setLogsNextCursor(null);
+      setLogsError(null);
+      setLogSubmitError(null);
+    }
+  }, [showLogsModal, logFilterSupplierId]);
+
+  useEffect(() => {
+    if (!showLogsModal) return;
+    if (logFilterSupplierId === "all") return;
+    setLogForm((prev) => ({ ...prev, supplierId: String(logFilterSupplierId) }));
+  }, [logFilterSupplierId, showLogsModal]);
+
+  const fetchLogs = useCallback(
+    async ({ reset = false, cursor } = {}) => {
+      if (!showLogsModal) return;
+      setLogsLoading(true);
+      if (reset) {
+        setLogs([]);
+        setLogsNextCursor(null);
+      }
+      try {
+        const params = { take: 50 };
+        if (cursor) params.cursor = cursor;
+        let response;
+        if (logFilterSupplierId === "all") {
+          response = await listSupplierLogs(params);
+        } else {
+          response = await listSupplierLogsBySupplier(Number(logFilterSupplierId), params);
+        }
+        const data = Array.isArray(response?.data) ? response.data : [];
+        setLogs((prev) => (reset ? data : [...prev, ...data]));
+        setLogsNextCursor(response?.nextCursor ?? null);
+        setLogsError(null);
+      } catch (error) {
+        setLogsError(error.message || "Failed to load supplier logs.");
+      } finally {
+        setLogsLoading(false);
+      }
+    },
+    [logFilterSupplierId, showLogsModal]
+  );
+
+  useEffect(() => {
+    if (!showLogsModal) return;
+    fetchLogs({ reset: true });
+  }, [showLogsModal, logFilterSupplierId, fetchLogs]);
+
+  const filteredSuppliers = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return suppliers;
+    return suppliers.filter((supplier) => {
+      const fields = [
+        supplier.name,
+        supplier.contactPerson,
+        supplier.products,
+        supplier.status,
+        supplier.email,
+        supplier.phone,
+        supplier.address,
+      ];
+      return fields.some((field) => (field || "").toLowerCase().includes(keyword));
+    });
+  }, [suppliers, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / entriesPerPage) || 1);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, entriesPerPage]);
 
   const indexOfLastEntry = currentPage * entriesPerPage;
   const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
   const currentSuppliers = filteredSuppliers.slice(indexOfFirstEntry, indexOfLastEntry);
-  const totalPages = Math.ceil(filteredSuppliers.length / entriesPerPage);
+
+  const openLogsModal = (supplierId = "all") => {
+    setLogFilterSupplierId(supplierId === "all" ? "all" : String(supplierId));
+    setShowLogsModal(true);
+  };
+
+  const closeLogsModal = () => {
+    setShowLogsModal(false);
+    setLogFilterSupplierId("all");
+  };
+
+  const handleAddSupplier = async (formValues) => {
+    const payload = normalizeSupplierPayload(formValues);
+    if (!payload.name) {
+      throw new Error("Supplier name is required.");
+    }
+    const { supplier } = await createSupplier(payload);
+    setSuppliers((prev) => {
+      const next = [...prev, supplier];
+      next.sort((a, b) => a.name.localeCompare(b.name));
+      return next;
+    });
+  };
+
+  const handleEditSupplier = async (updatedValues) => {
+    const supplierId = updatedValues.id || editingSupplier?.id;
+    if (!supplierId) {
+      throw new Error("Missing supplier id.");
+    }
+    const payload = normalizeSupplierPayload(updatedValues);
+    const { supplier } = await updateSupplier(supplierId, payload);
+    setSuppliers((prev) => {
+      const next = prev.map((item) => (item.id === supplier.id ? supplier : item));
+      next.sort((a, b) => a.name.localeCompare(b.name));
+      return next;
+    });
+    setEditingSupplier(supplier);
+    if (
+      showLogsModal &&
+      (logFilterSupplierId === "all" || logFilterSupplierId === String(supplier.id))
+    ) {
+      fetchLogs({ reset: true });
+    }
+  };
+
+  const handleLogFilterChange = (event) => {
+    setLogFilterSupplierId(event.target.value);
+  };
+
+  const handleLogFormChange = (field, value) => {
+    setLogForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogTypeChange = (value) => {
+    setLogForm((prev) =>
+      value === "DELIVERY"
+        ? { ...prev, type: value }
+        : { ...prev, type: value, productId: "", quantity: "", unitCost: "" }
+    );
+  };
+
+  const handleLogFormSubmit = async (event) => {
+    event.preventDefault();
+    if (logSubmitting) return;
+
+    setLogSubmitError(null);
+
+    const supplierIdValue =
+      logFilterSupplierId === "all" ? logForm.supplierId : String(logFilterSupplierId);
+    if (!supplierIdValue) {
+      setLogSubmitError("Supplier is required.");
+      return;
+    }
+    const supplierId = Number(supplierIdValue);
+    if (!Number.isInteger(supplierId)) {
+      setLogSubmitError("Invalid supplier.");
+      return;
+    }
+
+    const payload = {
+      type: logForm.type,
+    };
+    const trimmedNotes = safeTrim(logForm.notes);
+    if (trimmedNotes) payload.notes = trimmedNotes;
+
+    if (logForm.type === "DELIVERY") {
+      if (!logForm.productId) {
+        setLogSubmitError("Product is required for deliveries.");
+        return;
+      }
+      const quantity = Number(logForm.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        setLogSubmitError("Quantity must be a positive number.");
+        return;
+      }
+      payload.productId = logForm.productId;
+      payload.quantity = Math.trunc(quantity);
+      if (logForm.unitCost) {
+        const unitCost = Number(logForm.unitCost);
+        if (Number.isFinite(unitCost)) {
+          payload.unitCost = unitCost;
+        }
+      }
+    }
+
+    setLogSubmitting(true);
+    try {
+      await createSupplierLog(supplierId, payload);
+      await fetchLogs({ reset: true });
+      const defaultSupplierId = logFilterSupplierId !== "all" ? String(logFilterSupplierId) : "";
+      setLogForm(createInitialLogForm(defaultSupplierId));
+    } catch (error) {
+      setLogSubmitError(error.message || "Failed to record supplier log.");
+    } finally {
+      setLogSubmitting(false);
+    }
+  };
+
+  const handleLoadMoreLogs = () => {
+    if (!logsNextCursor) return;
+    fetchLogs({ cursor: logsNextCursor });
+  };
 
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
       <div className="ml-20 p-6 w-full">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Supplier Records</h1>
           <AdminInfo />
         </div>
 
-        {/* Search & Add */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
-            <input
-              type="text"
-              placeholder="Search Supplier"
-              className="outline-none w-full text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <FaSearch className="text-gray-500 text-sm" />
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center border rounded-md px-4 py-2 w-full sm:w-96 bg-white">
+              <input
+                type="text"
+                placeholder="Search Supplier"
+                className="outline-none w-full text-sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <FaSearch className="text-gray-500 text-sm" />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={loadSuppliers}
+                className="px-4 py-1 rounded-full border border-gray-300 text-sm bg-white hover:bg-gray-100 disabled:opacity-60"
+                disabled={loadingSuppliers}
+              >
+                {loadingSuppliers ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow border border-yellow-500 rounded-full text-sm"
+              >
+                + Add Supplier
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 rounded shadow text-lg font-semibold border border-yellow-500 rounded-full text-sm"
-          >
-            + Add Supplier
-          </button>
+          {supplierError && (
+            <p className="text-sm text-red-600">{supplierError}</p>
+          )}
         </div>
 
-        {/* Table */}
-        <div className="border rounded-md overflow-hidden">
-          <div className="max-h-[500px] overflow-y-auto">
-            <table className="w-full table-auto border-collapse text-sm">
-              <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
-                <tr className="text-left">
-                  <th className="p-3">No.</th>
-                  <th className="p-3">Supplier Name</th>
-                  <th className="p-3">Contact Person</th>
-                  <th className="p-3">Phone</th>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Address</th>
-                  <th className="p-3">Products</th>
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="overflow-auto">
+            <table className="table-auto w-full text-sm">
+              <thead className="bg-[#8B0000] text-white">
+                <tr>
+                  <th className="p-3 text-left">#</th>
+                  <th className="p-3 text-left">Supplier Name</th>
+                  <th className="p-3 text-left">Contact Person</th>
+                  <th className="p-3 text-left">Phone Number</th>
+                  <th className="p-3 text-left">Email</th>
+                  <th className="p-3 text-left">Address</th>
+                  <th className="p-3 text-left">Products</th>
                   <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-center">Edit</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {currentSuppliers.length > 0 ? (
+                {loadingSuppliers && currentSuppliers.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" className="text-center p-4 text-gray-500">
+                      Loading suppliers...
+                    </td>
+                  </tr>
+                ) : currentSuppliers.length > 0 ? (
                   currentSuppliers.map((supplier, i) => (
-                    <tr key={i} className="bg-white border-b hover:bg-[#f1f1f1]">
+                    <tr
+                      key={supplier.id || supplier.name}
+                      className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                    >
                       <td className="p-3">{indexOfFirstEntry + i + 1}</td>
-                      <td className="p-3">{supplier.name}</td>
-                      <td className="p-3">{supplier.contactPerson}</td>
-                      <td className="p-3">{supplier.phone}</td>
-                      <td className="p-3">{supplier.email}</td>
-                      <td className="p-3">{supplier.address}</td>
-                      <td className="p-3">{supplier.products}</td>
+                      <td className="p-3 font-semibold">{supplier.name}</td>
+                      <td className="p-3">{supplier.contactPerson || "â€”"}</td>
+                      <td className="p-3">{supplier.phone || "â€”"}</td>
+                      <td className="p-3">{supplier.email || "â€”"}</td>
+                      <td className="p-3">{supplier.address || "â€”"}</td>
+                      <td className="p-3">{supplier.products || "â€”"}</td>
                       <td className="p-3 text-center">
                         <span
                           className={`px-3 py-1 text-sm font-medium rounded-full ${
-                            supplier.status === "Active" ? "bg-green-500" : "bg-red-500"
+                            supplier.status === "ACTIVE" ? "bg-green-500" : "bg-red-500"
                           } text-white`}
                         >
-                          {supplier.status}
+                          {formatStatus(supplier.status)}
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <FaPen
-                          className="text-red-600 cursor-pointer mx-auto"
-                          onClick={() => {
-                            setSelectedSupplierIndex(indexOfFirstEntry + i);
-                            setShowEditModal(true);
-                            setNewSupplier(supplier);
-                          }}
-                        />
+                        <div className="flex flex-col items-center gap-2">
+                          <FaPen
+                            className="text-red-600 cursor-pointer"
+                            onClick={() => {
+                              setEditingSupplier(supplier);
+                              setShowEditModal(true);
+                            }}
+                          />
+                          <button
+                            className="text-xs text-blue-600 hover:underline"
+                            onClick={() => openLogsModal(supplier.id)}
+                          >
+                            Logs
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -236,7 +482,6 @@ Status: ${toSave.status}`,
           </div>
         </div>
 
-        {/* Bottom Controls */}
         <div className="flex flex-col md:flex-row items-center justify-between mt-4 gap-4">
           <ShowEntries
             entriesPerPage={entriesPerPage}
@@ -249,14 +494,13 @@ Status: ${toSave.status}`,
             setCurrentPage={setCurrentPage}
           />
           <button
-            onClick={() => setShowLogsModal(true)}
+            onClick={() => openLogsModal("all")}
             className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full text-sm"
           >
             View Logs
           </button>
         </div>
 
-        {/* Add Supplier Modal */}
         {showAddModal && (
           <AddSupplierModal
             onClose={() => setShowAddModal(false)}
@@ -264,59 +508,224 @@ Status: ${toSave.status}`,
           />
         )}
 
-        {/* Edit Supplier Modal */}
-        {showEditModal && (
+        {showEditModal && editingSupplier && (
           <EditSupplierModal
-            supplierData={newSupplier}
-            onClose={() => setShowEditModal(false)}
+            supplierData={editingSupplier}
+            onClose={() => {
+              setShowEditModal(false);
+              setEditingSupplier(null);
+            }}
             onSave={handleEditSupplier}
           />
         )}
 
-        {/* Logs Modal */}
         {showLogsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] flex flex-col">
-              <h2 className="text-xl font-bold mb-4">Supplier Logs</h2>
-              <div className="overflow-auto max-h-[60vh] border rounded mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <h2 className="text-xl font-bold">Supplier Logs</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <select
+                    className="border rounded px-3 py-2 text-sm"
+                    value={logFilterSupplierId}
+                    onChange={handleLogFilterChange}
+                  >
+                    <option value="all">All suppliers</option>
+                    {suppliers.map((supplier) => (
+                      <option key={supplier.id} value={String(supplier.id)}>
+                        {supplier.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => fetchLogs({ reset: true })}
+                    className="px-4 py-2 text-sm border rounded-full bg-white hover:bg-gray-100"
+                    disabled={logsLoading}
+                  >
+                    {logsLoading ? "Loading..." : "Reload"}
+                  </button>
+                </div>
+              </div>
+
+              <form
+                onSubmit={handleLogFormSubmit}
+                className="bg-gray-50 border rounded-lg p-4 mb-4"
+              >
+                <div className="grid gap-3 md:grid-cols-5">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold mb-1">Supplier</label>
+                    <select
+                      className="border rounded px-3 py-2 text-sm"
+                      value={
+                        logFilterSupplierId === "all"
+                          ? logForm.supplierId
+                          : String(logFilterSupplierId)
+                      }
+                      onChange={(e) => handleLogFormChange("supplierId", e.target.value)}
+                      disabled={logFilterSupplierId !== "all" || logSubmitting}
+                    >
+                      {logFilterSupplierId === "all" && (
+                        <option value="">Select supplier</option>
+                      )}
+                      {suppliers.map((supplier) => (
+                        <option key={supplier.id} value={String(supplier.id)}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold mb-1">Log Type</label>
+                    <select
+                      className="border rounded px-3 py-2 text-sm"
+                      value={logForm.type}
+                      disabled={logSubmitting}
+                      onChange={(e) => handleLogTypeChange(e.target.value)}
+                    >
+                      <option value="DELIVERY">Delivery</option>
+                      <option value="NOTE">Note</option>
+                    </select>
+                  </div>
+                  {logForm.type === "DELIVERY" && (
+                    <>
+                      <div className="flex flex-col">
+                        <label className="text-xs font-semibold mb-1">Product</label>
+                        <select
+                          className="border rounded px-3 py-2 text-sm"
+                          value={logForm.productId}
+                          disabled={logSubmitting || productsLoading}
+                          onChange={(e) => handleLogFormChange("productId", e.target.value)}
+                        >
+                          <option value="">Select product</option>
+                          {products.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs font-semibold mb-1">Quantity</label>
+                        <input
+                          type="number"
+                          min="1"
+                          className="border rounded px-3 py-2 text-sm"
+                          value={logForm.quantity}
+                          disabled={logSubmitting}
+                          onChange={(e) => handleLogFormChange("quantity", e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs font-semibold mb-1">Unit Cost (optional)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="border rounded px-3 py-2 text-sm"
+                          value={logForm.unitCost}
+                          disabled={logSubmitting}
+                          onChange={(e) => handleLogFormChange("unitCost", e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div
+                    className={
+                      logForm.type === "DELIVERY"
+                        ? "flex flex-col md:col-span-2"
+                        : "flex flex-col md:col-span-4"
+                    }
+                  >
+                    <label className="text-xs font-semibold mb-1">Notes</label>
+                    <textarea
+                      className="border rounded px-3 py-2 text-sm h-[70px] resize-none"
+                      value={logForm.notes}
+                      disabled={logSubmitting}
+                      onChange={(e) => handleLogFormChange("notes", e.target.value)}
+                    />
+                  </div>
+                </div>
+                {productsError && logForm.type === "DELIVERY" && (
+                  <p className="text-xs text-red-600 mt-2">{productsError}</p>
+                )}
+                {logSubmitError && (
+                  <p className="text-sm text-red-600 mt-3">{logSubmitError}</p>
+                )}
+                <div className="flex justify-end mt-4">
+                  <button
+                    type="submit"
+                    className="bg-yellow-500 hover:bg-yellow-600 text-black px-5 py-2 rounded-full text-sm font-semibold disabled:opacity-60"
+                    disabled={logSubmitting}
+                  >
+                    {logSubmitting ? "Saving..." : "Record Log"}
+                  </button>
+                </div>
+              </form>
+
+              <div className="overflow-auto max-h-[50vh] border rounded mb-4">
                 <table className="table-auto w-full text-sm">
                   <thead className="bg-[#8B0000] text-white sticky top-0">
                     <tr>
                       <th className="p-2 text-left">Date/Time</th>
-                      <th className="p-2 text-left">Action</th>
-                      <th className="p-2 text-left">Admin</th>
+                      <th className="p-2 text-left">Type</th>
                       <th className="p-2 text-left">Supplier</th>
+                      <th className="p-2 text-left">Product</th>
+                      <th className="p-2 text-left">Recorded By</th>
                       <th className="p-2 text-left">Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {logs.length > 0 ? (
-                      logs.map((log, i) => (
-                        <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="p-2 align-top">{log.datetime}</td>
-                          <td className="p-2 align-top font-semibold">{log.action}</td>
-                          <td className="p-2 align-top">{log.admin}</td>
-                          <td className="p-2 align-top">{log.supplier}</td>
-                          <td className="p-2 whitespace-pre-line">{log.detail}</td>
+                      logs.map((log) => (
+                        <tr key={log.id} className="odd:bg-gray-50">
+                          <td className="p-2 align-top">{formatDateTime(log.createdAt)}</td>
+                          <td className="p-2 align-top font-semibold">{formatLogType(log.type)}</td>
+                          <td className="p-2 align-top">{log.supplier?.name || "â€”"}</td>
+                          <td className="p-2 align-top">{log.productName || log.product?.name || "â€”"}</td>
+                          <td className="p-2 align-top">
+                            {log.recordedBy?.fullName || log.recordedBy?.username || "â€”"}
+                          </td>
+                          <td className="p-2 align-top whitespace-pre-line">
+                            {describeLogDetails(log) || "â€”"}
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="5" className="text-center p-4 text-gray-500">
-                          No logs found.
+                        <td colSpan="6" className="text-center p-4 text-gray-500">
+                          {logsLoading ? "Loading logs..." : "No logs found."}
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => setShowLogsModal(false)}
-                  className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-full"
-                >
-                  Close
-                </button>
+
+              {logsError && (
+                <p className="text-sm text-red-600 mb-2">{logsError}</p>
+              )}
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="text-sm text-gray-600">
+                  {logsLoading && logs.length > 0 ? "Loading more logs..." : ""}
+                </div>
+                <div className="flex items-center gap-3 justify-end">
+                  {logsNextCursor && (
+                    <button
+                      onClick={handleLoadMoreLogs}
+                      className="bg-white border rounded-full px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-60"
+                      disabled={logsLoading}
+                    >
+                      {logsLoading ? "Loading..." : "Load More"}
+                    </button>
+                  )}
+                  <button
+                    onClick={closeLogsModal}
+                    className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-full"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -327,3 +736,4 @@ Status: ${toSave.status}`,
 };
 
 export default SupplierRecords;
+

@@ -1,11 +1,18 @@
 // src/utils/mapOrder.js
 const STATUS_MAP = {
-  IN_PROGRESS: "ongoing",
+  IN_PROGRESS: "pending",
   READY: "ongoing",
-  SERVED: "complete",
+  SERVED: "ongoing",
   PAID: "complete",
   VOIDED: "cancelled",
   REFUNDED: "cancelled",
+};
+
+const UI_TO_ORDER_STATUS = {
+  pending: "IN_PROGRESS",
+  ongoing: "READY",
+  complete: "PAID",
+  cancelled: "VOIDED",
 };
 
 const ensureTransactionId = (order = {}) => {
@@ -155,6 +162,11 @@ export function mapOrderToTx(order = {}) {
 export function mapOrderStatusToUi(status) {
   const normalized = String(status || "").toUpperCase();
   return STATUS_MAP[normalized] || "pending";
+}
+
+export function mapUiStatusToOrder(status) {
+  const normalized = String(status || "").toLowerCase();
+  return UI_TO_ORDER_STATUS[normalized] || null;
 }
 
 export function mapOrderToUiOrder(order = {}) {

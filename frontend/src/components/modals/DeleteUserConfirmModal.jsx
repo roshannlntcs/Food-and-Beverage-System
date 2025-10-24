@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from "react";
+import React, { useEffect } from "react";
 import { FaTrash } from "react-icons/fa";
 
 const DeleteUserConfirmModal = ({ isOpen, onCancel, onConfirm, userName = "this user" }) => {

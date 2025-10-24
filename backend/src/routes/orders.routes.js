@@ -752,5 +752,3 @@ router.post("/:id/void", requireManager, async (req, res) => {
 });
 
 module.exports = router;
-
-
