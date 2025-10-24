@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+﻿import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import Sidebar from "../../components/Sidebar";
@@ -8,9 +8,11 @@ import ShowEntries from "../../components/ShowEntries";
 import ResetConfirmationModal from "../../components/ResetConfirmationModal";
 import MessageModal from "../../components/modals/MessageModal";
 import AddUserModal from "../../components/modals/AddUserModal";
-import { FaUsers } from "react-icons/fa";
+import EditUserModal from "../../components/modals/EditUserModal";
+import DeleteUserConfirmModal from "../../components/modals/DeleteUserConfirmModal";
+import { FaUsers, FaPen, FaTrash } from "react-icons/fa";
 import { resetSystem, importUsers } from "../../api/admin";
-import { fetchUsers, createUser } from "../../api/users";
+import { fetchUsers, createUser, updateUser, deleteUser } from "../../api/users";
 import { useAuth } from "../../contexts/AuthContext";
 
 const ROLE_LABEL = {
@@ -58,6 +60,10 @@ const mapCsvRole = (value) => {
   return "CASHIER";
 };
 
+const REQUIRED_CSV_HEADERS = ["Student ID No.", "Full Name"];
+const PASSWORD_HEADER_CANDIDATES = ["Default Password", "Password"];
+const CSV_SAMPLE_LIMIT = 5;
+
 const SuperAdmin = () => {
   const navigate = useNavigate();
   const { currentUser, authLoaded } = useAuth() || {};
@@ -79,6 +85,10 @@ const SuperAdmin = () => {
   });
   const [showResetMenu, setShowResetMenu] = useState(false);
   const [pendingResetScope, setPendingResetScope] = useState("all");
+  const [editUserModalOpen, setEditUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [deleteUserModalOpen, setDeleteUserModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const fileInputRef = useRef(null);
   const resetMenuRef = useRef(null);
@@ -282,47 +292,292 @@ const SuperAdmin = () => {
     }
   };
 
-  const handleCsvImport = async (rows) => {
-    const prepared = rows
-      .map((row) => ({
-        schoolId: row["Student ID No."]?.trim(),
-        username: row["Username"]?.trim() || row["Student ID No."]?.trim(),
-        fullName: row["Full Name"]?.trim(),
-        password: row["Default Password"]?.trim() || row["Password"]?.trim(),
-        program: row["Program"]?.trim(),
-        section: row["Section"]?.trim(),
-        sex: row["Sex"]?.trim(),
-        role: mapCsvRole(row["Role"]),
-      }))
-      .filter(
-        (user) =>
-          user.schoolId &&
-          user.username &&
-          user.fullName &&
-          user.password
+  const handleCsvImport = async (rows, headers = []) => {
+    const headerList = Array.isArray(headers) ? headers : [];
+    const headerLookup = new Map(
+      headerList
+        .filter((header) => typeof header === "string")
+        .map((header) => [header.trim().toLowerCase(), header])
+    );
+
+    const resolveValue = (row, ...candidates) => {
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        const normalized = String(candidate).trim().toLowerCase();
+        const headerKey = headerLookup.get(normalized);
+        if (headerKey && row && row[headerKey] !== undefined) return row[headerKey];
+        const directKey =
+          row &&
+          Object.keys(row).find(
+            (key) => String(key || "").trim().toLowerCase() === normalized
+          );
+        if (directKey) return row[directKey];
+      }
+      return undefined;
+    };
+
+    const missingHeaders = REQUIRED_CSV_HEADERS.filter(
+      (header) => !headerLookup.has(header.toLowerCase())
+    );
+    const passwordHeader =
+      headerList.find((header) =>
+        PASSWORD_HEADER_CANDIDATES.some(
+          (candidate) =>
+            String(header || "").trim().toLowerCase() === candidate.toLowerCase()
+        )
+      ) ||
+      PASSWORD_HEADER_CANDIDATES.find((candidate) =>
+        headerLookup.has(candidate.toLowerCase())
       );
 
-    if (!prepared.length) {
+    if (missingHeaders.length || !passwordHeader) {
+      const missing = [...missingHeaders];
+      if (!passwordHeader) missing.push("Password / Default Password");
       showMessage(
-        "No Valid Rows",
-        "The CSV does not contain any valid user records.",
+        "CSV Missing Columns",
+        `The uploaded file is missing the required column(s): ${missing.join(", ")}.`,
         "error"
       );
       return;
     }
 
-    try {
-      await importUsers(prepared);
+    const duplicateRows = [];
+    const skippedRows = [];
+    const seenSchoolIds = new Set();
+    const seenUsernames = new Set();
+    const prepared = [];
+
+    const formatSampleList = (entries, formatter) => {
+      const sample = entries.slice(0, CSV_SAMPLE_LIMIT).map(formatter);
+      const remaining = entries.length - sample.length;
+      return `${sample.join(", ")}${remaining > 0 ? `, and ${remaining} more` : ""}`;
+    };
+
+    rows.forEach((row, index) => {
+      if (!row || typeof row !== "object") {
+        skippedRows.push(index + 2);
+        return;
+      }
+
+      const schoolIdRaw = resolveValue(row, "Student ID No.", "Student ID");
+      const usernameRaw = resolveValue(row, "Username", "User Name");
+      const fullNameRaw = resolveValue(row, "Full Name", "Name");
+      const passwordRaw = resolveValue(row, passwordHeader, ...PASSWORD_HEADER_CANDIDATES);
+
+      const schoolId = String(schoolIdRaw || "").trim();
+      const username = String((usernameRaw || schoolIdRaw) ?? "").trim();
+      const fullName = String(fullNameRaw || "").trim();
+      const password = String(passwordRaw || "").trim();
+      const program = String(resolveValue(row, "Program") || "").trim();
+      const section = String(resolveValue(row, "Section") || "").trim();
+      const sex = String(resolveValue(row, "Sex") || "").trim();
+      const role = mapCsvRole(resolveValue(row, "Role"));
+      const rowNumber = index + 2;
+
+      if (!schoolId || !username || !fullName || !password) {
+        skippedRows.push(rowNumber);
+        return;
+      }
+
+      const schoolKey = schoolId.toLowerCase();
+      const usernameKey = username.toLowerCase();
+
+      if (seenSchoolIds.has(schoolKey) || seenUsernames.has(usernameKey)) {
+        duplicateRows.push({ row: rowNumber, schoolId, username });
+        return;
+      }
+
+      seenSchoolIds.add(schoolKey);
+      seenUsernames.add(usernameKey);
+
+      prepared.push({
+        schoolId,
+        username,
+        fullName,
+        password,
+        program,
+        section,
+        sex,
+        role,
+      });
+    });
+
+    if (!prepared.length) {
       showMessage(
-        "Upload Successful",
-        `${prepared.length} users imported successfully.`
+        "No Valid Rows",
+        "The CSV does not contain any complete user records.",
+        "error"
       );
+      return;
+    }
+
+    const existingIds = new Set(
+      users
+        .map((user) => String(user.schoolId || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const existingUsernames = new Set(
+      users
+        .map((user) => String(user.username || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    const existingConflicts = [];
+    const importable = prepared.filter((entry) => {
+      const idKey = entry.schoolId.toLowerCase();
+      const usernameKey = entry.username.toLowerCase();
+      if (existingIds.has(idKey) || existingUsernames.has(usernameKey)) {
+        existingConflicts.push(entry);
+        return false;
+      }
+      return true;
+    });
+
+    if (!importable.length) {
+      const notes = [];
+      if (existingConflicts.length) {
+        notes.push(
+          `${existingConflicts.length} existing record${existingConflicts.length === 1 ? "" : "s"}`
+        );
+      }
+      if (duplicateRows.length) {
+        notes.push(
+          `${duplicateRows.length} duplicate row${duplicateRows.length === 1 ? "" : "s"} inside the file`
+        );
+      }
+      if (skippedRows.length) {
+        notes.push(
+          `${skippedRows.length} incomplete row${skippedRows.length === 1 ? "" : "s"}`
+        );
+      }
+      const detail = notes.length
+        ? `Nothing new to import. Skipped ${notes.join(", ")}.`
+        : "No new user accounts were found in the uploaded file.";
+      showMessage("No New Users", detail, "error");
+      return;
+    }
+
+    try {
+      await importUsers(importable);
+      const fragments = [];
+      fragments.push(
+        `${importable.length} user${importable.length === 1 ? "" : "s"} imported successfully.`
+      );
+      if (existingConflicts.length) {
+        const summary = formatSampleList(
+          existingConflicts,
+          (entry) => `${entry.fullName} (${entry.schoolId})`
+        );
+        fragments.push(
+          `Skipped existing account${existingConflicts.length === 1 ? "" : "s"}: ${summary}.`
+        );
+      }
+      if (duplicateRows.length) {
+        const summary = formatSampleList(
+          duplicateRows,
+          (entry) => `row ${entry.row} (${entry.schoolId}/${entry.username})`
+        );
+        fragments.push(
+          `Ignored duplicate row${duplicateRows.length === 1 ? "" : "s"} in the CSV: ${summary}.`
+        );
+      }
+      if (skippedRows.length) {
+        fragments.push(
+          `Skipped ${skippedRows.length} incomplete row${skippedRows.length === 1 ? "" : "s"}.`
+        );
+      }
+      showMessage("Upload Successful", fragments.join(" "), "success");
       await loadUsers();
     } catch (error) {
       console.error("Import users failed:", error);
       showMessage(
         "Upload Failed",
         error?.message || "Please review the file and try again.",
+        "error"
+      );
+    }
+  };
+
+  const openEditUser = (record) => {
+    if (!record) return;
+    setEditingUser(record);
+    setEditUserModalOpen(true);
+  };
+
+  const saveEditedUser = async (updatedForm) => {
+    if (!editingUser) return;
+
+    const clean = (value) => String(value || '').trim();
+    const sexValue = clean(updatedForm.sex).toUpperCase();
+    const normalizedSex =
+      sexValue === 'M' || sexValue === 'F'
+        ? sexValue
+        : sexValue.startsWith('M')
+        ? 'M'
+        : sexValue.startsWith('F')
+        ? 'F'
+        : null;
+
+    const payload = {
+      schoolId: clean(updatedForm.schoolId),
+      username: clean(updatedForm.username),
+      fullName: clean(updatedForm.fullName),
+      role: String(updatedForm.role || '').trim().toUpperCase() || 'CASHIER',
+      program: clean(updatedForm.program) || null,
+      section: clean(updatedForm.section) || null,
+      sex: normalizedSex,
+    };
+
+    if (updatedForm.resetPassword && clean(updatedForm.resetPassword)) {
+      payload.resetPassword = clean(updatedForm.resetPassword);
+    }
+
+    try {
+      await updateUser(editingUser.id, payload);
+      showMessage('User Updated', 'Changes saved successfully.');
+      setEditUserModalOpen(false);
+      setEditingUser(null);
+      await loadUsers();
+    } catch (error) {
+      console.error('Update user failed:', error);
+      showMessage(
+        'Unable to Update User',
+        error?.message || 'Please review the details and try again.',
+        'error'
+      );
+    }
+  };
+
+  const confirmDeleteUser = (record) => {
+    if (!record) return;
+    if (String(record.role || '').toUpperCase() === 'SUPER_ADMIN') {
+      showMessage(
+        'Action Not Allowed',
+        'Super admin accounts cannot be deleted.',
+        'error'
+      );
+      return;
+    }
+    setDeleteTarget(record);
+    setDeleteUserModalOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget?.id) return;
+    try {
+      await deleteUser(deleteTarget.id);
+      showMessage(
+        "User Deleted",
+        `${deleteTarget.fullName || deleteTarget.username || "User"} has been removed.`
+      );
+      setDeleteUserModalOpen(false);
+      setDeleteTarget(null);
+      await loadUsers();
+    } catch (error) {
+      console.error("Delete user failed:", error);
+      showMessage(
+        "Unable to Delete User",
+        error?.message || "Please try again later.",
         "error"
       );
     }
@@ -335,9 +590,12 @@ const SuperAdmin = () => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
-        handleCsvImport(results.data || []);
-        event.target.value = "";
+      complete: async (results) => {
+        try {
+          await handleCsvImport(results.data || [], results.meta?.fields || []);
+        } finally {
+          event.target.value = "";
+        }
       },
       error: (error) => {
         console.error("CSV parsing error:", error);
@@ -461,40 +719,83 @@ const SuperAdmin = () => {
                   <th className="py-3 px-4">Sex</th>
                   <th className="py-3 px-4">Recent Login</th>
                   <th className="py-3 px-4">Role</th>
+                  <th className="py-3 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={8} className="py-6 text-center text-gray-500">
+                    <td colSpan={9} className="py-6 text-center text-gray-500">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && paginatedUsers.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-6 text-center text-gray-500">
+                    <td colSpan={9} className="py-6 text-center text-gray-500">
                       No users found.
                     </td>
                   </tr>
                 )}
                 {!loading &&
-                  paginatedUsers.map((user) => (
-                    <tr key={user.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">{user.schoolId || "—"}</td>
-                      <td className="py-3 px-4">{user.username || "—"}</td>
-                      <td className="py-3 px-4">{user.fullName || "—"}</td>
-                      <td className="py-3 px-4">{user.program || "—"}</td>
-                      <td className="py-3 px-4">{user.section || "—"}</td>
-                      <td className="py-3 px-4">{user.sex || "—"}</td>
-                      <td className="py-3 px-4">
-                        {formatDateTime(user.lastLogin)}
-                      </td>
-                      <td className="py-3 px-4">
-                        {ROLE_LABEL[user.role] || user.role || "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  paginatedUsers.map((user) => {
+                    const isSuperAdmin =
+                      String(user.role || "").toUpperCase() === "SUPER_ADMIN";
+                    return (
+                      <tr key={user.id} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4">{user.schoolId || "N/A"}</td>
+                        <td className="py-3 px-4">{user.username || "N/A"}</td>
+                        <td className="py-3 px-4">{user.fullName || "N/A"}</td>
+                        <td className="py-3 px-4">{user.program || "N/A"}</td>
+                        <td className="py-3 px-4">{user.section || "N/A"}</td>
+                        <td className="py-3 px-4">{user.sex || "N/A"}</td>
+                        <td className="py-3 px-4">
+                          {formatDateTime(user.lastLogin)}
+                        </td>
+                        <td className="py-3 px-4">
+                          {ROLE_LABEL[user.role] || user.role || "N/A"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center justify-center gap-4">
+                            <FaPen
+                              title="Edit user"
+                              aria-label="Edit user"
+                              role="button"
+                              tabIndex={0}
+                              className="text-red-600 cursor-pointer outline-none"
+                              onClick={() => openEditUser(user)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  openEditUser(user);
+                                }
+                              }}
+                            />
+                            <FaTrash
+                              title={isSuperAdmin ? "Super admin cannot be deleted" : "Delete user"}
+                              aria-label="Delete user"
+                              role="button"
+                              tabIndex={0}
+                              className={`outline-none ${
+                                isSuperAdmin
+                                  ? "text-gray-400 cursor-not-allowed"
+                                  : "text-red-600 cursor-pointer"
+                              }`}
+                              onClick={() => {
+                                if (!isSuperAdmin) confirmDeleteUser(user);
+                              }}
+                              onKeyDown={(event) => {
+                                if ((event.key === "Enter" || event.key === " ") && !isSuperAdmin) {
+                                  event.preventDefault();
+                                  confirmDeleteUser(user);
+                                }
+                              }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -535,6 +836,30 @@ const SuperAdmin = () => {
         onSave={handleAddUser}
       />
 
+      <EditUserModal
+        isOpen={editUserModalOpen}
+        onClose={() => {
+          setEditUserModalOpen(false);
+          setEditingUser(null);
+        }}
+        user={editingUser}
+        onSave={saveEditedUser}
+      />
+
+      <DeleteUserConfirmModal
+        isOpen={deleteUserModalOpen}
+        onCancel={() => {
+          setDeleteUserModalOpen(false);
+          setDeleteTarget(null);
+        }}
+        onConfirm={handleDeleteUser}
+        userName={
+          deleteTarget
+            ? `${deleteTarget.fullName || deleteTarget.username || deleteTarget.schoolId || "User"}`
+            : ""
+        }
+      />
+
       <MessageModal
         isOpen={messageModal.isOpen}
         onClose={() => setMessageModal((prev) => ({ ...prev, isOpen: false }))}
@@ -547,3 +872,7 @@ const SuperAdmin = () => {
 };
 
 export default SuperAdmin;
+
+
+
+

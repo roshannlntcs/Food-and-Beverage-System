@@ -93,9 +93,10 @@ const ProductUpdate = ProductCreate.partial();
 // GET /products?search=&category=
 router.get('/', async (req, res) => {
   try {
-    const { search, category } = req.query;
+    const { search, category, includeInactive } = req.query;
     const where = {
       AND: [
+        includeInactive ? undefined : { active: true },
         search
           ? { name: { contains: String(search), mode: 'insensitive' } }
           : undefined,
@@ -294,8 +295,45 @@ router.put('/:id', async (req, res) => {
 // DELETE /products/:id
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.product.delete({ where: { id: String(req.params.id) } });
-    res.status(204).end();
+    const pathId = String(req.params.id);
+    const userId = req.user?.sub ? Number(req.user.sub) : null;
+
+    const archived = await prisma.$transaction(async (tx) => {
+      const existing = await tx.product.findUnique({
+        where: { id: pathId },
+        include: { category: true },
+      });
+
+      if (!existing) {
+        const error = new Error('Product not found');
+        error.code = 'P2025';
+        throw error;
+      }
+
+      const product = await tx.product.update({
+        where: { id: pathId },
+        data: {
+          active: false,
+        },
+        include: { category: true },
+      });
+
+      await recordInventoryLog(tx, {
+        productId: product.id,
+        productName: product.name,
+        action: 'DELETE',
+        detail: `Archived product: ${product.name}`,
+        stock: product.quantity,
+        oldPrice: product.price,
+        newPrice: null,
+        category: product.category?.name || null,
+        userId,
+      });
+
+      return product;
+    });
+
+    res.json(shape(archived));
   } catch (e) {
     if (e?.code === 'P2025') return res.status(404).json({ error: 'Product not found' });
     console.error('DELETE /products/:id failed', e);

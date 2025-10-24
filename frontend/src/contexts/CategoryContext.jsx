@@ -181,6 +181,57 @@ export default function CategoryProvider({ children }) {
     [categories]
   );
 
+  const updateCategory = useCallback(
+    async (id, input = {}) => {
+      if (!id) return null;
+      const rawName =
+        typeof input === 'string'
+          ? input
+          : input?.key || input?.name || input?.label || null;
+      const nextName = rawName ? canonicalCategoryName(rawName) : null;
+      const payload = {};
+      if (nextName) payload.name = nextName;
+      if (Object.prototype.hasOwnProperty.call(input, 'icon')) {
+        payload.iconUrl = input.icon || null;
+      } else if (Object.prototype.hasOwnProperty.call(input, 'iconUrl')) {
+        payload.iconUrl = input.iconUrl || null;
+      }
+      if (!Object.keys(payload).length) return null;
+
+      try {
+        const updated = await api(`/categories/${id}`, 'PUT', payload);
+        const norm = normalizeCategory(updated);
+        if (!norm) return null;
+        setCategories((prev) => {
+          const filtered = prev.filter((cat) => cat.id !== id);
+          const deduped = filtered.filter(
+            (cat) => cat.name.toLowerCase() !== norm.name.toLowerCase()
+          );
+          return orderCategories([...deduped, norm]);
+        });
+        return norm;
+      } catch (err) {
+        console.error('Category update failed:', err);
+        throw err;
+      }
+    },
+    []
+  );
+
+  const removeCategory = useCallback(async (id) => {
+    if (!id) return false;
+    try {
+      await api(`/categories/${id}`, 'DELETE');
+      setCategories((prev) =>
+        prev.filter((category) => category.id !== id)
+      );
+      return true;
+    } catch (err) {
+      console.error('Category removal failed:', err);
+      throw err;
+    }
+  }, []);
+
   const getIdByName = useCallback((name) => {
     const canonical = canonicalCategoryName(name);
     if (!canonical) return null;
@@ -198,10 +249,12 @@ export default function CategoryProvider({ children }) {
     categories,
     refresh,
     addCategory,
+    updateCategory,
+    removeCategory,
     getIdByName,
     loading,
     error,
-  }), [categories, refresh, addCategory, getIdByName, loading, error]);
+  }), [categories, refresh, addCategory, updateCategory, removeCategory, getIdByName, loading, error]);
 
   return <CategoryCtx.Provider value={value}>{children}</CategoryCtx.Provider>;
 }

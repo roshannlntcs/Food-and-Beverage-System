@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 
 const ROLE_OPTIONS = [
   { value: "cashier", label: "Cashier" },
@@ -75,7 +75,7 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
             onClick={onClose}
             className="text-white hover:text-gray-200 text-lg font-bold"
           >
-            ✕
+            X
           </button>
         </div>
 
@@ -176,3 +176,5 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
 };
 
 export default AddUserModal;
+
+

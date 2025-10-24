@@ -1,12 +1,18 @@
-import React, { useEffect } from "react";
+﻿import React, { useEffect } from "react";
 import { FaTrash } from "react-icons/fa";
 
 const DeleteUserConfirmModal = ({ isOpen, onCancel, onConfirm, userName = "this user" }) => {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => {
-      if (e.key === "Enter") { e.preventDefault(); onConfirm(); }
-      if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (typeof onConfirm === "function") onConfirm();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (typeof onCancel === "function") onCancel();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -21,18 +27,19 @@ const DeleteUserConfirmModal = ({ isOpen, onCancel, onConfirm, userName = "this 
           <FaTrash className="text-white text-xl" aria-hidden="true" />
         </div>
         <p className="text-sm text-gray-800 leading-relaxed">
-          Are you sure you want to delete <span className="font-semibold">“{userName}”</span>?
+          Are you sure you want to delete <span className="font-semibold">"{userName}"</span>?
+          <br />
           This action cannot be undone.
         </p>
         <div className="mt-5 flex items-center justify-center gap-3">
           <button
-            onClick={onConfirm}
+            onClick={() => typeof onConfirm === "function" && onConfirm()}
             className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-6 py-2 rounded-full"
           >
             Confirm
           </button>
           <button
-            onClick={onCancel}
+            onClick={() => typeof onCancel === "function" && onCancel()}
             className="bg-black text-white font-bold px-6 py-2 rounded-full"
           >
             Cancel
@@ -44,3 +51,5 @@ const DeleteUserConfirmModal = ({ isOpen, onCancel, onConfirm, userName = "this 
 };
 
 export default DeleteUserConfirmModal;
+
+

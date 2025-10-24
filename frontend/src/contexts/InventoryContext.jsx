@@ -145,6 +145,17 @@ export default function InventoryProvider({ children }) {
     return norm;
   }, [addCategory, getIdByName]);
 
+  const removeItem = useCallback(async (id) => {
+    if (!id) return;
+    try {
+      await api(`/products/${id}`, 'DELETE');
+      setInventory((prev) => prev.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error('Inventory deletion failed:', error);
+      throw error;
+    }
+  }, []);
+
   const getEffectiveStatus = useCallback((item) => {
     const qty = Number(item?.quantity ?? 0);
     if (qty <= 0) return 'Unavailable';
@@ -200,11 +211,12 @@ export default function InventoryProvider({ children }) {
     refresh: fetchAll,
     addItem: createItem,
     updateItem,
+    removeItem,
     getEffectiveStatus,
     applyTransaction,
     loading,
     error,
-  }), [inventory, fetchAll, createItem, updateItem, getEffectiveStatus, applyTransaction, loading, error]);
+  }), [inventory, fetchAll, createItem, updateItem, removeItem, getEffectiveStatus, applyTransaction, loading, error]);
 
   return <InventoryCtx.Provider value={value}>{children}</InventoryCtx.Provider>;
 }

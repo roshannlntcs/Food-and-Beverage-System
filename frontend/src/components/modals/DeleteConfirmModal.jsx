@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+﻿import React, { useEffect } from "react";
 import { FaTrash } from "react-icons/fa";
 
 const DeleteConfirmModal = ({ itemName = "this item", onConfirm, onCancel }) => {
@@ -6,10 +6,10 @@ const DeleteConfirmModal = ({ itemName = "this item", onConfirm, onCancel }) => 
     const handleKeyDown = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        onConfirm();
+        if (typeof onConfirm === "function") onConfirm();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        onCancel();
+        if (typeof onCancel === "function") onCancel();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -27,19 +27,21 @@ const DeleteConfirmModal = ({ itemName = "this item", onConfirm, onCancel }) => 
         {/* Message */}
         <p className="text-sm text-gray-800 leading-relaxed">
           Are you sure you want to delete{" "}
-          <span className="font-semibold">“{itemName}”</span>? <br />This action cannot be undone.
+          <span className="font-semibold">"{itemName}"</span>?
+          <br />
+          This action cannot be undone.
         </p>
 
         {/* Actions */}
         <div className="mt-5 flex items-center justify-center gap-3">
           <button
-            onClick={onConfirm}
+            onClick={() => typeof onConfirm === "function" && onConfirm()}
             className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-6 py-2 rounded-full"
           >
             Confirm
           </button>
           <button
-            onClick={onCancel}
+            onClick={() => typeof onCancel === "function" && onCancel()}
             className="bg-black text-white font-bold px-6 py-2 rounded-full"
           >
             Cancel
@@ -51,3 +53,5 @@ const DeleteConfirmModal = ({ itemName = "this item", onConfirm, onCancel }) => 
 };
 
 export default DeleteConfirmModal;
+
+
