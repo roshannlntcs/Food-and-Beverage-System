@@ -9,7 +9,7 @@ const DEFAULT_CATEGORIES = [
   { key: "Appetizers", icon: DEFAULT_ICON, locked: true },
   { key: "Side Dish", icon: DEFAULT_ICON, locked: true },
   { key: "Soup", icon: DEFAULT_ICON, locked: true },
-  { key: "Desserts", icon: DEFAULT_ICON, locked: true },
+  { key: "Dessert", icon: DEFAULT_ICON, locked: true },
   { key: "Drinks", icon: DEFAULT_ICON, locked: true },
 ];
 
@@ -18,7 +18,6 @@ const OPTIONAL_CATEGORIES = [
   { key: "Banana Split", icon: "/icons/banana_split.png" },
   { key: "Birthday Cake", icon: "/icons/birthday_cake.png" },
   { key: "Bottle of Water", icon: "/icons/bottled_water.png" },
-  { key: "Dessert", icon: "/icons/dessert.png" },
   { key: "Guacamole", icon: "/icons/guacamole.png" },
   { key: "Lemonade", icon: "/icons/lemonade.png" },
   { key: "Macaron", icon: "/icons/macaron.png" },
@@ -26,7 +25,6 @@ const OPTIONAL_CATEGORIES = [
   { key: "Nachos", icon: "/icons/nachos.png" },
   { key: "Noodles", icon: "/icons/noodles.png" },
   { key: "Pie", icon: "/icons/pie.png" },
-  { key: "Pizza", icon: "/icons/pizza.png" },
   { key: "Potato", icon: "/icons/potato.png" },
   { key: "Rice Bowl", icon: "/icons/rice_bowl.png" },
   { key: "Soup Plate", icon: "/icons/soup_plate.png" },
@@ -43,6 +41,13 @@ const toDataUrl = (file) =>
     reader.onerror = () => reject(new Error("Failed to read the selected image."));
     reader.readAsDataURL(file);
   });
+
+const resolveIconSrc = (icon) => {
+  if (!icon) return DEFAULT_ICON;
+  if (icon.startsWith('http') || icon.startsWith('data:') || icon.startsWith('blob:')) return icon;
+  if (icon.startsWith('/')) return icon;
+  return `/icons/${icon.replace(/^\/+/, '')}`;
+};
 
 const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   const {
@@ -270,12 +275,12 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       {!showSuccess && !showConfirm && !showEditModal && (
-        <div className="bg-white w-[500px] rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white w-[480px] rounded-2xl shadow-lg overflow-hidden">
           <div className="bg-[#8B0000] text-white text-center py-4 rounded-t-2xl">
             <h2 className="text-lg font-bold">Manage Category</h2>
           </div>
 
-          <div className="px-8 py-6 space-y-6">
+          <div className="px-6 py-5 space-y-5">
             <div className="flex items-center gap-4">
               <label className="text-sm font-semibold">
                 Add new category name
@@ -312,14 +317,19 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
               <h3 className="text-sm font-semibold mb-2">Categories:</h3>
               <div className="grid grid-cols-2 gap-y-2 gap-x-6">
                 {categories.map((cat, index) => (
-                  <div key={`${cat.key}-${index}`} className="flex items-center gap-2">
+                  <div key={`${cat.key}-${index}`} className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       className="accent-[#8B0000]"
                       checked
                       readOnly
                     />
-                    <span className="flex-1 text-gray-700">{cat.key}</span>
+                    <img
+                      src={resolveIconSrc(cat.icon)}
+                      alt={`${cat.key} icon`}
+                      className="w-6 h-6 object-contain border rounded bg-white"
+                    />
+                    <span className="flex-1 text-gray-700 truncate">{cat.key}</span>
                     <button
                       type="button"
                       onClick={() => handleEdit(cat)}
@@ -349,7 +359,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
               </h3>
               <div className="grid grid-cols-2 gap-y-2 gap-x-6">
                 {renderedOptional.map((cat) => (
-                  <div key={cat.key} className="flex items-center gap-2">
+                  <div key={cat.key} className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       className="accent-[#8B0000]"
@@ -357,7 +367,12 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
                       disabled={cat.disabled}
                       onChange={() => toggleOptional(cat)}
                     />
-                    <span className="flex-1 text-gray-700">{cat.key}</span>
+                    <img
+                      src={resolveIconSrc(cat.icon)}
+                      alt={`${cat.key} icon`}
+                      className="w-6 h-6 object-contain border rounded bg-white"
+                    />
+                    <span className="flex-1 text-gray-700 truncate">{cat.key}</span>
                   </div>
                 ))}
               </div>

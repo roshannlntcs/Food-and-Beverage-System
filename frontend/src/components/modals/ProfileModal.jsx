@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import ReactDOM from "react-dom";
 import images from "../../utils/images";
 import ChangePasswordModal from "./ChangePasswordModal"; // Import the new modal
 
@@ -82,10 +83,11 @@ export default function ProfileModal({
   };
 
   if (!show) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  return ReactDOM.createPortal(
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[50] text-gray-900">
         <div className="bg-white rounded-2xl shadow-xl p-6 w-[460px] border border-[#800000]">
           {/* Profile Section */}
           <div className="text-center mb-6">
@@ -106,13 +108,13 @@ export default function ProfileModal({
               </label>
             </div>
             <h2 className="text-xl font-bold">{userName}</h2>
-            <p className="text-gray-600">School ID: {schoolId}</p>
+            <p className="text-gray-600">School ID: {schoolId || "—"}</p>
           </div>
 
           {/* Analytics Section */}
           <div className="bg-gray-50 rounded-lg p-5 mb-6">
             <h3 className="text-lg font-semibold text-center mb-4">Today's Overview</h3>
-            <div className="grid grid-cols-2 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center text-gray-900">
               <div className="bg-white p-4 rounded-lg shadow-sm">
                 <p className="text-xl font-bold text-[#800000]">{totalSold}</p>
                 <p className="text-xs text-gray-600">Items Sold</p>
@@ -191,6 +193,7 @@ export default function ProfileModal({
         onClose={() => setShowChangePassword(false)}
         onChangePassword={onChangePassword}
       />
-    </>
+    </>,
+    document.body
   );
 }

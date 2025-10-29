@@ -65,8 +65,8 @@
       ]
     },
     {
-      "id": "desserts",
-      "name": "Desserts",
+      "id": "dessert",
+      "name": "Dessert",
       "products": [
         { "id": "leche-flan", "name": "Leche Flan", "price": 50, "imageUrl": "leche-flan.jpg", "description": "Creamy caramel-topped custard.", "sizes": [{"label":"Single","price":0}], "addons": [{"label":"Caramel Sauce","price":5}], "allergens": "Egg, Dairy" },
         { "id": "halohalo", "name": "Halo-Halo", "price": 120, "imageUrl": "halohalo.jpg", "description": "Mixed shaved ice dessert bowl.", "sizes": [{"label":"Regular","price":0}], "addons": [{"label":"Leche Flan","price":15}], "allergens": "Dairy" },
@@ -98,3 +98,4 @@
     }
   ]
 }
+

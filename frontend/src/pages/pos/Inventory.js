@@ -1,15 +1,15 @@
-// frontend/src/pages/admin/Inventory.js
+﻿// frontend/src/pages/admin/Inventory.js
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
-import { FaSearch, FaPen } from 'react-icons/fa';
-import AdminInfo from '../../components/AdminInfo';
+import { FaSearch, FaPen, FaTrash } from 'react-icons/fa';
+import AdminInfoDashboard2 from '../../components/AdminInfoDashboard2';
 import AddItemModal from '../../components/modals/add-item-modal';
 import EditItemModal from '../../components/modals/edit-item-modal';
 import LogsModal from '../../components/modals/logs-modal';
 import CategoryFilterModal from '../../components/modals/category-filter-modal';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
 import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
-import AddCategoryModal from '../../components/modals/AddCategoryModal';
+import ManageCategoryModal from '../../components/modals/ManageCategoryModal';
 import ShowEntries from '../../components/ShowEntries';
 import Pagination from '../../components/Pagination';
 import { useCategories } from '../../contexts/CategoryContext';
@@ -80,7 +80,7 @@ const describeSupplierLink = (link) => {
     const previous = link.metadata?.previousStatus || link.metadata?.prevStatus;
     const next = link.metadata?.nextStatus || link.metadata?.status || link.supplier?.status;
     const statusDetail =
-      previous && next ? `${previous} â†’ ${next}` : next ? `Now ${next}` : 'Status change';
+      previous && next ? `${previous} -> ${next}` : next ? `Now ${next}` : 'Status change';
     parts.push(statusDetail);
   } else {
     parts.push(link.type || 'Log');
@@ -108,7 +108,7 @@ const summarizeSupplierLinks = (links) => {
 
 export default function Inventory() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { inventory = [], addItem, updateItem, getEffectiveStatus } = useInventory();
+  const { inventory = [], addItem, updateItem, removeItem, getEffectiveStatus } = useInventory();
 
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -142,7 +142,9 @@ export default function Inventory() {
   const [errorMessage, setErrorMessage] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [showManageCategories, setShowManageCategories] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const { categories = [], addCategory } = useCategories() || {};
 
@@ -254,10 +256,10 @@ export default function Inventory() {
       category: newItem.category,
       quantity: qty,
       status,
-      allergens: newItem.allergens || '',
+      allergens: newItem.allergens || "N/A",
       sizes: normalizedSizes,
       addons: normalizedAddons,
-      description: newItem.description || '',
+      description: newItem.description || "N/A",
       image: newItem.image || '',
     };
 
@@ -302,9 +304,9 @@ export default function Inventory() {
       category: newItem.category,
       quantity: qty,
       status,
-      allergens: newItem.allergens || '',
+      allergens: newItem.allergens || "N/A",
       addons: normalizedAddons,
-      description: newItem.description || '',
+      description: newItem.description || "N/A",
       sizes: normalizedSizes,
       image: newItem.image !== undefined ? newItem.image : current.image || '',
     };
@@ -371,77 +373,109 @@ export default function Inventory() {
     setShowSaveModal(true);
   };
 
+  const startDeleteItem = (item) => {
+    if (!item) return;
+    setItemToDelete(item);
+    setDeleteLoading(false);
+  };
+
+  const cancelDeleteItem = () => {
+    setItemToDelete(null);
+    setDeleteLoading(false);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!itemToDelete?.id) return;
+    setDeleteLoading(true);
+    try {
+      await removeItem(itemToDelete.id);
+      await refreshLogs();
+      setItemToDelete(null);
+    } catch (error) {
+      setErrorMessage(error?.message || 'Failed to delete item.');
+      setShowErrorModal(true);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
-      <div className="ml-20 p-6 w-full">
-        <div className="flex justify-between items-center mb-6">
+      <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
+        <div className="px-6 pt-6 pb-2 flex justify-between items-center">
           <h1 className="text-3xl font-bold">Inventory</h1>
-          <AdminInfo />
+          <AdminInfoDashboard2 />
         </div>
 
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
-              <input
-                type="text"
-                placeholder="Search"
-                className="outline-none w-full text-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <FaSearch className="text-gray-500 text-sm" />
+        <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="outline-none w-full text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <FaSearch className="text-gray-500 text-sm" />
+              </div>
+
+              {selectedCategory && (
+                <div className="text-sm text-gray-700 flex items-center">
+                  Filter: <span className="font-semibold ml-1">{selectedCategory}</span>
+                  <button
+                    onClick={() => setSelectedCategory('')}
+                    className="ml-2 text-blue-600 hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowCategoryFilter(true)}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100"
+              >
+                Filter Category
+              </button>
+
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white"
+              >
+                <option value="">All Statuses</option>
+                <option value="Available">Available</option>
+                <option value="Low Stock">Low Stock</option>
+                <option value="Unavailable">Unavailable</option>
+              </select>
             </div>
 
-            {selectedCategory && (
-              <div className="text-sm text-gray-700 flex items-center">
-                Filter: <span className="font-semibold ml-1">{selectedCategory}</span>
-                <button onClick={() => setSelectedCategory('')} className="ml-2 text-blue-600 hover:underline">Clear</button>
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowCategoryFilter(true)}
-              className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100"
-            >
-              Filter Category
-            </button>
-
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white"
-            >
-              <option value="">All Statuses</option>
-              <option value="Available">Available</option>
-              <option value="Low Stock">Low Stock</option>
-              <option value="Unavailable">Unavailable</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowManageCategories(true)}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 shadow text-sm font-semibold border border-yellow-500 rounded-full"
+              >
+                Manage Categories
+              </button>
+              <button
+                onClick={() => {
+                  setNewItem(createEmptyItem());
+                  setSelectedItemId(null);
+                  setShowAddModal(true);
+                }}
+                className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 shadow text-sm font-semibold border border-yellow-500 rounded-full"
+              >
+                + Add Item
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAddCategoryModal(true)}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 shadow text-sm font-semibold border border-yellow-500 rounded-full"
-            >
-              + Add Category
-            </button>
-            <button
-              onClick={() => {
-                setNewItem(createEmptyItem());
-                setSelectedItemId(null);
-                setShowAddModal(true);
-              }}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-1 shadow text-sm font-semibold border border-yellow-500 rounded-full"
-            >
-              + Add Item
-            </button>
-          </div>
-        </div>
-
-        <div className="border rounded-md overflow-hidden">
-          <div className="max-h-[500px] overflow-y-auto">
-            <table className="w-full table-auto border-collapse text-sm">
+          <div className="flex-none border rounded-md overflow-hidden">
+            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+              <table className="w-full table-auto border-collapse text-sm">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left">
                   <th className="p-3">No.</th>
@@ -452,9 +486,9 @@ export default function Inventory() {
                   <th className="p-3">Add-ons</th>
                   <th className="p-3">Description</th>
                   <th className="p-3">Sizes</th>
-                  <th className="p-3 text-center">Stock</th>
+                  <th className="py-3 px-1 text-left">Stock</th>
                   <th className="p-3 text-center">Status</th>
-                  <th className="p-3 text-center">Edit</th>
+                  <th className="p-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -463,14 +497,14 @@ export default function Inventory() {
                     <td className="p-3">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="p-3">{item.name}</td>
                     <td className="p-3">{formatCurrency(item.price)}</td>
-                    <td className="p-3">{item.category || 'â€”'}</td>
-                    <td className="p-3">{item.allergens || 'â€”'}</td>
+                    <td className="p-3">{item.category || "N/A"}</td>
+                    <td className="p-3">{item.allergens || "N/A"}</td>
                     <td className="p-3">{describeOptions(item.addons)}</td>
-                    <td className="p-3">{item.description || 'â€”'}</td>
+                    <td className="p-3">{item.description || "N/A"}</td>
                     <td className="p-3">{describeOptions(item.sizes)}</td>
-                    <td className="p-3 text-center">{item.quantity ?? 0}</td>
+                    <td className="py-3 px-1 text-left">{item.quantity ?? 0}</td>
                     <td className="p-3 text-center">
-                      <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                      <span className={`inline-flex items-center justify-center whitespace-nowrap px-3 py-1 text-sm font-medium rounded-full ${
                         getEffectiveStatus(item) === 'Available' ? 'bg-green-500' :
                         getEffectiveStatus(item) === 'Low Stock' ? 'bg-orange-400' : 'bg-red-600'
                       } text-white`}>
@@ -478,26 +512,40 @@ export default function Inventory() {
                       </span>
                     </td>
                     <td className="p-3 text-center">
-                      <FaPen
-                        className="text-red-600 cursor-pointer mx-auto"
-                        onClick={() => {
-                          setSelectedItemId(item.id);
-                          setNewItem({
-                            id: item.id,
-                            name: item.name,
-                            price: item.price ?? '',
-                            category: item.category,
-                            quantity: String(item.quantity ?? ''),
-                            status: deriveStatusFromQuantity(Number(item.quantity ?? 0)),
-                            allergens: item.allergens || '',
-                            addons: normalizeOptionArray(item.addons),
-                            description: item.description || '',
-                            sizes: normalizeOptionArray(item.sizes),
-                            image: item.image || ''
-                          });
-                          setShowEditModal(true);
-                        }}
-                      />
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedItemId(item.id);
+                            setNewItem({
+                              id: item.id,
+                              name: item.name,
+                              price: item.price ?? '',
+                              category: item.category,
+                              quantity: String(item.quantity ?? ''),
+                              status: deriveStatusFromQuantity(Number(item.quantity ?? 0)),
+                              allergens: item.allergens || "N/A",
+                              addons: normalizeOptionArray(item.addons),
+                              description: item.description || "N/A",
+                              sizes: normalizeOptionArray(item.sizes),
+                              image: item.image || ''
+                            });
+                            setShowEditModal(true);
+                          }}
+                          className="text-red-600 hover:text-red-700 transition-colors"
+                          title="Edit item"
+                        >
+                          <FaPen />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startDeleteItem(item)}
+                          className="text-gray-600 hover:text-red-600 transition-colors"
+                          title="Delete item"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -511,7 +559,7 @@ export default function Inventory() {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-between items-center">
+        <div className="flex justify-between items-center">
           <ShowEntries
             entriesPerPage={entriesPerPage}
             setEntriesPerPage={(n) => { setEntriesPerPage(n); setCurrentPage(1); }}
@@ -525,6 +573,7 @@ export default function Inventory() {
             View Logs
           </button>
         </div>
+      </div>
 
         {showAddModal && (
           <AddItemModal
@@ -575,28 +624,45 @@ export default function Inventory() {
           <ValidationErrorModal message={errorMessage} onClose={() => setShowErrorModal(false)} />
         )}
 
-        {showAddCategoryModal && (
-          <AddCategoryModal
-            onClose={() => setShowAddCategoryModal(false)}
-            onAdded={async (payload) => {
-              const clean = String(
-                typeof payload === 'string' ? payload : payload?.name || ''
-              ).trim();
-              if (!clean) {
-                setShowAddCategoryModal(false);
-                return;
-              }
-            try {
-              await addCategory({ name: clean, icon: payload?.icon || null });
-            } catch (error) {
-              console.error('Failed to add category:', error);
-            }
-            refreshLogs().catch(() => {});
-            setShowAddCategoryModal(false);
-          }}
-        />
-      )}
+        {showManageCategories && (
+          <ManageCategoryModal
+            isOpen
+            onClose={() => setShowManageCategories(false)}
+            />
+        )}
+
+        {itemToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white w-[400px] rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-2">
+                Delete "{itemToDelete.name}"?
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">
+                This will archive the product, hide it from the POS menu, and create an inventory log of the removal.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={cancelDeleteItem}
+                  className="px-5 py-2 rounded-full border border-gray-300 text-sm hover:bg-gray-100"
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteItem}
+                  disabled={deleteLoading}
+                  className="px-5 py-2 rounded-full bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-60"
+                >
+                  {deleteLoading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

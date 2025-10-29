@@ -1,7 +1,7 @@
-// src/pages/pos/VoidLogs.jsx
+﻿// src/pages/pos/VoidLogs.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import Sidebar from "../../components/Sidebar";
-import AdminInfo from "../../components/AdminInfo";
+import AdminInfoDashboard2 from "../../components/AdminInfoDashboard2";
 import ShowEntries from "../../components/ShowEntries";
 import Pagination from "../../components/Pagination";
 import { FaSearch } from "react-icons/fa";
@@ -9,9 +9,12 @@ import { fetchVoidLogs } from "../../api/orders";
 import VoidDetailModal from "../../components/modals/VoidDetailModal";
 
 const formatDateTime = (value) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+  if (value === null || value === undefined || value === "") return "-";
+  const source = typeof value === "number" ? value : String(value);
+  const date = new Date(source);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === "string" && value.trim() ? value : "-";
+  }
   return date.toLocaleString();
 };
 
@@ -113,7 +116,25 @@ export default function VoidLogs() {
 
   const normalizedRows = useMemo(() => {
     return rows.map((row) => {
-      const timestamp = row.approvedAt || row.requestedAt || row.createdAt || row.dateTime;
+      const timestamp =
+        row.approvedAt ||
+        row.requestedAt ||
+        row.voidedAt ||
+        row.voided_at ||
+        row.dateTime ||
+        row.date_time ||
+        row.date ||
+        row.date_at ||
+        row.timestamp ||
+        row.createdAt ||
+        row.created_at ||
+        row.updatedAt ||
+        row.updated_at ||
+        row.order?.createdAt ||
+        row.order?.updatedAt ||
+        row.order?.dateTime ||
+        row.order?.timestamp ||
+        row.order?.date;
       const items = Array.isArray(row.items) ? row.items : [];
       return {
         ...row,
@@ -142,8 +163,16 @@ export default function VoidLogs() {
     });
   }, [normalizedRows, searchQuery]);
 
-  const startIndex = (currentPage - 1) * entriesPerPage;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / entriesPerPage) || 1);
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * entriesPerPage;
   const currentPageRows = filteredRows.slice(startIndex, startIndex + entriesPerPage);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
   const handleRowClick = (row) => {
     if (!row) return;
     const detailPayload = {
@@ -162,104 +191,114 @@ export default function VoidLogs() {
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
-      <div className="ml-20 p-6 w-full">
-        <div className="flex justify-between items-center mb-6">
+      <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
+        <div className="px-6 pt-6 pb-2 flex justify-between items-center">
           <h1 className="text-3xl font-bold">Void Logs</h1>
-          <AdminInfo />
+          <AdminInfoDashboard2 />
         </div>
 
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
-            <FaSearch className="text-gray-500 mr-2" />
-            <input
-              type="text"
-              placeholder="Search by transaction, item, or reason"
-              className="outline-none w-full text-sm"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
+        <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
+              <FaSearch className="text-gray-500 mr-2" />
+              <input
+                type="text"
+                placeholder="Search by transaction, item, or reason"
+                className="outline-none w-full text-sm"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            <ShowEntries
+              entriesPerPage={entriesPerPage}
+              setEntriesPerPage={setEntriesPerPage}
+              setCurrentPage={setCurrentPage}
             />
           </div>
-          <ShowEntries entriesPerPage={entriesPerPage} setEntriesPerPage={setEntriesPerPage} />
-        </div>
 
-        <div className="bg-white rounded-xl shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-center w-16">No.</th>
-                <th className="text-left p-3 w-48">Date &amp; Time</th>
-                <th className="text-left p-3">Void ID</th>
-                <th className="text-left p-3">Transaction ID</th>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Voided Items</th>
-                <th className="text-left p-3">Cashier</th>
-                <th className="text-left p-3">Manager</th>
-                <th className="text-left p-3">Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="p-6 text-center text-gray-500">
-                    Loading...
-                  </td>
-                </tr>
-              ) : currentPageRows.length ? (
-                currentPageRows.map((row, idx) => (
-                  <tr
-                    key={row.id ?? row.voidId}
-                    className="border-t align-top hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => handleRowClick(row)}
-                  >
-                    <td className="p-3 text-center">{startIndex + idx + 1}</td>
-                    <td className="p-3">{row.displayDateTime}</td>
-                    <td className="p-3 font-medium">{row.voidId || row.id}</td>
-                    <td className="p-3">{row.transactionId}</td>
-                    <td className="p-3">
-                      {row.voidType === "TRANSACTION" || row.type === "TRANSACTION"
-                        ? "Transaction"
-                        : "Item"}
-                    </td>
-                    <td className="p-3">
-                      {row.items.length ? (
-                        row.items.map((item, itemIdx) => (
-                          <div
-                            key={item.orderItemId || itemIdx}
-                            className="flex justify-between gap-4"
-                          >
-                            <span className="truncate">{item.name || `#${item.orderItemId}`}</span>
-                            <span className="text-gray-600 whitespace-nowrap">
-                              x{item.qty ?? item.quantity ?? 0}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <span>-</span>
-                      )}
-                    </td>
-                    <td className="p-3">{row.cashierName}</td>
-                    <td className="p-3">{row.managerName}</td>
-                    <td className="p-3">{row.reason || "-"}</td>
+          <div className="flex-none bg-white rounded-xl shadow overflow-hidden">
+            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+              <table className="w-full text-sm">
+                <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
+                  <tr>
+                    <th className="p-3 text-center w-16">No.</th>
+                    <th className="text-left p-3 w-48">Date &amp; Time</th>
+                    <th className="text-left p-3">Void ID</th>
+                    <th className="text-left p-3">Transaction ID</th>
+                    <th className="text-left p-3">Type</th>
+                    <th className="text-left p-3">Voided Items</th>
+                    <th className="text-left p-3">Cashier</th>
+                    <th className="text-left p-3">Manager</th>
+                    <th className="text-left p-3">Reason</th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={9} className="p-6 text-center text-gray-500">
-                    No records found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          <div className="p-3 border-t flex justify-end">
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={9} className="p-6 text-center text-gray-500">
+                        Loading...
+                      </td>
+                    </tr>
+                  ) : currentPageRows.length ? (
+                    currentPageRows.map((row, idx) => (
+                      <tr
+                        key={row.id ?? row.voidId}
+                        className="border-b align-top odd:bg-white even:bg-gray-50 hover:bg-[#f1f1f1] cursor-pointer transition-colors"
+                        onClick={() => handleRowClick(row)}
+                      >
+                        <td className="p-3 text-center">{startIndex + idx + 1}</td>
+                        <td className="p-3">{row.displayDateTime}</td>
+                        <td className="p-3 font-medium">{row.voidId || row.id}</td>
+                        <td className="p-3">{row.transactionId}</td>
+                        <td className="p-3">
+                          {row.voidType === "TRANSACTION" || row.type === "TRANSACTION"
+                            ? "Transaction"
+                            : "Item"}
+                        </td>
+                        <td className="p-3">
+                          {row.items.length ? (
+                            row.items.map((item, itemIdx) => (
+                              <div
+                                key={item.orderItemId || itemIdx}
+                                className="flex justify-between gap-4"
+                              >
+                                <span className="truncate">
+                                  {item.name || `#${item.orderItemId}`}
+                                </span>
+                                <span className="text-gray-600 whitespace-nowrap">
+                                  x{item.qty ?? item.quantity ?? 0}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <span>-</span>
+                          )}
+                        </td>
+                        <td className="p-3">{row.cashierName}</td>
+                        <td className="p-3">{row.managerName}</td>
+                        <td className="p-3">{row.reason || "-"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={9} className="p-6 text-center text-gray-500">
+                        No records found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
             <Pagination
               currentPage={currentPage}
-              totalEntries={filteredRows.length}
-              entriesPerPage={entriesPerPage}
-              onPageChange={setCurrentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
             />
           </div>
         </div>
@@ -273,3 +312,4 @@ export default function VoidLogs() {
     </div>
   );
 }
+

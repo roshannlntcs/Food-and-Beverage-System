@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+﻿import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import Sidebar from "../../components/Sidebar";
-import AdminInfo from "../../components/AdminInfo";
+import AdminInfoDashboard2 from "../../components/AdminInfoDashboard2";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
 import ResetConfirmationModal from "../../components/ResetConfirmationModal";
@@ -612,13 +612,14 @@ const SuperAdmin = () => {
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar />
-      <div className="ml-20 p-8 flex-1">
-        <div className="flex justify-between items-center mb-8">
+      <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
+        <div className="px-8 pt-8 pb-3 flex justify-between items-center">
           <h1 className="text-3xl font-bold">System Administrator</h1>
-          <AdminInfo />
+          <AdminInfoDashboard2 />
         </div>
 
-        <div className="flex justify-between items-center mb-12">
+        <div className="flex-1 min-h-0 px-8 pb-8 overflow-hidden flex flex-col gap-6">
+        <div className="flex justify-between items-center">
           <div className="flex gap-3">
             <div className="relative z-40" ref={resetMenuRef}>
               <button
@@ -671,7 +672,7 @@ const SuperAdmin = () => {
           />
         </div>
 
-        <section className="bg-white rounded-lg shadow">
+        <section className="flex flex-col bg-white rounded-lg shadow flex-none max-h-[65vh]">
           <header className="flex items-center justify-between px-6 py-4 border-b">
             <h2 className="font-semibold flex items-center gap-2 text-base">
               <FaUsers /> Users
@@ -707,9 +708,10 @@ const SuperAdmin = () => {
             </div>
           </header>
 
-          <div className="max-h-[500px] overflow-y-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-gray-100 sticky top-0 z-10">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+              <table className="min-w-full border-collapse text-sm">
+                <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left border-b">
                   <th className="py-3 px-4">School ID</th>
                   <th className="py-3 px-4">Username</th>
@@ -742,7 +744,7 @@ const SuperAdmin = () => {
                     const isSuperAdmin =
                       String(user.role || "").toUpperCase() === "SUPER_ADMIN";
                     return (
-                      <tr key={user.id} className="border-b hover:bg-gray-50">
+                      <tr key={user.id} className="border-b odd:bg-white even:bg-gray-50 hover:bg-[#f1f1f1]">
                         <td className="py-3 px-4">{user.schoolId || "N/A"}</td>
                         <td className="py-3 px-4">{user.username || "N/A"}</td>
                         <td className="py-3 px-4">{user.fullName || "N/A"}</td>
@@ -798,6 +800,7 @@ const SuperAdmin = () => {
                   })}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-6 py-4 border-t">
@@ -817,6 +820,7 @@ const SuperAdmin = () => {
             <div className="w-[150px]" />
           </div>
         </section>
+        </div>
       </div>
 
       <ResetConfirmationModal
@@ -872,6 +876,9 @@ const SuperAdmin = () => {
 };
 
 export default SuperAdmin;
+
+
+
 
 
 

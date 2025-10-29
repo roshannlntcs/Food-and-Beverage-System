@@ -1,12 +1,13 @@
-// src/pages/admin/SupplierRecords.jsx
+﻿// src/pages/admin/SupplierRecords.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "../../components/Sidebar";
-import AdminInfo from "../../components/AdminInfo";
+import AdminInfoDashboard2 from "../../components/AdminInfoDashboard2";
 import { FaSearch, FaPen } from "react-icons/fa";
 import AddSupplierModal from "../../components/AddSupplierModal";
 import EditSupplierModal from "../../components/EditSupplierModal";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
+import { useInventory } from "../../contexts/InventoryContext";
 import {
   listSuppliers,
   createSupplier,
@@ -117,6 +118,8 @@ const SupplierRecords = () => {
   const [logSubmitting, setLogSubmitting] = useState(false);
   const [logSubmitError, setLogSubmitError] = useState(null);
 
+  const { refresh: refreshInventory } = useInventory() || {};
+
   const loadSuppliers = async () => {
     setLoadingSuppliers(true);
     try {
@@ -216,11 +219,11 @@ const SupplierRecords = () => {
       const fields = [
         supplier.name,
         supplier.contactPerson,
+        supplier.phone,
+        supplier.email,
+        supplier.address,
         supplier.products,
         supplier.status,
-        supplier.email,
-        supplier.phone,
-        supplier.address,
       ];
       return fields.some((field) => (field || "").toLowerCase().includes(keyword));
     });
@@ -350,6 +353,13 @@ const SupplierRecords = () => {
     try {
       await createSupplierLog(supplierId, payload);
       await fetchLogs({ reset: true });
+      if (typeof refreshInventory === "function") {
+        try {
+          await refreshInventory();
+        } catch (error) {
+          console.error("Failed to refresh inventory after supplier log:", error);
+        }
+      }
       const defaultSupplierId = logFilterSupplierId !== "all" ? String(logFilterSupplierId) : "";
       setLogForm(createInitialLogForm(defaultSupplierId));
     } catch (error) {
@@ -367,13 +377,13 @@ const SupplierRecords = () => {
   return (
     <div className="flex min-h-screen bg-[#f9f6ee] overflow-hidden">
       <Sidebar />
-      <div className="ml-20 p-6 w-full">
-        <div className="flex justify-between items-center mb-6">
+      <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
+        <div className="px-6 pt-6 pb-2 flex justify-between items-center">
           <h1 className="text-3xl font-bold">Supplier Records</h1>
-          <AdminInfo />
+          <AdminInfoDashboard2 />
         </div>
 
-        <div className="flex flex-col gap-2 mb-4">
+        <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center border rounded-md px-4 py-2 w-full sm:w-96 bg-white">
               <input
@@ -404,12 +414,11 @@ const SupplierRecords = () => {
           {supplierError && (
             <p className="text-sm text-red-600">{supplierError}</p>
           )}
-        </div>
 
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="overflow-auto">
-            <table className="table-auto w-full text-sm">
-              <thead className="bg-[#8B0000] text-white">
+          <div className="flex-none bg-white shadow rounded-lg overflow-hidden">
+            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+              <table className="table-auto w-full text-sm">
+                <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr>
                   <th className="p-3 text-left">#</th>
                   <th className="p-3 text-left">Supplier Name</th>
@@ -437,11 +446,11 @@ const SupplierRecords = () => {
                     >
                       <td className="p-3">{indexOfFirstEntry + i + 1}</td>
                       <td className="p-3 font-semibold">{supplier.name}</td>
-                      <td className="p-3">{supplier.contactPerson || "â€”"}</td>
-                      <td className="p-3">{supplier.phone || "â€”"}</td>
-                      <td className="p-3">{supplier.email || "â€”"}</td>
-                      <td className="p-3">{supplier.address || "â€”"}</td>
-                      <td className="p-3">{supplier.products || "â€”"}</td>
+                      <td className="p-3">{supplier.contactPerson || "N/A"}</td>
+                      <td className="p-3">{supplier.phone || "N/A"}</td>
+                      <td className="p-3">{supplier.email || "N/A"}</td>
+                      <td className="p-3">{supplier.address || "N/A"}</td>
+                      <td className="p-3">{supplier.products || "N/A"}</td>
                       <td className="p-3 text-center">
                         <span
                           className={`px-3 py-1 text-sm font-medium rounded-full ${
@@ -478,28 +487,30 @@ const SupplierRecords = () => {
                   </tr>
                 )}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between mt-4 gap-4">
-          <ShowEntries
-            entriesPerPage={entriesPerPage}
-            setEntriesPerPage={setEntriesPerPage}
-            setCurrentPage={setCurrentPage}
-          />
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            setCurrentPage={setCurrentPage}
-          />
-          <button
-            onClick={() => openLogsModal("all")}
-            className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full text-sm"
-          >
-            View Logs
-          </button>
-        </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <ShowEntries
+              entriesPerPage={entriesPerPage}
+              setEntriesPerPage={setEntriesPerPage}
+              setCurrentPage={setCurrentPage}
+            />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+            />
+            <button
+              onClick={() => openLogsModal("all")}
+              className="px-5 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded shadow border border-yellow-500 rounded-full text-sm"
+            >
+              View Logs
+            </button>
+          </div>
+
+      </div>
 
         {showAddModal && (
           <AddSupplierModal
@@ -521,7 +532,7 @@ const SupplierRecords = () => {
 
         {showLogsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] flex flex-col">
+              <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] flex flex-col">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                 <h2 className="text-xl font-bold">Supplier Logs</h2>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -662,9 +673,9 @@ const SupplierRecords = () => {
                 </div>
               </form>
 
-              <div className="overflow-auto max-h-[50vh] border rounded mb-4">
+              <div className="overflow-auto max-h-[50vh] border rounded mb-4 no-scrollbar">
                 <table className="table-auto w-full text-sm">
-                  <thead className="bg-[#8B0000] text-white sticky top-0">
+                  <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                     <tr>
                       <th className="p-2 text-left">Date/Time</th>
                       <th className="p-2 text-left">Type</th>
@@ -697,36 +708,36 @@ const SupplierRecords = () => {
                         </td>
                       </tr>
                     )}
-                  </tbody>
-                </table>
-              </div>
-
-              {logsError && (
-                <p className="text-sm text-red-600 mb-2">{logsError}</p>
-              )}
-
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="text-sm text-gray-600">
-                  {logsLoading && logs.length > 0 ? "Loading more logs..." : ""}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex items-center gap-3 justify-end">
-                  {logsNextCursor && (
+
+                {logsError && (
+                  <p className="text-sm text-red-600 mb-2">{logsError}</p>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="text-sm text-gray-600">
+                    {logsLoading && logs.length > 0 ? "Loading more logs..." : ""}
+                  </div>
+                  <div className="flex items-center gap-3 justify-end">
+                    {logsNextCursor && (
+                      <button
+                        onClick={handleLoadMoreLogs}
+                        className="bg-white border rounded-full px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-60"
+                        disabled={logsLoading}
+                      >
+                        {logsLoading ? "Loading..." : "Load More"}
+                      </button>
+                    )}
                     <button
-                      onClick={handleLoadMoreLogs}
-                      className="bg-white border rounded-full px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-60"
-                      disabled={logsLoading}
+                      onClick={closeLogsModal}
+                      className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-full"
                     >
-                      {logsLoading ? "Loading..." : "Load More"}
+                      Close
                     </button>
-                  )}
-                  <button
-                    onClick={closeLogsModal}
-                    className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded-full"
-                  >
-                    Close
-                  </button>
+                  </div>
                 </div>
-              </div>
             </div>
           </div>
         )}
@@ -736,4 +747,5 @@ const SupplierRecords = () => {
 };
 
 export default SupplierRecords;
+
 
