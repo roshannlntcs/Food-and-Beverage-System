@@ -18,6 +18,7 @@ import { mapOrderToTx } from "../utils/mapOrder";
 
 const DEFAULT_LOW_THRESHOLD = 10;
 const MAX_ORDER_FETCH = 100;
+const READ_STORAGE_KEY = "dashboard.readNotifications";
 
 const pesoFormatter = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -31,12 +32,20 @@ const normalizeNotifications = (list = []) => {
   return [...list]
     .filter(Boolean)
     .map((item) => {
+      const baseType = item.type || "general";
+      const text = item.text || "";
       const timestamp =
         item.timestamp ||
         (item.time ? new Date(item.time).toISOString() : null) ||
         new Date().toISOString();
+      const id =
+        item.id || `${baseType}|${text}|${timestamp}`;
+
       return {
         ...item,
+        type: baseType,
+        text,
+        id,
         timestamp,
         time: item.time || new Date(timestamp).toLocaleString(),
       };
@@ -63,6 +72,7 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [readIds, setReadIds] = useState(() => new Set());
   const [displayNotifications, setDisplayNotifications] = useState(() => {
     if (Array.isArray(notifications) && notifications.length) {
       return normalizeNotifications(notifications);
@@ -94,6 +104,33 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
   const dropdownRef = useRef(null);
   const dropdownBtnRef = useRef(null);
   const notifRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(READ_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setReadIds(new Set(parsed));
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load read notifications:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        READ_STORAGE_KEY,
+        JSON.stringify(Array.from(readIds))
+      );
+    } catch (err) {
+      console.warn("Failed to persist read notifications:", err);
+    }
+  }, [readIds]);
 
   const handleClickOutside = useCallback((event) => {
     if (
@@ -175,6 +212,23 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
       }
     }
   }, [notifications]);
+
+  useEffect(() => {
+    setReadIds((prev) => {
+      if (!prev.size) return prev;
+      const ids = new Set(displayNotifications.map((notif) => notif.id));
+      let changed = false;
+      const next = new Set();
+      prev.forEach((id) => {
+        if (ids.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [displayNotifications]);
 
   useEffect(() => {
     if (profileAnalytics) {
@@ -324,10 +378,20 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
   const bellNotifications = useMemo(
     () =>
       Array.isArray(displayNotifications)
-        ? displayNotifications.slice(0, 5)
+        ? displayNotifications.slice(0, 8)
         : [],
     [displayNotifications]
   );
+
+  const unreadCount = useMemo(() => {
+    if (!Array.isArray(displayNotifications) || !displayNotifications.length) {
+      return 0;
+    }
+    return displayNotifications.reduce((count, notif) => {
+      if (!notif?.id) return count + 1;
+      return readIds.has(notif.id) ? count : count + 1;
+    }, 0);
+  }, [displayNotifications, readIds]);
 
   const handleSwitchRole = useCallback(() => {
     setShowProfile(false);
@@ -393,6 +457,26 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     [changePassword, showToast]
   );
 
+  const handleBellNotificationClick = useCallback(
+    (notif) => {
+      if (!notif) return;
+      if (notif.id) {
+        setReadIds((prev) => {
+          if (prev.has(notif.id)) return prev;
+          const next = new Set(prev);
+          next.add(notif.id);
+          return next;
+        });
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("dashboard-notification-click", { detail: notif })
+        );
+      }
+    },
+    []
+  );
+
   return (
     <div className="flex items-center space-x-4 relative z-50">
       <div className="relative" ref={notifRef}>
@@ -401,9 +485,9 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
           className="relative focus:outline-none hover:text-yellow-400 transition"
         >
           <FaBell className="text-xl text-current" />
-          {bellNotifications.length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1 leading-none">
-              {bellNotifications.length}
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1 leading-none">
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </button>
@@ -423,10 +507,22 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
                     ) : (
                       <FaCube className="text-orange-500" />
                     );
+                  const isRead = notif.id ? readIds.has(notif.id) : false;
                   return (
                     <div
-                      key={`${notif.text}-${idx}`}
-                      className="px-4 py-3 border-b last:border-b-0 flex items-start gap-3"
+                      key={`${notif.id || notif.text}-${idx}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleBellNotificationClick(notif)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleBellNotificationClick(notif);
+                        }
+                      }}
+                      className={`px-4 py-3 border-b last:border-b-0 flex items-start gap-3 cursor-pointer transition ${
+                        isRead ? "opacity-60" : ""
+                      } hover:bg-gray-50 focus:bg-gray-100`}
                     >
                       <span className="mt-1">{icon}</span>
                       <div>
