@@ -65,9 +65,26 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
   const { showToast } = useToast();
   const { inventory = [] } = useInventory() || {};
 
+  // Normalize various sex values -> "M" / "F" / null
+const normalizeSex = (val) => {
+  if (!val || typeof val !== "string") return null;
+  const v = val.trim().toLowerCase();
+  if (v === "m" || v === "male") return "M";
+  if (v === "f" || v === "female") return "F";
+  return null;
+};
+
   const adminName = currentUser?.fullName || "Admin";
-  const avatarUrl =
-    currentUser?.avatarUrl || images["avatar-ph.png"] || "https://i.pravatar.cc/100?img=68";
+ const localSex = typeof window !== "undefined" ? localStorage.getItem("sex") : null;
+const sex = normalizeSex(currentUser?.sex) || normalizeSex(localSex);
+const genderAvatar = sex === "M" ? "/male_user.png" : sex === "F" ? "/female_user.png" : null;
+
+const avatarUrl =
+  currentUser?.avatarUrl ||
+  genderAvatar ||
+  images["avatar-ph.png"] ||
+  "https://i.pravatar.cc/100?img=68";
+
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -544,11 +561,10 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
           onClick={() => setDropdownOpen((prev) => !prev)}
           className="flex items-center space-x-3 cursor-pointer select-none"
         >
-          <img
-            src={avatarUrl}
-            alt="Admin Avatar"
-            className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
-          />
+                    <div className="h-9 w-9 rounded-full overflow-hidden bg-white ring-1 ring-gray-300 shadow-sm flex items-center justify-center">
+            <img src={avatarUrl} alt="Admin Avatar" className="h-8 w-8 object-contain" />
+          </div>
+
           <div className="hidden md:block leading-tight text-current">
             <div className="text-sm font-semibold">{adminName}</div>
             <div className="text-xs opacity-80">Administrator</div>

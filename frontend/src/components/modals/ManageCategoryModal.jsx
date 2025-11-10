@@ -15,16 +15,9 @@ const DEFAULT_CATEGORIES = [
 
 const OPTIONAL_CATEGORIES = [
   { key: "Alcohol", icon: "/icons/alcoholic_cocktail.png" },
-  { key: "Guacamole", icon: "/icons/guacamole.png" },
-  { key: "Lemonade", icon: "/icons/lemonade.png" },
-  { key: "Macaron", icon: "/icons/macaron.png" },
-  { key: "Milkshake", icon: "/icons/milkshake.png" },
-  { key: "Nachos", icon: "/icons/nachos.png" },
   { key: "Noodles", icon: "/icons/noodles.png" },
   { key: "Pie", icon: "/icons/pie.png" },
-  { key: "Potato", icon: "/icons/potato.png" },
   { key: "Rice Bowl", icon: "/icons/rice_bowl.png" },
-  { key: "Soup Plate", icon: "/icons/soup_plate.png" },
   { key: "Wine", icon: "/icons/wine_glass.png" },
 ];
 

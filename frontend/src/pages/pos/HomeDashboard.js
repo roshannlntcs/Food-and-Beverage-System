@@ -84,6 +84,15 @@ const makeInclusiveDate = (value, endOfDay = false) => {
   return date;
 };
 const Dashboard = () => {
+  // Normalize various sex values -> "M" / "F" / null
+const normalizeSex = (val) => {
+  if (!val || typeof val !== "string") return null;
+  const v = val.trim().toLowerCase();
+  if (v === "m" || v === "male") return "M";
+  if (v === "f" || v === "female") return "F";
+  return null;
+};
+
   const { inventory: inventoryFromCtx = [] } = useInventory() || {};
   const { currentUser } = useAuth() || {};
   const currentUserName = currentUser?.fullName || "Admin";
@@ -417,12 +426,17 @@ const Dashboard = () => {
           user?.username ||
           "--";
         const username = user?.username || user?.email || "";
-        const avatar =
-          user?.avatarUrl ||
-          user?.avatar ||
-          user?.image ||
-          user?.img ||
-          null;
+       const sex = normalizeSex(user?.sex);
+const genderAvatar = sex === "M" ? "/male_user.png" : sex === "F" ? "/female_user.png" : null;
+
+const avatar =
+  user?.avatarUrl ||
+  user?.avatar ||
+  user?.image ||
+  user?.img ||
+  genderAvatar ||
+  null;
+
         const diffMs = Date.now() - date.getTime();
         const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
         let relativeLabel;
@@ -1296,11 +1310,10 @@ const Dashboard = () => {
                         <div key={entry.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             {entry.avatar ? (
-                              <img
-                                src={entry.avatar}
-                                alt={entry.name}
-                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                              />
+                             <div className="h-9 w-9 rounded-full overflow-hidden bg-white ring-1 ring-gray-200 flex items-center justify-center">
+  <img src={entry.avatar} alt={entry.name} className="h-8 w-8 object-contain" />
+</div>
+
                             ) : (
                               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-600 border border-gray-200">
                                 {(entry.name || "U")
