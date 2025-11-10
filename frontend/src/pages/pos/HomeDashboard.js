@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Sidebar from "../../components/Sidebar";
@@ -46,6 +47,31 @@ const formatCurrency = (value) => pesoFormatter.format(Number(value || 0));
 const formatCount = (value) =>
   Number.isFinite(value) ? Number(value).toLocaleString() : "0";
 
+const coerceDate = (value) => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const toISODate = (value) => {
+  const date = coerceDate(value);
+  return date ? date.toISOString() : null;
+};
+
+const formatTimestamp = (value) => {
+  const date = coerceDate(value) || new Date();
+  return date.toLocaleString();
+};
+
+const cssEscape = (value) => {
+  if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+    return CSS.escape(value);
+  }
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, (match) => `\\${match}`);
+};
+
+const MAX_DASHBOARD_NOTIFICATIONS = 40;
+
 const makeInclusiveDate = (value, endOfDay = false) => {
   if (!value) return null;
   const date = new Date(value);
@@ -81,12 +107,30 @@ const Dashboard = () => {
     });
     return { byId, byName };
   }, [inventoryFromCtx]);
+  const focusStockRow = useCallback((stockId) => {
+    if (!stockId) return;
+    setHighlightedStockId(stockId);
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+    highlightTimeoutRef.current = setTimeout(
+      () => setHighlightedStockId(null),
+      2000
+    );
+    if (typeof document !== "undefined") {
+      const selector = `[data-stock-id=\"${cssEscape(stockId)}\"]`;
+      const element = document.querySelector(selector);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, []);
 
   const [selectedStock, setSelectedStock] = useState("");
   const [stockOpen, setStockOpen] = useState(false);
   const [selectedTop, setSelectedTop] = useState("");
   const [topOpen, setTopOpen] = useState(false);
-  const [orderRange, setOrderRange] = useState("this_week");
+  const [orderRange, setOrderRange] = useState("30");
   const [orderRangeOpen, setOrderRangeOpen] = useState(false);
   const [showDateError, setShowDateError] = useState(false);
 
@@ -104,6 +148,10 @@ const Dashboard = () => {
 
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const stockQuantityRef = useRef(new Map());
+  const highlightTimeoutRef = useRef(null);
+  const [highlightedStockId, setHighlightedStockId] = useState(null);
+  const [selectedNotification, setSelectedNotification] = useState(null);
 
   const appliedFromDate = useMemo(
     () => makeInclusiveDate(appliedFrom),
@@ -112,6 +160,14 @@ const Dashboard = () => {
   const appliedToDate = useMemo(
     () => makeInclusiveDate(appliedTo, true),
     [appliedTo]
+  );
+  useEffect(
+    () => () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    },
+    []
   );
   const loadOrders = useCallback(async () => {
     setOrdersLoading(true);
@@ -312,12 +368,7 @@ const Dashboard = () => {
     if (!transactionsWithinDates.length) return [];
     const now = new Date();
     let start;
-    if (orderRange === "this_week") {
-      const day = now.getDay();
-      start = new Date(now);
-      start.setDate(now.getDate() - day);
-      start.setHours(0, 0, 0, 0);
-    } else if (["30", "60", "90"].includes(orderRange)) {
+    if (["30", "60", "90"].includes(orderRange)) {
       start = new Date(now);
       start.setDate(now.getDate() - (Number(orderRange) - 1));
       start.setHours(0, 0, 0, 0);
@@ -460,45 +511,217 @@ const Dashboard = () => {
   }, [transactionsWithinDates, resolveInventoryItem]);
 
   const notifications = useMemo(() => {
-    const list = [];
-    stockEntries.forEach((entry) => {
-      if (entry.current <= 0) {
-        list.push({
+    const previousQuantities = stockQuantityRef.current || new Map();
+    const nextQuantities = new Map();
+    const stockNotifs = [];
+
+    (inventoryFromCtx || []).forEach((item) => {
+      if (!item) return;
+      const rawKey =
+        item.id ??
+        item._id ??
+        item.uuid ??
+        item.sku ??
+        item.code ??
+        item.productId ??
+        item.name;
+      const key = rawKey ? String(rawKey) : String(item.name || "item");
+      const qty = Number(item.quantity ?? 0);
+      const threshold =
+        Number(item.lowThreshold ?? DEFAULT_LOW_THRESHOLD) ||
+        DEFAULT_LOW_THRESHOLD;
+      const timestamp =
+        toISODate(item.updatedAt) ||
+        toISODate(item.createdAt) ||
+        new Date().toISOString();
+      const stockMeta = {
+        stockId: key,
+        stockName: item.name,
+        stockCategory: item.category,
+        currentQty: qty,
+        threshold,
+      };
+
+      if (qty <= 0) {
+        stockNotifs.push({
           type: "stock",
-          text: `Out of stock: ${entry.name}`,
-          timestamp: new Date().toISOString(),
-          time: new Date().toLocaleString(),
+          variant: "out",
+          text: `Out of stock: ${item.name}`,
+          timestamp,
+          time: formatTimestamp(timestamp),
+          ...stockMeta,
         });
-      } else if (entry.current <= entry.threshold) {
-        list.push({
+      } else if (qty <= threshold) {
+        stockNotifs.push({
           type: "stock",
-          text: `Low stock: ${entry.name} (${entry.current} left)`,
-          timestamp: new Date().toISOString(),
-          time: new Date().toLocaleString(),
+          variant: "low",
+          text: `Low stock: ${item.name} (${qty} left)`,
+          timestamp,
+          time: formatTimestamp(timestamp),
+          ...stockMeta,
         });
       }
-    });
 
-    transactionsWithinDates.slice(0, 10).forEach((tx) => {
-      const label = tx.reference || tx.id || tx.orderNumber || "Order";
-      list.push({
-        type: "order",
-        text: `Transaction ${label} - ${formatCurrency(tx.total || 0)}`,
-        timestamp: tx.date || new Date().toISOString(),
-        time: tx.date
-          ? new Date(tx.date).toLocaleString()
-          : new Date().toLocaleString(),
+      const prevQty =
+        previousQuantities.has(key) && Number.isFinite(previousQuantities.get(key))
+          ? previousQuantities.get(key)
+          : null;
+      if (prevQty !== null && qty > prevQty) {
+        const delta = qty - prevQty;
+        stockNotifs.push({
+          type: "stock",
+          variant: "restock",
+          text:
+            delta > 0
+              ? `Stock added: ${item.name} (+${delta})`
+              : `Stock updated: ${item.name}`,
+          timestamp,
+          time: formatTimestamp(timestamp),
+          ...stockMeta,
+          delta,
+        });
+      }
+      nextQuantities.set(key, qty);
+    });
+    stockQuantityRef.current = nextQuantities;
+
+    const transactionNotifs = transactionsWithinDates
+      .slice(0, 50)
+      .flatMap((tx) => {
+        const label =
+          tx.reference ||
+          tx.orderID ||
+          tx.transactionID ||
+          tx.id ||
+          tx.orderNumber ||
+          "Order";
+        const iso =
+          toISODate(tx.createdAt) ||
+          toISODate(tx.date) ||
+          new Date().toISOString();
+        const base = {
+          type: "order",
+          timestamp: iso,
+          time: formatTimestamp(iso),
+          transactionId:
+            tx.transactionID || tx.id || tx.orderID || tx.orderNumber || label,
+          orderDbId: tx.orderDbId || tx.orderID || null,
+          transactionLabel: label,
+          transactionTotal: tx.total || 0,
+          cashier: tx.cashier || "",
+          status: tx.status || "",
+          items: tx.items || [],
+        };
+        const status = String(tx.status || "").toLowerCase();
+        const entries = [];
+        if (tx.voided || status.includes("void")) {
+          entries.push({
+            ...base,
+            variant: "voided",
+            text: `Transaction ${label} voided`,
+          });
+        } else if (status.includes("cancel")) {
+          entries.push({
+            ...base,
+            variant: "cancelled",
+            text: `Transaction ${label} cancelled`,
+          });
+        } else {
+          entries.push({
+            ...base,
+            variant: "completed",
+            text: `Transaction ${label} completed - ${formatCurrency(
+              tx.total || 0
+            )}`,
+          });
+        }
+
+        if (tx.hasVoidedItems) {
+          entries.push({
+            ...base,
+            variant: "voided-items",
+            text: `Item(s) voided in transaction ${label}`,
+          });
+        }
+        return entries;
       });
-    });
 
-    return list
+    return [...stockNotifs, ...transactionNotifs]
       .sort(
         (a, b) =>
           new Date(b.timestamp || 0).getTime() -
           new Date(a.timestamp || 0).getTime()
       )
-      .slice(0, 10);
-  }, [stockEntries, transactionsWithinDates]);
+      .slice(0, MAX_DASHBOARD_NOTIFICATIONS);
+  }, [inventoryFromCtx, transactionsWithinDates]);
+
+  const stockNotificationList = useMemo(
+    () =>
+      Array.isArray(notifications)
+        ? notifications.filter((notif) => notif.type === "stock")
+        : [],
+    [notifications]
+  );
+
+  const transactionNotificationList = useMemo(
+    () =>
+      Array.isArray(notifications)
+        ? notifications.filter((notif) => notif.type !== "stock")
+        : [],
+    [notifications]
+  );
+
+  const handleNotificationClick = useCallback(
+    (notif) => {
+      if (!notif) return;
+      let detail = notif;
+      if (notif.type === "stock") {
+        const product =
+          inventoryIndex.byId.get(String(notif.stockId || "")) ||
+          (typeof notif.stockName === "string"
+            ? inventoryIndex.byName.get(notif.stockName.toLowerCase())
+            : undefined);
+        if (product) {
+          detail = { ...notif, product };
+        }
+        if (notif.stockId || product?.id || product?.name) {
+          focusStockRow(String(notif.stockId || product?.id || product?.name));
+        }
+      } else {
+        const match = transactionsWithinDates.find((tx) => {
+          const candidates = [
+            tx.transactionID,
+            tx.id,
+            tx.orderID,
+            tx.orderNumber,
+            tx.reference,
+          ]
+            .filter(Boolean)
+            .map(String);
+          const target = String(
+            notif.transactionId || notif.transactionLabel || ""
+          );
+          return candidates.includes(target);
+        });
+        if (match) {
+          detail = { ...notif, transaction: match };
+        }
+      }
+      setSelectedNotification(detail);
+    },
+    [focusStockRow, inventoryIndex, transactionsWithinDates]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handler = (event) => {
+      if (event?.detail) {
+        handleNotificationClick(event.detail);
+      }
+    };
+    window.addEventListener("dashboard-notification-click", handler);
+    return () => window.removeEventListener("dashboard-notification-click", handler);
+  }, [handleNotificationClick]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -656,8 +879,17 @@ const Dashboard = () => {
                             const percentage = item.total
                               ? Math.min(100, Math.max(0, (item.current / item.total) * 100))
                               : 0;
+                            const stockKey = String(item.id || item.name);
                             return (
-                              <div key={item.id}>
+                              <div
+                                key={item.id || item.name}
+                                data-stock-id={stockKey}
+                                className={`rounded-md px-2 py-2 transition ${
+                                  highlightedStockId === stockKey
+                                    ? "bg-yellow-50 ring-2 ring-yellow-200"
+                                    : "hover:bg-gray-50"
+                                }`}
+                              >
                                 <div className="flex justify-between text-sm font-medium">
                                   <span>{item.name}</span>
                                   <span>
@@ -768,41 +1000,42 @@ const Dashboard = () => {
                   <div className="relative">
                     <button
                       onClick={() => setOrderRangeOpen((prev) => !prev)}
-                      className="text-gray-500 text-sm border px-2 py-1 rounded"
+                      className="text-gray-500 text-xs border px-2 py-1 rounded bg-gray-50 flex items-center gap-1"
                     >
-                      {ORDER_RANGE_LABELS[orderRange] || "This week"}
+                      {ORDER_RANGE_LABELS[orderRange] || "Last 30 days"}
+                      <ChevronDown className="h-3 w-3" />
                     </button>
                     {orderRangeOpen && (
-                      <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded shadow-lg z-50">
+                      <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded shadow-lg z-50">
                         <button
                           type="button"
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-100"
                           onClick={() => {
                             setOrderRange("this_week");
                             setOrderRangeOpen(false);
                           }}
                         >
-                          This week
+                          This Week
                         </button>
                         <button
                           type="button"
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-100"
                           onClick={() => {
                             setOrderRange("30");
                             setOrderRangeOpen(false);
                           }}
                         >
-                          Last 30 days
+                          Last 30 Days
                         </button>
                         <button
                           type="button"
-                          className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                          className="block w-full text-left px-3 py-2 text-xs hover:bg-gray-100"
                           onClick={() => {
                             setOrderRange("60");
                             setOrderRangeOpen(false);
                           }}
                         >
-                          Last 60 days
+                          Last 60 Days
                         </button>
                       </div>
                     )}
@@ -913,6 +1146,136 @@ const Dashboard = () => {
                 )}
               </div>
 
+              <div className="bg-white rounded-lg p-4 shadow flex flex-col flex-1 min-h-0">
+                <div className="flex justify-between items-center gap-4">
+                  <h2 className="font-bold flex items-center gap-2">
+                    <ShoppingCart size={16} />
+                    Notifications
+                  </h2>
+                  <span className="text-gray-400 text-xs md:text-sm">
+                    {notifications.length
+                      ? `Updated ${formatTimestamp(notifications[0]?.timestamp)}`
+                      : "No notifications yet"}
+                  </span>
+                </div>
+                <div
+                  className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-1 pb-1"
+                  style={{ maxHeight: 150 }}
+                >
+                  <div className="flex flex-col border rounded-lg p-3 overflow-hidden">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-gray-800">
+                        Stock Alerts
+                      </p>
+                      <span className="text-xs text-gray-400">
+                        {stockNotificationList.length}
+                      </span>
+                    </div>
+                    <div
+                      className="flex-1 overflow-y-auto no-scrollbar divide-y pr-1 pb-1"
+                      style={{ maxHeight: 100 }}
+                    >
+                      {stockNotificationList.length === 0 ? (
+                        <p className="text-gray-400 text-sm py-4 text-center">
+                          No stock notifications
+                        </p>
+                      ) : (
+                        stockNotificationList.map((notif, idx) => {
+                          const colorClass =
+                            notif.variant === "out"
+                              ? "text-red-500"
+                              : notif.variant === "low"
+                              ? "text-yellow-500"
+                              : "text-green-600";
+                          return (
+                            <div
+                              key={`${notif.text}-${notif.timestamp}-${idx}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleNotificationClick(notif)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  handleNotificationClick(notif);
+                                }
+                              }}
+                              className={`flex items-start gap-3 py-2 px-2 rounded-md cursor-pointer transition ${
+                                selectedNotification === notif
+                                  ? "bg-yellow-50 ring-1 ring-yellow-200"
+                                  : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <Package className={`mt-1 ${colorClass}`} size={16} />
+                              <div>
+                        <p className="text-xs text-gray-800">{notif.text}</p>
+                        <p className="text-[0.65rem] text-gray-500">{notif.time}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col border rounded-lg p-3 overflow-hidden">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-gray-800">
+                        Transaction Alerts
+                      </p>
+                      <span className="text-xs text-gray-400">
+                        {transactionNotificationList.length}
+                      </span>
+                    </div>
+                    <div
+                      className="flex-1 overflow-y-auto no-scrollbar divide-y pr-1 pb-1"
+                      style={{ maxHeight: 100 }}
+                    >
+                      {transactionNotificationList.length === 0 ? (
+                        <p className="text-gray-400 text-sm py-4 text-center">
+                          No transaction notifications
+                        </p>
+                      ) : (
+                        transactionNotificationList.map((notif, idx) => {
+                          const variant = String(notif.variant || "").toLowerCase();
+                          const colorClass = variant.includes("void")
+                            ? "text-red-500"
+                            : variant.includes("cancel")
+                            ? "text-orange-500"
+                            : "text-green-600";
+                          return (
+                            <div
+                              key={`${notif.text}-${notif.timestamp}-${idx}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleNotificationClick(notif)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  handleNotificationClick(notif);
+                                }
+                              }}
+                              className={`flex items-start gap-3 py-2 px-2 rounded-md cursor-pointer transition ${
+                                selectedNotification === notif
+                                  ? "bg-blue-50 ring-1 ring-blue-200"
+                                  : "hover:bg-gray-50"
+                              }`}
+                            >
+                              <ShoppingCart
+                                className={`mt-1 ${colorClass}`}
+                                size={16}
+                              />
+                              <div>
+                        <p className="text-xs text-gray-800">{notif.text}</p>
+                        <p className="text-[0.65rem] text-gray-500">{notif.time}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-white rounded-lg p-4 shadow flex flex-col min-h-0 flex-1">
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="font-bold flex items-center gap-2">
@@ -926,9 +1289,9 @@ const Dashboard = () => {
                 {recentLoginEntries.length ? (
                   <div
                     className="mt-1 overflow-y-auto no-scrollbar pr-1"
-                    style={{ maxHeight: 132 }}
+                    style={{ maxHeight: 79 }}
                   >
-                    <div className="space-y-3">
+                    <div className="space-y-3 pb-1">
                       {recentLoginEntries.map((entry) => (
                         <div key={entry.id} className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -973,41 +1336,123 @@ const Dashboard = () => {
                   </p>
                 )}
               </div>
+            </div>
 
-              <div className="bg-white rounded-lg p-4 shadow flex flex-col flex-1 min-h-0">
-                <div className="flex justify-between items-center">
-                  <h2 className="font-bold flex items-center gap-2">
-                    <ShoppingCart size={16} />
-                    Notifications
-                  </h2>
-                  <span className="text-gray-400 text-sm">
-                    {new Date().toLocaleDateString()}
-                  </span>
-                </div>
+            {selectedNotification && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+                onClick={() => setSelectedNotification(null)}
+              >
                 <div
-                  className="mt-2 space-y-1 overflow-y-auto no-scrollbar pr-1"
-                  style={{ maxHeight: 100 }}
+                  className="bg-white rounded-lg shadow-2xl w-full max-w-md p-5 relative"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {notifications.length === 0 ? (
-                    <p className="text-gray-400 text-sm">No notifications</p>
-                  ) : (
-                    notifications.map((notif, idx) => (
-                      <div key={`${notif.text}-${idx}`} className="flex items-start gap-2">
-                        {notif.type === "order" ? (
-                          <ShoppingCart size={16} className="text-green-500 mt-1" />
-                        ) : (
-                          <Package size={16} className="text-orange-500 mt-1" />
-                        )}
-                        <div>
-                          <p className="text-sm text-gray-700">{notif.text}</p>
-                          <p className="text-xs text-gray-400">{notif.time}</p>
-                        </div>
+                  <button
+                    type="button"
+                    className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-sm"
+                    onClick={() => setSelectedNotification(null)}
+                  >
+                    ✕
+                  </button>
+                  <h3 className="text-base font-semibold text-gray-900 pr-6">
+                    {selectedNotification.text}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedNotification.time}
+                  </p>
+
+                  {selectedNotification.type === "stock" ? (
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
+                      <div>
+                        <p className="text-xs text-gray-500">Item</p>
+                        <p className="font-semibold">
+                          {selectedNotification.stockName || "N/A"}
+                        </p>
                       </div>
-                    ))
+                      <div>
+                        <p className="text-xs text-gray-500">Category</p>
+                        <p className="font-semibold">
+                          {selectedNotification.stockCategory || "Uncategorized"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Quantity</p>
+                        <p className="font-semibold">
+                          {selectedNotification.product?.quantity ??
+                            selectedNotification.currentQty ??
+                            "Unknown"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Threshold</p>
+                        <p className="font-semibold">
+                          {selectedNotification.threshold ?? "N/A"}
+                        </p>
+                      </div>
+                      {selectedNotification.product?.status && (
+                        <div className="col-span-2">
+                          <p className="text-xs text-gray-500">Status</p>
+                          <p className="font-semibold">
+                            {selectedNotification.product.status}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-700">
+                      <div>
+                        <p className="text-xs text-gray-500">Reference</p>
+                        <p className="font-semibold">
+                          {selectedNotification.transactionLabel ||
+                            selectedNotification.transactionId ||
+                            "Transaction"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Amount</p>
+                        <p className="font-semibold">
+                          {formatCurrency(
+                            selectedNotification.transactionTotal || 0
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Status</p>
+                        <p className="font-semibold capitalize">
+                          {selectedNotification.variant ||
+                            selectedNotification.status ||
+                            "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Cashier</p>
+                        <p className="font-semibold">
+                          {selectedNotification.cashier || "N/A"}
+                        </p>
+                      </div>
+                      {selectedNotification.transaction?.items?.length ? (
+                        <div className="col-span-2">
+                          <p className="text-xs text-gray-500 mb-1">Items</p>
+                          <ul className="max-h-32 overflow-y-auto no-scrollbar text-xs text-gray-600 space-y-1">
+                            {selectedNotification.transaction.items.map((item) => (
+                              <li
+                                key={item.id}
+                                className="flex justify-between border-b last:border-b-0 pb-1"
+                              >
+                                <span>{item.name}</span>
+                                <span className="font-semibold">
+                                  x{item.quantity ?? item.qty ?? 1}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </main>
       </div>
