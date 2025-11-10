@@ -14,10 +14,7 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const OPTIONAL_CATEGORIES = [
-  { key: "Alcoholic Cocktail", icon: "/icons/alcoholic_cocktail.png" },
-  { key: "Banana Split", icon: "/icons/banana_split.png" },
-  { key: "Birthday Cake", icon: "/icons/birthday_cake.png" },
-  { key: "Bottle of Water", icon: "/icons/bottled_water.png" },
+  { key: "Alcohol", icon: "/icons/alcoholic_cocktail.png" },
   { key: "Guacamole", icon: "/icons/guacamole.png" },
   { key: "Lemonade", icon: "/icons/lemonade.png" },
   { key: "Macaron", icon: "/icons/macaron.png" },
@@ -28,7 +25,6 @@ const OPTIONAL_CATEGORIES = [
   { key: "Potato", icon: "/icons/potato.png" },
   { key: "Rice Bowl", icon: "/icons/rice_bowl.png" },
   { key: "Soup Plate", icon: "/icons/soup_plate.png" },
-  { key: "Spaghetti", icon: "/icons/spaghetti.png" },
   { key: "Wine", icon: "/icons/wine_glass.png" },
 ];
 

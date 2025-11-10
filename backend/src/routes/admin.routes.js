@@ -4,6 +4,7 @@ const { z } = require('zod');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { recordInventoryLog } = require('../lib/inventory');
 
 const prisma = new PrismaClient();
 const DEFAULT_STOCK = 100;
@@ -19,19 +20,21 @@ function assertSuperAdmin(req, res, next) {
   }
 }
 
+const ScopeEnum = z.enum([
+  'transactions','voids','users','categories','products','all','stock'
+]);
+
 const ResetPayload = z.object({
   scope: z
-    .union([
-      z.enum(['transactions', 'voids', 'users', 'categories', 'products', 'all']),
-      z.array(z.enum(['transactions', 'voids', 'users', 'categories', 'products', 'all'])).min(1),
-    ])
+    .union([ScopeEnum, z.array(ScopeEnum).nonempty()])
     .optional(),
+  qty: z.coerce.number().int().min(0).max(9999).optional(), // for stock reset override; optional
 });
 
 // Reset subsets of data (transactions, voids, users, categories, products)
 router.post('/reset', assertSuperAdmin, async (req, res) => {
   try {
-    const { scope } = ResetPayload.parse(req.body || {});
+    const { scope, qty } = ResetPayload.parse(req.body || {});
 
     let scopes = [];
     if (!scope) {
@@ -47,6 +50,7 @@ router.post('/reset', assertSuperAdmin, async (req, res) => {
     }
 
     const applied = Array.from(new Set(scopes));
+    const defaultQty = Number.isFinite(qty) ? qty : DEFAULT_STOCK;
 
     const resetTransactions =
       applied.includes('transactions') ||
@@ -159,6 +163,18 @@ router.post('/reset', assertSuperAdmin, async (req, res) => {
             });
           }
         }
+      }
+      if (applied.includes('stock')) {
+        await tx.product.updateMany({ data: { quantity: DEFAULT_STOCK } });
+        await recordInventoryLog(tx, {
+          productId: null,
+          productName: 'BULK',
+          action: 'RESET_QUANTITY',
+          detail:`Set all product quantities to ${defaultQty}`,
+          stock: defaultQty,
+          category: null,
+          userId: Number(req.user?.sub) || null,
+        });
       }
     });
 

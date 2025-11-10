@@ -31,7 +31,9 @@ const RESET_WARNINGS = {
     "This will remove all categories and products, then restore the default set. Transactions and void logs will also be cleared. Continue?",
   products:
     "This will remove all products and inventory logs, then restore the default catalog. Transactions and void logs will also be cleared. Continue?",
-  all:
+  stock:
+   "This resets all product quantities to 100. Continue?",
+    all:
     "This will remove all transactions, void logs, products, categories, and non-super-admin users. Do you want to continue?",
 };
 
@@ -41,6 +43,7 @@ const RESET_SUCCESS = {
   users: "User accounts have been reset.",
   categories: "Categories and products have been restored to defaults.",
   products: "Products have been restored to defaults.",
+  stock: "All product quantities were reset to 100.",
   all: "System data has been reset to defaults.",
 };
 
@@ -120,6 +123,11 @@ const SuperAdmin = () => {
         label: "Reset Products",
         helper: "Restores the default product catalog.",
       },
+      {
+    scope: "stock",
+    label: "Reset Stock",
+    helper: "Sets every product’s quantity back to 100 without deleting data.",
+  },
       {
         scope: "all",
         label: "Reset All Data",

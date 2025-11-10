@@ -1,4 +1,4 @@
-// src/components/admin/AddCategoryModal.jsx
+
 import React, { useState } from "react";
 
 const DEFAULT_ICON = "/assets/default-category.png";
