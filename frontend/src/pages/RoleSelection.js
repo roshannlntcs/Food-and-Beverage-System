@@ -1,5 +1,9 @@
 // src/pages/RoleSelection.jsx
+<<<<<<< HEAD
 import React, { useState } from "react";
+=======
+import React, { useEffect, useMemo, useState } from "react";
+>>>>>>> 7c1d42891335635ff78164231f4af2e9ac015d5d
 import { useNavigate } from "react-router-dom";
 import { FaCashRegister, FaWrench, FaUser } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
@@ -10,9 +14,44 @@ export default function RoleSelection() {
   const { currentUser } = useAuth() || {};
 
   const [selectedRole, setSelectedRole] = useState(null);
+<<<<<<< HEAD
 
   const resolvedAvatar = resolveUserAvatar(currentUser);
   const fullName = currentUser?.fullName || "";
+=======
+  const [fullName, setFullName] = useState("");
+
+  // Normalize "sex" -> "M" | "F" | null
+  const normalizeSex = (val) => {
+    if (!val || typeof val !== "string") return null;
+    const v = val.trim().toLowerCase();
+    if (v === "m" || v === "male") return "M";
+    if (v === "f" || v === "female") return "F";
+    return null;
+  };
+
+  // Derive once per render from source-of-truth user object
+  const { sex, avatarUrl } = useMemo(() => {
+    const localSex =
+      typeof window !== "undefined" ? localStorage.getItem("sex") : null;
+    const s = normalizeSex(currentUser?.sex) || normalizeSex(localSex);
+    const genderAvatar = s === "M" ? "/male_user.png" : s === "F" ? "/female_user.png" : null;
+
+    // avatarUrl wins, then gender fallback, then none
+    return {
+      sex: s,
+      avatarUrl: currentUser?.avatarUrl || genderAvatar || null,
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setFullName("");
+      return;
+    }
+    setFullName(currentUser.fullName || "");
+  }, [currentUser]);
+>>>>>>> 7c1d42891335635ff78164231f4af2e9ac015d5d
 
   const handleContinue = () => {
     if (selectedRole === "admin") {
@@ -37,6 +76,7 @@ export default function RoleSelection() {
           </h1>
         )}
 
+<<<<<<< HEAD
         <div className="flex justify-center mb-6">
           {resolvedAvatar ? (
             <div className="w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-transform duration-300">
@@ -44,6 +84,16 @@ export default function RoleSelection() {
                 src={resolvedAvatar}
                 alt="Profile avatar"
                 className="w-full h-full object-cover"
+=======
+        {/* Avatar preview synced with AdminInfoDashboard2 */}
+        <div className="flex justify-center mb-6">
+          {avatarUrl ? (
+            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
+              <img
+                src={avatarUrl}
+                alt="Profile"
+                className="w-24 h-24 object-contain -m-4"
+>>>>>>> 7c1d42891335635ff78164231f4af2e9ac015d5d
               />
             </div>
           ) : (
@@ -53,7 +103,9 @@ export default function RoleSelection() {
           )}
         </div>
 
-        <h2 className="text-lg font-medium mb-6 text-gray-800">Please select your role</h2>
+        <h2 className="text-lg font-medium mb-6 text-gray-800">
+          Please select your role
+        </h2>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
           {[

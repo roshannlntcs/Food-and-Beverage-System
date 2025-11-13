@@ -35,16 +35,16 @@ const CONTENT = {
           {/* Project Leader (center, spans both columns) */}
           <div className="md:col-span-2 flex flex-col items-center gap-1">
             <div className="h-14 w-14 rounded-full bg-neutral-300 overflow-hidden">
-              <img src="/team/leader.jpg" alt="Project Leader" className="h-full w-full object-cover" />
+              <img src="rnl.jpg" alt="Project Leader" className="h-full w-full object-cover" />
             </div>
             <div className="text-sm opacity-90 mt-1">Project Leader</div>
-            <div className="text-[13px] mt-0.5">Lanticse, Rose Anne</div>
+            <div className="text-[13px] mt-0.5">Lanticse, Rose Ann</div>
           </div>
 
           {/* Backend Developer */}
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-neutral-300 overflow-hidden shrink-0">
-              <img src="/team/backend.jpg" alt="Backend Developer" className="h-full w-full object-cover" />
+              <img src="mbj.jpg" alt="Backend Developer" className="h-full w-full object-cover" />
             </div>
             <div>
               <div className="text-sm">Backend Developer</div>
@@ -55,33 +55,33 @@ const CONTENT = {
           {/* Quality Assurance (QA) */}
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-neutral-300 overflow-hidden shrink-0">
-              <img src="/team/qa.jpg" alt="Quality Assurance" className="h-full w-full object-cover" />
+              <img src="jdm.jpg" alt="Quality Assurance" className="h-full w-full object-cover" />
             </div>
             <div>
               <div className="text-sm">Quality Assurance/ Frontend</div>
-              <div className="text-[12px] opacity-90 mt-0.5">Mialn, Jhapet Dave L.</div>
+              <div className="text-[12px] opacity-90 mt-0.5">Milan, Jhapet Dave </div>
             </div>
           </div>
 
           {/* Technical Writer */}
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-neutral-300 overflow-hidden shrink-0">
-              <img src="/team/writer.jpg" alt="Technical Writer" className="h-full w-full object-cover" />
+              <img src="pl.jpg" alt="Technical Writer" className="h-full w-full object-cover" />
             </div>
             <div>
               <div className="text-sm">Technical Writer</div>
-              <div className="text-[12px] opacity-90 mt-0.5">Villarde, John Paul.</div>
+              <div className="text-[12px] opacity-90 mt-0.5">Villarde, John Paul</div>
             </div>
           </div>
 
           {/* Frontend Developer */}
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-neutral-300 overflow-hidden shrink-0">
-              <img src="/team/frontend.jpg" alt="Frontend Developer" className="h-full w-full object-cover" />
+              <img src="gjm.jpg" alt="Frontend Developer" className="h-full w-full object-cover" />
             </div>
             <div>
               <div className="text-sm">Frontend Developer</div>
-              <div className="text-[12px] opacity-90 mt-0.5">Montajes, Genesis John</div>
+              <div className="text-[12px] opacity-90 mt-0.5">Montajes, Genesis John </div>
             </div>
           </div>
         </div>

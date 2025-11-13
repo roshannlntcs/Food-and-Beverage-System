@@ -1,17 +1,16 @@
-// src/pages/LandingPage.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import InfoModal from "../components/modals/InfoModal"; // <- adjust if needed
+import InfoModal from "../components/modals/InfoModal"; 
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(null); // "about" | "how" | "features" | "help" | null
+  const [open, setOpen] = useState(null); 
 
   const handleGetStarted = () => navigate("/user-login");
 
   return (
     <div className="relative min-h-screen bg-[#F6F3EA] text-gray-900 flex flex-col font-sans overflow-hidden">
-      {/* Full Background Image */}
+
       <div className="absolute inset-0 z-0">
         <img
           src="/newlandinglogin.png"

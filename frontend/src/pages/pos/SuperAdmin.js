@@ -191,6 +191,17 @@ const SuperAdmin = () => {
     });
   }, []);
 
+  const handleAddUserValidationError = useCallback(
+    (detailMessage) => {
+      showMessage(
+        "Missing Fields",
+        detailMessage || "Please fill in all required fields before saving.",
+        "error"
+      );
+    },
+    [showMessage]
+  );
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -918,11 +929,13 @@ const SuperAdmin = () => {
         warnings={RESET_WARNINGS}
       />
 
-      <AddUserModal
+            <AddUserModal
         isOpen={addUserModalOpen}
         onClose={() => setAddUserModalOpen(false)}
         onSave={handleAddUser}
+        onValidationError={handleAddUserValidationError}
       />
+
 
       <EditUserModal
         isOpen={editUserModalOpen}
@@ -947,7 +960,7 @@ const SuperAdmin = () => {
             : ""
         }
       />
-
+  
       <MessageModal
         isOpen={messageModal.isOpen}
         onClose={() => setMessageModal((prev) => ({ ...prev, isOpen: false }))}

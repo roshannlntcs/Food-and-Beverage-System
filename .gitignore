@@ -2,6 +2,3 @@ node_modules
 backend/prisma/*.db
 backend/prisma/*.db-wal
 backend/prisma/*.db-shm
-desktop/app
-desktop/dist
-desktop/*.log
