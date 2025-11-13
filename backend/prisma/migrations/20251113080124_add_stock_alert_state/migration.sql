@@ -1,0 +1,8 @@
+-- CreateTable
+CREATE TABLE "StockAlertState" (
+    "userId" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "signature" TEXT NOT NULL DEFAULT '',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "StockAlertState_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);

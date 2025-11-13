@@ -61,7 +61,12 @@ const ProductUpdate = ProductCreate.partial();
 // GET /products?search=&category=
 router.get('/', async (req, res) => {
   try {
-    const { search, category, includeInactive } = req.query;
+    const { search, category } = req.query;
+    const includeInactiveRaw = req.query.includeInactive;
+    const includeInactive =
+      typeof includeInactiveRaw === 'string'
+        ? ['true', '1', 'yes'].includes(includeInactiveRaw.toLowerCase())
+        : includeInactiveRaw === true;
     const where = {
       AND: [
         includeInactive ? undefined : { active: true },

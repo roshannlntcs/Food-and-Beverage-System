@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaBell, FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import { FaBell, FaUser, FaSignOutAlt, FaCog } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
+import resolveUserAvatar from '../utils/avatarHelper';
 import { useNavigate } from 'react-router-dom';
 
 const AdminInfo = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const adminName = currentUser?.fullName || 'Admin';
-  const sex = currentUser?.sex || ''; // "M" or "F"
-  const avatarUrl = currentUser?.avatarUrl || null;
+  const avatarUrl = resolveUserAvatar(currentUser);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -48,24 +48,6 @@ const AdminInfo = () => {
           src={avatarUrl}
           alt="Admin Avatar"
           className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
-        />
-      );
-    }
-    if (sex === 'M') {
-      return (
-        <img
-          src="/male_user.png"
-          alt="Male User"
-          className="w-10 h-10 rounded-full object-contain border-2 border-gray-300 shadow-sm bg-white"
-        />
-      );
-    }
-    if (sex === 'F') {
-      return (
-        <img
-          src="/female_user.png"
-          alt="Female User"
-          className="w-10 h-10 rounded-full object-contain border-2 border-gray-300 shadow-sm bg-white"
         />
       );
     }

@@ -8,10 +8,16 @@ const { authRequired } = require('../middleware');
 const prisma = new PrismaClient();
 const router = express.Router();
 
+const cookieSecureEnv = process.env.COOKIE_SECURE;
+const cookieSecure =
+  typeof cookieSecureEnv === 'string'
+    ? cookieSecureEnv.toLowerCase() !== 'false'
+    : process.env.NODE_ENV === 'production';
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  secure: cookieSecure,
   maxAge: 1000 * 60 * 60 * 12, // 12 hours
 };
 

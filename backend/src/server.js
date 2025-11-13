@@ -54,6 +54,7 @@ app.use('/analytics', authRequired, require('./routes/analytics.routes'));
 app.use('/suppliers', authRequired, require('./routes/suppliers.routes'));
 app.use('/admin', authRequired, require('./routes/admin.routes'));
 app.use('/inventory/logs', authRequired, require('./routes/inventoryLogs.routes'));
+app.use('/stock-alerts', authRequired, require('./routes/stockAlerts.routes'));
 
 
 app.get('/health', (_req, res) => res.json({

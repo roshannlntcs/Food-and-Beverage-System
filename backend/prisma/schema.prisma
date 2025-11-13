@@ -72,6 +72,7 @@ model User {
   voidLogsManager   VoidLog[]          @relation("VoidLogManager")
   inventoryLogs     InventoryLog[]
   supplierLogs      SupplierLog[]
+  stockAlertState   StockAlertState?
 }
 
 model Category {
@@ -237,4 +238,12 @@ model SupplierLog {
   recordedById   Int?
   recordedBy     User?            @relation(fields: [recordedById], references: [id], onDelete: SetNull)
   createdAt      DateTime         @default(now())
+}
+
+model StockAlertState {
+  userId     Int      @id
+  signature  String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -51,10 +51,10 @@ export default function UserLoginPage() {
 
   return (
     <div
-      className="min-h-screen w-full bg-cover bg-center flex items-center justify-center px-6 md:px-12"
+      className="min-h-screen w-full bg-cover bg-center flex items-center justify-center md:justify-start px-6 md:px-24"
       style={{ backgroundImage: "url('/userlogin_bg.png')" }}
     >
-      <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl w-full max-w-md p-8 md:p-10 space-y-8">
+      <div className="bg-white/90 backdrop-blur-sm shadow-xl rounded-2xl w-full max-w-md p-8 md:p-10 space-y-8 md:mr-auto">
         <div className="flex flex-col items-center space-y-3 text-center">
           <img src="/poslogo.png" alt="POS Logo" className="h-16 w-auto" />
           <h1 className="text-2xl font-bold text-gray-800">Welcome back</h1>
@@ -107,25 +107,24 @@ export default function UserLoginPage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full h-11 rounded-full bg-[#FFC72C] text-black font-semibold shadow hover:bg-[#ffb400] transition disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {busy ? "Signing in..." : "Sign In"}
-          </button>
+          <div className="space-y-3 pt-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full h-11 rounded-full bg-[#FFC72C] text-black font-semibold shadow hover:bg-[#ffb400] transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {busy ? "Signing in..." : "Sign In"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="w-full h-11 rounded-full border border-gray-300 text-gray-700 font-semibold hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
 
-        <div className="text-center text-sm text-gray-600">
-          Need an account?{" "}
-          <button
-            type="button"
-            onClick={() => navigate("/register")}
-            className="text-[#800000] font-semibold hover:underline"
-          >
-            Register here
-          </button>
-        </div>
       </div>
     </div>
   );

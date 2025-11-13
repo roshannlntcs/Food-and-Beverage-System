@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
+import { FaCheckCircle } from "react-icons/fa";
 import images from "../../utils/images";
 import ChangePasswordModal from "./ChangePasswordModal"; // Import the new modal
 
@@ -19,6 +20,7 @@ export default function ProfileModal({
 }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -29,6 +31,11 @@ export default function ProfileModal({
   useEffect(() => {
     setPreviewUrl(null);
   }, [avatarUrl, show]);
+  useEffect(() => {
+    if (!show) {
+      setShowSuccess(false);
+    }
+  }, [show]);
 
   const {
     totalSold,
@@ -75,6 +82,7 @@ export default function ProfileModal({
 
     try {
       await onAvatarUpload?.(file);
+      setShowSuccess(true);
     } catch (error) {
       console.error("Avatar upload failed:", error);
       URL.revokeObjectURL(objectUrl);
@@ -193,6 +201,21 @@ export default function ProfileModal({
         onClose={() => setShowChangePassword(false)}
         onChangePassword={onChangePassword}
       />
+      {showSuccess && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white w-[350px] rounded-2xl shadow-lg flex flex-col items-center p-6 space-y-4 text-center">
+            <FaCheckCircle className="text-green-500 text-5xl" aria-hidden="true" />
+            <p className="text-lg font-semibold text-gray-800">Profile image changed successfully!</p>
+            <button
+              type="button"
+              onClick={() => setShowSuccess(false)}
+              className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-6 py-2 rounded-full"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </>,
     document.body
   );

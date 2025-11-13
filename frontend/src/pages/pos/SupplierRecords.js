@@ -1,5 +1,6 @@
 ﻿// src/pages/admin/SupplierRecords.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import AdminInfoDashboard2 from "../../components/AdminInfoDashboard2";
 import { FaSearch, FaPen } from "react-icons/fa";
@@ -93,6 +94,8 @@ const createInitialLogForm = (supplierId = "") => ({
 });
 
 const SupplierRecords = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [suppliers, setSuppliers] = useState([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(true);
   const [supplierError, setSupplierError] = useState(null);
@@ -229,6 +232,11 @@ const SupplierRecords = () => {
     });
   }, [suppliers, search]);
 
+  const openLogsModal = useCallback((supplierId = "all") => {
+    setLogFilterSupplierId(supplierId === "all" ? "all" : String(supplierId));
+    setShowLogsModal(true);
+  }, []);
+
   const totalPages = Math.max(1, Math.ceil(filteredSuppliers.length / entriesPerPage) || 1);
 
   useEffect(() => {
@@ -241,14 +249,16 @@ const SupplierRecords = () => {
     setCurrentPage(1);
   }, [search, entriesPerPage]);
 
+  useEffect(() => {
+    if (location.state?.openSupplierLogs) {
+      openLogsModal("all");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, openLogsModal, navigate]);
+
   const indexOfLastEntry = currentPage * entriesPerPage;
   const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
   const currentSuppliers = filteredSuppliers.slice(indexOfFirstEntry, indexOfLastEntry);
-
-  const openLogsModal = (supplierId = "all") => {
-    setLogFilterSupplierId(supplierId === "all" ? "all" : String(supplierId));
-    setShowLogsModal(true);
-  };
 
   const closeLogsModal = () => {
     setShowLogsModal(false);
@@ -380,7 +390,7 @@ const SupplierRecords = () => {
       <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
         <div className="px-6 pt-6 pb-2 flex justify-between items-center">
           <h1 className="text-3xl font-bold">Supplier Records</h1>
-          <AdminInfoDashboard2 />
+          <AdminInfoDashboard2 enableStockAlerts />
         </div>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">

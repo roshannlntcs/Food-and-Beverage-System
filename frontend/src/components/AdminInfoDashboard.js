@@ -1,11 +1,12 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
-import { FaBell, FaUser, FaChevronDown } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
+import { FaBell, FaUser, FaChevronDown, FaCog } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
+import resolveUserAvatar from '../utils/avatarHelper';
 
 const AdminInfo = () => {
   const { currentUser, logout } = useAuth() || {};
   const adminName = currentUser?.fullName || 'Admin';
-  const profileImage = currentUser?.avatarUrl || null;
+  const profileImage = resolveUserAvatar(currentUser);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -117,7 +118,9 @@ const AdminInfo = () => {
         <div className="absolute right-0 top-14 w-45 bg-white border border-gray-200 rounded shadow-lg z-50 text-gray-800">
           <div className="p-3 border-b font-semibold">{adminName}</div>
           <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Profile</button>
-          <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Settings</button>
+          <button className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100">
+            <FaCog /> Settings
+          </button>
           <button
             onClick={handleLogout}
             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
@@ -131,5 +134,3 @@ const AdminInfo = () => {
 };
 
 export default AdminInfo;
-
-

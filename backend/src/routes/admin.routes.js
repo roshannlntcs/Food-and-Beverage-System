@@ -46,7 +46,7 @@ router.post('/reset', assertSuperAdmin, async (req, res) => {
     }
 
     if (scopes.includes('all')) {
-      scopes = ['transactions', 'voids', 'users', 'categories', 'products'];
+      scopes = ['transactions', 'voids', 'users', 'categories', 'products', 'stock'];
     }
 
     const applied = Array.from(new Set(scopes));
@@ -165,12 +165,12 @@ router.post('/reset', assertSuperAdmin, async (req, res) => {
         }
       }
       if (applied.includes('stock')) {
-        await tx.product.updateMany({ data: { quantity: DEFAULT_STOCK } });
+        await tx.product.updateMany({ data: { quantity: defaultQty } });
         await recordInventoryLog(tx, {
           productId: null,
           productName: 'BULK',
           action: 'RESET_QUANTITY',
-          detail:`Set all product quantities to ${defaultQty}`,
+          detail: `Set all product quantities to ${defaultQty}`,
           stock: defaultQty,
           category: null,
           userId: Number(req.user?.sub) || null,

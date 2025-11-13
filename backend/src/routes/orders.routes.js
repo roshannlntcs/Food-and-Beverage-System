@@ -333,7 +333,7 @@ const recomputeFinancials = ({
   const discountFromPct = Number((subtotal * (discountPct / 100)).toFixed(2));
   const rawDiscount = discountFromPct + discountValue + couponValue;
   const totalDiscount = Number(Math.min(rawDiscount, subtotal).toFixed(2));
-  const taxableBase = Math.max(subtotal - discountFromPct, 0);
+  const taxableBase = Math.max(subtotal - totalDiscount, 0);
   const tax = Number((taxableBase * taxRate).toFixed(2));
   const total = Number(Math.max(subtotal - totalDiscount + tax, 0).toFixed(2));
   const tenderedValue = Number(
@@ -502,12 +502,10 @@ router.post("/", async (req, res) => {
           },
         });
 
-        await tx.product
-          .update({
-            where: { id: item.productId },
-            data: { quantity: { decrement: item.quantity } },
-          })
-          .catch(() => {});
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { quantity: { decrement: item.quantity } },
+        });
       }
 
       await tx.payment.create({
@@ -629,12 +627,10 @@ router.post("/:id/void", requireManager, async (req, res) => {
           },
         });
 
-        await tx.product
-          .update({
-            where: { id: item.productId },
-            data: { quantity: { increment: item.qty } },
-          })
-          .catch(() => {});
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { quantity: { increment: item.qty } },
+        });
       }
 
       const freshOrder = await tx.order.findUnique({

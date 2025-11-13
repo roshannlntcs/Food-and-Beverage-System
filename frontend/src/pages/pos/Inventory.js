@@ -54,16 +54,19 @@ const normalizeOptionArray = (list) =>
         .filter((entry) => entry.label)
     : [];
 
-const describeOptions = (list) =>
-  Array.isArray(list) && list.length
-    ? list
-        .map((entry) =>
-          typeof entry === 'string'
-            ? entry
-            : `${entry.label}${entry.price ? ` (${PESO}${Number(entry.price).toFixed(2)})` : ''}`
-        )
-        .join(', ')
-    : 'â€”';
+const describeOptions = (list = []) => {
+  if (!Array.isArray(list) || list.length === 0) return 'N/A';
+  return list
+    .map((entry) =>
+      typeof entry === 'string'
+        ? entry
+        : `${entry.label}${
+            entry.price ? ` (${PESO}${Number(entry.price).toFixed(2)})` : ''
+          }`
+    )
+    .join(', ');
+};
+
 
 const describeSupplierLink = (link) => {
   if (!link) return '';
@@ -405,7 +408,7 @@ export default function Inventory() {
       <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
         <div className="px-6 pt-6 pb-2 flex justify-between items-center">
           <h1 className="text-3xl font-bold">Inventory</h1>
-          <AdminInfoDashboard2 />
+          <AdminInfoDashboard2 enableStockAlerts />
         </div>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
@@ -665,4 +668,3 @@ export default function Inventory() {
     </div>
   );
 }
-

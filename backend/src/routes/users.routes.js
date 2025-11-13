@@ -132,8 +132,11 @@ router.put('/:id/password', async (req, res) => {
         return res.status(400).json({ error: 'Invalid user id' });
       }
   
-      // Allow admins or the user themselves to change the password
-      if (!ALLOWED_ADMIN_ROLES.has(req.user.role) && req.user.id !== userId) {
+  const requesterRole = req.user?.role;
+  const requesterId = Number(req.user?.sub);
+
+  // Allow admins or the user themselves to change the password
+  if (!ALLOWED_ADMIN_ROLES.has(requesterRole) && requesterId !== userId) {
         return res.status(403).json({ error: 'Forbidden' });
       }
   

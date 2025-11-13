@@ -1,30 +1,26 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { FaTrash, FaEdit } from "react-icons/fa";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FaTrash, FaEdit, FaCheckCircle } from "react-icons/fa";
 import { useCategories } from "../../contexts/CategoryContext";
 
-const DEFAULT_ICON = "/assets/default-category.png";
+const DEFAULT_ICON = "/icons/pizza.png";
 
 const DEFAULT_CATEGORIES = [
-  { key: "Main Dish", icon: DEFAULT_ICON, locked: true },
-  { key: "Appetizers", icon: DEFAULT_ICON, locked: true },
-  { key: "Side Dish", icon: DEFAULT_ICON, locked: true },
-  { key: "Soup", icon: DEFAULT_ICON, locked: true },
-  { key: "Dessert", icon: DEFAULT_ICON, locked: true },
-  { key: "Drinks", icon: DEFAULT_ICON, locked: true },
+  { key: "Main Dish", icon: "/icons/rice_bowl.png", locked: true },
+  { key: "Appetizers", icon: "/icons/guacamole.png", locked: true },
+  { key: "Side Dish", icon: "/icons/potato.png", locked: true },
+  { key: "Soup", icon: "/icons/soup_plate.png", locked: true },
+  { key: "Dessert", icon: "/icons/birthday_cake.png", locked: true },
+  { key: "Drinks", icon: "/icons/bottled_water.png", locked: true },
 ];
 
 const OPTIONAL_CATEGORIES = [
-  { key: "Alcohol", icon: "/icons/alcoholic_cocktail.png" },
-  { key: "Guacamole", icon: "/icons/guacamole.png" },
-  { key: "Lemonade", icon: "/icons/lemonade.png" },
-  { key: "Macaron", icon: "/icons/macaron.png" },
-  { key: "Milkshake", icon: "/icons/milkshake.png" },
-  { key: "Nachos", icon: "/icons/nachos.png" },
-  { key: "Noodles", icon: "/icons/noodles.png" },
-  { key: "Pie", icon: "/icons/pie.png" },
-  { key: "Potato", icon: "/icons/potato.png" },
+  { key: "Pizza", icon: "/icons/pizza.png" },
+  { key: "Pasta", icon: "/icons/spaghetti.png" },
   { key: "Rice Bowl", icon: "/icons/rice_bowl.png" },
-  { key: "Soup Plate", icon: "/icons/soup_plate.png" },
+  { key: "Cakes", icon: "/icons/birthday_cake.png" },
+  { key: "Noodles", icon: "/icons/noodles.png" },
+  { key: "Alcohol", icon: "/icons/alcoholic_cocktail.png" },
+  { key: "Snacks", icon: "/icons/potato.png" },
   { key: "Wine", icon: "/icons/wine_glass.png" },
 ];
 
@@ -40,9 +36,15 @@ const toDataUrl = (file) =>
 
 const resolveIconSrc = (icon) => {
   if (!icon) return DEFAULT_ICON;
-  if (icon.startsWith('http') || icon.startsWith('data:') || icon.startsWith('blob:')) return icon;
-  if (icon.startsWith('/')) return icon;
-  return `/icons/${icon.replace(/^\/+/, '')}`;
+  if (
+    icon.startsWith("http") ||
+    icon.startsWith("data:") ||
+    icon.startsWith("blob:")
+  ) {
+    return icon;
+  }
+  if (icon.startsWith("/")) return icon;
+  return `/icons/${icon.replace(/^\/+/, "")}`;
 };
 
 const ManageCategoryModal = ({ isOpen = true, onClose }) => {
@@ -75,8 +77,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
     return map;
   }, []);
 
-  useEffect(() => {
-    if (!isOpen) return;
+  const syncCategories = useCallback(() => {
     const merged = [];
     const seen = new Set();
 
@@ -87,7 +88,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
         id: cat.id ?? null,
         key: cat.name,
         icon: cat.icon || cat.iconUrl || defaultPreset?.icon || DEFAULT_ICON,
-        locked: defaultPreset ? true : false,
+        locked: Boolean(defaultPreset),
       });
       seen.add(canonical);
     });
@@ -101,15 +102,33 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
 
     merged.sort((a, b) => a.key.localeCompare(b.key));
     setCategories(merged);
+  }, [contextCategories, defaultsLookup]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    syncCategories();
     setCategoryName("");
     setIconPreview(null);
     setEditTarget(null);
     setSelectedOptionals([]);
     setShowEditModal(false);
-    setShowSuccess(false);
     setShowConfirm(false);
     setPendingDelete(null);
-  }, [contextCategories, defaultsLookup, isOpen]);
+  }, [isOpen, syncCategories]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    syncCategories();
+  }, [contextCategories, isOpen, syncCategories]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setShowSuccess(false);
+      setShowConfirm(false);
+      setShowEditModal(false);
+      setPendingDelete(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     return () => {
@@ -134,7 +153,6 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   };
 
   const handleDeleteClick = (category) => {
-    if (category.locked) return;
     setPendingDelete(category);
     setShowConfirm(true);
   };
@@ -177,11 +195,12 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
     setSaving(true);
     try {
       if (trimmedName) {
-        if (isEditing && !editTarget.locked) {
-          await updateCategory?.(editTarget.id, {
-            name: trimmedName,
+        if (isEditing) {
+          const payload = {
+            name: editTarget.locked ? editTarget.key : trimmedName,
             icon: iconPreview || editTarget.icon || DEFAULT_ICON,
-          });
+          };
+          await updateCategory?.(editTarget.id, payload);
           setSuccessMessage("Category updated successfully!");
         } else if (!isEditing) {
           await addCategory?.({
@@ -220,7 +239,6 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   };
 
   const handleEdit = (category) => {
-    if (category.locked) return;
     setCategoryName(category.key);
     setIconPreview(category.icon || DEFAULT_ICON);
     setEditTarget(category);
@@ -312,40 +330,54 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
             <div>
               <h3 className="text-sm font-semibold mb-2">Categories:</h3>
               <div className="grid grid-cols-2 gap-y-2 gap-x-6">
-                {categories.map((cat, index) => (
-                  <div key={`${cat.key}-${index}`} className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      className="accent-[#8B0000]"
-                      checked
-                      readOnly
-                    />
-                    <img
-                      src={resolveIconSrc(cat.icon)}
-                      alt={`${cat.key} icon`}
-                      className="w-6 h-6 object-contain border rounded bg-white"
-                    />
-                    <span className="flex-1 text-gray-700 truncate">{cat.key}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(cat)}
-                      className="text-[#800000] hover:text-red-700 disabled:opacity-50"
-                      disabled={cat.locked}
-                      title={cat.locked ? "Default categories cannot be edited" : "Edit"}
+                {categories.map((cat, index) => {
+                  const isDefault = Boolean(cat.locked);
+                  return (
+                    <div
+                      key={`${cat.key}-${index}`}
+                      className={`flex items-center justify-between gap-3 rounded px-1 py-1 ${
+                        isDefault ? "bg-gray-50" : ""
+                      }`}
                     >
-                      <FaEdit size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteClick(cat)}
-                      className="text-[#800000] hover:text-red-700 disabled:opacity-50"
-                      disabled={cat.locked}
-                      title={cat.locked ? "Default categories cannot be removed" : "Remove"}
-                    >
-                      <FaTrash size={14} />
-                    </button>
-                  </div>
-                ))}
+                      <div
+                        className={`flex items-center gap-3 flex-1 ${
+                          isDefault ? "text-gray-500" : "text-gray-700"
+                        }`}
+                      >
+                        <img
+                          src={resolveIconSrc(cat.icon)}
+                          alt={`${cat.key} icon`}
+                          className={`w-6 h-6 object-contain border rounded bg-white ${
+                            isDefault ? "opacity-70" : ""
+                          }`}
+                        />
+                        <span className="flex-1 truncate">{cat.key}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(cat)}
+                          className="text-[#800000] hover:text-red-700"
+                          title="Edit category"
+                        >
+                          <FaEdit size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(cat)}
+                          className="text-[#800000] hover:text-red-700"
+                          title={
+                            isDefault
+                              ? "Remove (restored after Reset Categories)"
+                              : "Remove"
+                          }
+                        >
+                          <FaTrash size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -429,13 +461,13 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
       )}
 
       {showSuccess && (
-        <div className="bg-white w-[400px] rounded-2xl shadow-lg overflow-hidden text-center p-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center">
-              <span className="text-white text-3xl">✔</span>
-            </div>
+        <div className="bg-white w-[360px] rounded-2xl shadow-lg overflow-hidden text-center p-8 space-y-4">
+          <div className="flex items-center justify-center">
+            <FaCheckCircle className="text-green-500 text-5xl" aria-hidden="true" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">{successMessage}</h3>
+          <p className="text-lg font-semibold text-gray-800">
+            {successMessage || "Category saved successfully!"}
+          </p>
           <button
             type="button"
             onClick={closeSuccess}

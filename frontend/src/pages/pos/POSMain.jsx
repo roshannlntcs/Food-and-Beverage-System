@@ -41,6 +41,7 @@ import { canonicalCategoryName } from "../../utils/categories";
 import { useInventory } from "../../contexts/InventoryContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../components/ToastProvider";
+import resolveUserAvatar from "../../utils/avatarHelper";
 
 // assets helper
 const importAll = (r) =>
@@ -229,8 +230,8 @@ export default function POSMain() {
   // user info
   const userName = currentUser?.fullName || "Cashier";
   const schoolId = currentUser?.schoolId || "";
-  const avatarUrl = currentUser?.avatarUrl || images["avatar-ph.png"];
-  const profilePic = avatarUrl || images["avatar-ph.png"];
+  const avatarUrl = resolveUserAvatar(currentUser);
+  const profilePic = avatarUrl;
   const profileAnalytics = useMemo(() => {
     const totalTransactions = transactions.length;
     const totalRevenue = transactions.reduce(

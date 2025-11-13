@@ -13,6 +13,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { fetchOrders } from "../../api/orders";
 import { fetchUsers } from "../../api/users";
 import { mapOrderToTx } from "../../utils/mapOrder";
+import resolveUserAvatar from "../../utils/avatarHelper";
 import {
   BarChart,
   Bar,
@@ -71,6 +72,7 @@ const cssEscape = (value) => {
 };
 
 const MAX_DASHBOARD_NOTIFICATIONS = 40;
+const STOCK_DETAIL_EVENT = "dashboard-stock-detail-request";
 
 const makeInclusiveDate = (value, endOfDay = false) => {
   if (!value) return null;
@@ -417,12 +419,7 @@ const Dashboard = () => {
           user?.username ||
           "--";
         const username = user?.username || user?.email || "";
-        const avatar =
-          user?.avatarUrl ||
-          user?.avatar ||
-          user?.image ||
-          user?.img ||
-          null;
+        const avatar = resolveUserAvatar(user);
         const diffMs = Date.now() - date.getTime();
         const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
         let relativeLabel;
@@ -707,6 +704,14 @@ const Dashboard = () => {
           detail = { ...notif, transaction: match };
         }
       }
+      if (notif.type === "stock") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent(STOCK_DETAIL_EVENT, { detail })
+          );
+        }
+        return;
+      }
       setSelectedNotification(detail);
     },
     [focusStockRow, inventoryIndex, transactionsWithinDates]
@@ -786,6 +791,7 @@ const Dashboard = () => {
             <AdminInfoDashboard2
               notifications={notifications}
               profileAnalytics={profileAnalytics}
+              enableStockAlerts
             />
           </div>
         </header>

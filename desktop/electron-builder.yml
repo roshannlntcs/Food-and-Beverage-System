@@ -1,0 +1,32 @@
+appId: edu.lab.pos.foodbeverage
+productName: FoodAndBeveragePOS
+compression: maximum
+directories:
+  output: dist
+  buildResources: build
+files:
+  - "main.js"
+  - "preload.js"
+  - "package.json"
+  - "node_modules/**/*"
+  - "app/**/*"
+  - "!dist{,/**/*}"
+  - "!**/*.map"
+asar: true
+extraResources:
+  - from: ../backend
+    to: backend
+    filter:
+      - package.json
+      - src/**/*
+      - prisma/**/*
+      - node_modules/**/*
+      - .env
+win:
+  target:
+    - nsis
+  artifactName: FoodAndBeveragePOS-${version}-Setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true

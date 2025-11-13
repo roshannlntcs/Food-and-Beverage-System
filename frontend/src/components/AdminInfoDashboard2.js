@@ -1,24 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   FaBell,
   FaUser,
-  FaCog,
   FaSignOutAlt,
   FaShoppingCart,
   FaCube,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "./ToastProvider";
 import ProfileModal from "./modals/ProfileModal";
 import images from "../utils/images";
+import resolveUserAvatar from "../utils/avatarHelper";
 import { useInventory } from "../contexts/InventoryContext";
 import { fetchOrders } from "../api/orders";
+import { fetchStockAlertState as fetchStockAlertStateApi, updateStockAlertState as updateStockAlertStateApi } from "../api/stockAlerts";
 import { mapOrderToTx } from "../utils/mapOrder";
 
 const DEFAULT_LOW_THRESHOLD = 10;
+const STOCK_ALERT_RESET = 100;
 const MAX_ORDER_FETCH = 100;
 const READ_STORAGE_KEY = "dashboard.readNotifications";
+const STOCK_DETAIL_EVENT = "dashboard-stock-detail-request";
 
 const pesoFormatter = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -58,7 +63,7 @@ const normalizeNotifications = (list = []) => {
     .slice(0, 10);
 };
 
-const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
+const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics, enableStockAlerts = false }) => {
   const navigate = useNavigate();
   const { currentUser, updateProfile, changePassword, logout } =
     useAuth() || {};
@@ -67,11 +72,15 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
 
   const adminName = currentUser?.fullName || "Admin";
   const avatarUrl =
-    currentUser?.avatarUrl || images["avatar-ph.png"] || "https://i.pravatar.cc/100?img=68";
+    resolveUserAvatar(currentUser) ||
+    images["avatar-ph.png"] ||
+    "https://i.pravatar.cc/100?img=68";
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showStockAlert, setShowStockAlert] = useState(false);
+  const [selectedStockNotif, setSelectedStockNotif] = useState(null);
   const [readIds, setReadIds] = useState(() => new Set());
   const [displayNotifications, setDisplayNotifications] = useState(() => {
     if (Array.isArray(notifications) && notifications.length) {
@@ -85,6 +94,8 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     }
     return [];
   });
+  const [lastSeenStockSignature, setLastSeenStockSignature] = useState("");
+  const [stockAlertStateLoaded, setStockAlertStateLoaded] = useState(false);
   const [analyticsState, setAnalyticsState] = useState(() => {
     if (profileAnalytics) return profileAnalytics;
     if (typeof window !== "undefined" && window.__dashboardProfileAnalytics) {
@@ -104,6 +115,8 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
   const dropdownRef = useRef(null);
   const dropdownBtnRef = useRef(null);
   const notifRef = useRef(null);
+  const previousStockSignatureRef = useRef("");
+  const portalTarget = typeof document !== "undefined" ? document.body : null;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -132,6 +145,53 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     }
   }, [readIds]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!currentUser?.id) {
+      setLastSeenStockSignature("");
+      setStockAlertStateLoaded(true);
+      return undefined;
+    }
+    setStockAlertStateLoaded(false);
+    (async () => {
+      try {
+        const state = await fetchStockAlertStateApi();
+        if (!cancelled) {
+          setLastSeenStockSignature(state?.signature || "");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn("Failed to load stock alert state:", err);
+          setLastSeenStockSignature("");
+        }
+      } finally {
+        if (!cancelled) {
+          setStockAlertStateLoaded(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
+  const persistStockAlertSignature = useCallback(
+    async (signature) => {
+      const normalizedSignature =
+        typeof signature === "string" ? signature : "";
+      if (normalizedSignature === lastSeenStockSignature) return;
+      setLastSeenStockSignature(normalizedSignature);
+      if (!currentUser?.id) return;
+      try {
+        await updateStockAlertStateApi(normalizedSignature);
+      } catch (err) {
+        console.warn("Failed to persist stock alert signature:", err);
+      }
+    },
+    [currentUser?.id, lastSeenStockSignature]
+  );
+
+
   const handleClickOutside = useCallback((event) => {
     if (
       dropdownRef.current &&
@@ -147,33 +207,56 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     }
   }, []);
 
+
   useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [handleClickOutside]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handleStockDetailRequest = (event) => {
+      const detail = event?.detail;
+      if (detail?.type === "stock") {
+        setSelectedStockNotif(detail);
+        setNotifOpen(false);
+      }
+    };
+    window.addEventListener(STOCK_DETAIL_EVENT, handleStockDetailRequest);
+    return () =>
+      window.removeEventListener(STOCK_DETAIL_EVENT, handleStockDetailRequest);
+  }, []);
 
   const buildStockNotifications = useCallback(() => {
     const now = new Date();
     return (inventory || []).reduce((acc, item) => {
       if (!item) return acc;
       const current = Number(item.quantity ?? 0);
+      if (current >= STOCK_ALERT_RESET) return acc;
       const threshold =
         Number(item.lowThreshold ?? DEFAULT_LOW_THRESHOLD) || DEFAULT_LOW_THRESHOLD;
-      if (current <= 0) {
-        acc.push({
-          type: "stock",
-          text: `Out of stock: ${item.name}`,
-          timestamp: now.toISOString(),
-          time: now.toLocaleTimeString(),
-        });
-      } else if (current <= threshold) {
-        acc.push({
-          type: "stock",
-          text: `Low stock: ${item.name} (${current} left)`,
-          timestamp: now.toISOString(),
-          time: now.toLocaleTimeString(),
-        });
-      }
+      const severity = current <= 0 ? "out" : "low";
+      if (severity === "low" && current > threshold) return acc;
+      acc.push({
+        type: "stock",
+        severity,
+        text:
+          severity === "out"
+            ? `Out of stock: ${item.name}`
+            : `Low stock: ${item.name} (${current} left)`,
+        itemId: item.id ?? null,
+        itemName: item.name || "Item",
+        category:
+          item.category ||
+          item.categoryName ||
+          item.categoryId ||
+          item.categoryKey ||
+          "Uncategorized",
+        quantity: current,
+        threshold,
+        timestamp: now.toISOString(),
+        time: now.toLocaleTimeString(),
+      });
       return acc;
     }, []);
   }, [inventory]);
@@ -383,6 +466,80 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     [displayNotifications]
   );
 
+  const stockAlertCounts = useMemo(() => {
+    if (!Array.isArray(displayNotifications)) return { low: 0, out: 0 };
+    return displayNotifications.reduce(
+      (acc, notif) => {
+        if (notif?.type !== "stock") return acc;
+        const text = (notif.text || "").toLowerCase();
+        if (text.includes("out of stock")) acc.out += 1;
+        else acc.low += 1;
+        return acc;
+      },
+      { low: 0, out: 0 }
+    );
+  }, [displayNotifications]);
+
+  const stockAlertTargets = useMemo(() => {
+    if (!Array.isArray(displayNotifications)) return [];
+    return displayNotifications
+      .filter((notif) => notif?.type === "stock")
+      .map((notif) => {
+        const identifier =
+          notif.itemId ??
+          notif.stockId ??
+          notif.productId ??
+          notif.product?.id ??
+          notif.id ??
+          notif.itemName ??
+          notif.stockName ??
+          notif.text ??
+          notif.time ??
+          "";
+        const severity =
+          notif.severity ||
+          ((notif.text || "").toLowerCase().includes("out of stock")
+            ? "out"
+            : "low");
+        const normalizedId = String(identifier).trim();
+        if (!normalizedId) return null;
+        return `${normalizedId}|${severity}`;
+      })
+      .filter(Boolean)
+      .sort();
+  }, [displayNotifications]);
+
+  const stockAlertSignature = useMemo(
+    () => (stockAlertTargets.length ? stockAlertTargets.join("::") : ""),
+    [stockAlertTargets]
+  );
+
+  const hasStockAlert = stockAlertCounts.low > 0 || stockAlertCounts.out > 0;
+
+  useEffect(() => {
+    if (!enableStockAlerts || !hasStockAlert || !stockAlertSignature) {
+      setShowStockAlert(false);
+      return;
+    }
+    if (!stockAlertStateLoaded) return;
+    if (stockAlertSignature !== lastSeenStockSignature) {
+      setShowStockAlert(true);
+    }
+  }, [
+    hasStockAlert,
+    enableStockAlerts,
+    stockAlertSignature,
+    lastSeenStockSignature,
+    stockAlertStateLoaded,
+  ]);
+
+  useEffect(() => {
+    if (!stockAlertSignature && previousStockSignatureRef.current) {
+      persistStockAlertSignature("");
+    }
+    previousStockSignatureRef.current = stockAlertSignature;
+  }, [stockAlertSignature, persistStockAlertSignature]);
+
   const unreadCount = useMemo(() => {
     if (!Array.isArray(displayNotifications) || !displayNotifications.length) {
       return 0;
@@ -411,6 +568,34 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     navigate("/user-login", { replace: true });
     window.location.reload();
   }, [logout, navigate]);
+
+  const markStockAlertAsHandled = useCallback(() => {
+    setShowStockAlert(false);
+    if (!stockAlertSignature) return;
+    persistStockAlertSignature(stockAlertSignature);
+  }, [stockAlertSignature, persistStockAlertSignature]);
+
+  const handleStockAlertView = useCallback(() => {
+    markStockAlertAsHandled();
+    setNotifOpen(true);
+  }, [markStockAlertAsHandled]);
+
+  const handleStockAlertDismiss = useCallback(() => {
+    markStockAlertAsHandled();
+  }, [markStockAlertAsHandled]);
+
+  const handleStockDetailDismiss = useCallback(() => {
+    setSelectedStockNotif(null);
+  }, []);
+
+  const handleStockDetailRestock = useCallback(() => {
+    setSelectedStockNotif(null);
+    setNotifOpen(false);
+    navigate("/admin/supplier-records", {
+      state: { openSupplierLogs: true },
+    });
+  }, [navigate]);
+
 
   const handleAvatarUpload = useCallback(
     async (file) => {
@@ -469,6 +654,11 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
         });
       }
       if (typeof window !== "undefined") {
+        if (notif.type === "stock") {
+          window.dispatchEvent(
+            new CustomEvent(STOCK_DETAIL_EVENT, { detail: notif })
+          );
+        }
         window.dispatchEvent(
           new CustomEvent("dashboard-notification-click", { detail: notif })
         );
@@ -477,133 +667,257 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics }) => {
     []
   );
 
+  const renderStockAlertModal = () => {
+    if (!showStockAlert || !portalTarget) return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4">
+        <div className="w-full max-w-md rounded-2xl border-2 border-[#800000] bg-white shadow-2xl p-6 space-y-4 text-center">
+          <div className="flex flex-col items-center justify-center gap-3 text-[#800000]">
+            <FaExclamationTriangle className="text-3xl" aria-hidden="true" />
+            <div className="text-center">
+              <p className="text-xl font-bold">Stock Alerts</p>
+              <p className="text-sm text-gray-700">
+                Items need your attention right away.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 text-sm text-gray-700">
+            {stockAlertCounts.out > 0 && (
+              <p className="font-semibold text-red-700">
+                {stockAlertCounts.out} item
+                {stockAlertCounts.out > 1 ? "s are" : " is"} out of stock.
+              </p>
+            )}
+            {stockAlertCounts.low > 0 && (
+              <p className="font-semibold text-yellow-600">
+                {stockAlertCounts.low} item
+                {stockAlertCounts.low > 1 ? "s are" : " is"} running low.
+              </p>
+            )}
+            <p className="text-xs text-gray-500">
+              Check the Notifications panel for details.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={handleStockAlertView}
+              className="flex-1 rounded-full bg-[#FFC72C] px-4 py-2 text-sm font-semibold text-black shadow hover:bg-yellow-500 transition-colors"
+            >
+              View Notifications
+            </button>
+            <button
+              type="button"
+              onClick={handleStockAlertDismiss}
+              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      </div>,
+      portalTarget
+    );
+  };
+
+  const renderStockDetailModal = () => {
+    if (!selectedStockNotif || !portalTarget) return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4">
+        <div className="w-full max-w-md rounded-2xl border-2 border-[#800000] bg-white shadow-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">{selectedStockNotif.time}</p>
+              <h3 className="text-xl font-semibold text-[#800000]">
+                {selectedStockNotif.text}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={handleStockDetailDismiss}
+              className="text-gray-500 hover:text-gray-700"
+              aria-label="Close stock detail"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+            <div>
+              <p className="text-xs uppercase text-gray-500">Item</p>
+              <p className="font-semibold">{selectedStockNotif.itemName}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-500">Category</p>
+              <p className="font-semibold">{selectedStockNotif.category}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-500">Quantity</p>
+              <p className="font-semibold">{selectedStockNotif.quantity}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-500">Threshold</p>
+              <p className="font-semibold">{selectedStockNotif.threshold}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-gray-500">Status</p>
+              <p className="font-semibold">
+                {selectedStockNotif.severity === "out" ? "Unavailable" : "Low"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={handleStockDetailRestock}
+              className="flex-1 rounded-full bg-[#FFC72C] px-4 py-2 text-sm font-semibold text-black shadow hover:bg-yellow-500 transition-colors"
+            >
+              Restock
+            </button>
+            <button
+              type="button"
+              onClick={handleStockDetailDismiss}
+              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      </div>,
+      portalTarget
+    );
+  };
+
   return (
-    <div className="flex items-center space-x-4 relative z-50">
-      <div className="relative" ref={notifRef}>
-        <button
-          onClick={() => setNotifOpen((prev) => !prev)}
-          className="relative focus:outline-none hover:text-yellow-400 transition"
-        >
-          <FaBell className="text-xl text-current" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1 leading-none">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
-        </button>
-        {notifOpen && (
-          <div className="absolute right-0 top-10 w-64 bg-white border rounded shadow-lg z-50 text-gray-800">
-            <div className="p-3 border-b font-semibold">Notifications</div>
-            <div className="max-h-64 overflow-y-auto no-scrollbar">
-              {bellNotifications.length === 0 ? (
-                <p className="p-4 text-sm text-gray-400">
-                  No notifications available
-                </p>
-              ) : (
-                bellNotifications.map((notif, idx) => {
-                  const icon =
-                    notif.type === "order" ? (
-                      <FaShoppingCart className="text-green-500" />
-                    ) : (
-                      <FaCube className="text-orange-500" />
-                    );
-                  const isRead = notif.id ? readIds.has(notif.id) : false;
-                  return (
-                    <div
-                      key={`${notif.id || notif.text}-${idx}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleBellNotificationClick(notif)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handleBellNotificationClick(notif);
-                        }
-                      }}
-                      className={`px-4 py-3 border-b last:border-b-0 flex items-start gap-3 cursor-pointer transition ${
-                        isRead ? "opacity-60" : ""
-                      } hover:bg-gray-50 focus:bg-gray-100`}
-                    >
-                      <span className="mt-1">{icon}</span>
-                      <div>
-                        <p className="text-sm text-gray-700">{notif.text}</p>
-                        <p className="text-xs text-gray-400 mt-1">{notif.time}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="relative">
-        <button
-          ref={dropdownBtnRef}
-          onClick={() => setDropdownOpen((prev) => !prev)}
-          className="flex items-center space-x-3 cursor-pointer select-none"
-        >
-          <img
-            src={avatarUrl}
-            alt="Admin Avatar"
-            className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
-          />
-          <div className="hidden md:block leading-tight text-current">
-            <div className="text-sm font-semibold">{adminName}</div>
-            <div className="text-xs opacity-80">Administrator</div>
-          </div>
-        </button>
-
-        {dropdownOpen && (
-          <div
-            ref={dropdownRef}
-            className="absolute right-0 top-14 w-44 bg-white border rounded shadow-lg z-50 text-gray-800"
+    <>
+      <div className="flex items-center space-x-4 relative z-50">
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen((prev) => !prev)}
+            className="relative focus:outline-none hover:text-yellow-400 transition"
           >
-            <div className="px-4 py-2 text-sm font-semibold border-b text-gray-800">
-              {adminName}
+            <FaBell className="text-xl text-current" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full px-1 leading-none">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <div className="absolute right-0 top-10 w-64 bg-white border rounded shadow-lg z-50 text-gray-800">
+              <div className="p-3 border-b font-semibold">Notifications</div>
+              <div className="max-h-64 overflow-y-auto no-scrollbar">
+                {bellNotifications.length === 0 ? (
+                  <p className="p-4 text-sm text-gray-400">
+                    No notifications available
+                  </p>
+                ) : (
+                  bellNotifications.map((notif, idx) => {
+                    const icon =
+                      notif.type === "order" ? (
+                        <FaShoppingCart className="text-green-500" />
+                      ) : (
+                        <FaCube className="text-orange-500" />
+                      );
+                    const isRead = notif.id ? readIds.has(notif.id) : false;
+                    return (
+                      <div
+                        key={`${notif.id || notif.text}-${idx}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleBellNotificationClick(notif)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleBellNotificationClick(notif);
+                          }
+                        }}
+                        className={`px-4 py-3 border-b last:border-b-0 flex items-start gap-3 cursor-pointer transition ${
+                          isRead ? "opacity-60" : ""
+                        } hover:bg-gray-50 focus:bg-gray-100`}
+                      >
+                        <span className="mt-1">{icon}</span>
+                        <div>
+                          <p className="text-sm text-gray-700">{notif.text}</p>
+                          <p className="text-xs text-gray-400 mt-1">{notif.time}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-            <button
-              className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100"
-              onClick={() => {
-                setDropdownOpen(false);
-                setShowProfile(true);
-              }}
+          )}
+        </div>
+
+        <div className="relative">
+          <button
+            ref={dropdownBtnRef}
+            onClick={() => setDropdownOpen((prev) => !prev)}
+            className="flex items-center space-x-3 cursor-pointer select-none"
+          >
+            <img
+              src={avatarUrl}
+              alt="Admin Avatar"
+              className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+            />
+            <div className="hidden md:block leading-tight text-current">
+              <div className="text-sm font-semibold">{adminName}</div>
+              <div className="text-xs opacity-80">Administrator</div>
+            </div>
+          </button>
+
+          {dropdownOpen && (
+            <div
+              ref={dropdownRef}
+              className="absolute right-0 top-14 w-44 bg-white border rounded shadow-lg z-50 text-gray-800"
             >
-              <FaUser /> Profile
-            </button>
-            <button className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100">
-              <FaCog /> Settings
-            </button>
-            <button
-              onClick={() => {
-                setDropdownOpen(false);
-                handleSwitchRole();
-              }}
-              className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100"
-            >
-              <FaSignOutAlt /> Switch Role
-            </button>
-          </div>
-        )}
+              <div className="px-4 py-2 text-sm font-semibold border-b text-gray-800">
+                {adminName}
+              </div>
+              <button
+                className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  setShowProfile(true);
+                }}
+              >
+                <FaUser /> Profile
+              </button>
+              <button
+                onClick={() => {
+                  setDropdownOpen(false);
+                  handleSwitchRole();
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100"
+              >
+                <FaSignOutAlt /> Switch Role
+              </button>
+            </div>
+          )}
+        </div>
+
+        <ProfileModal
+          show={showProfile}
+          userName={adminName}
+          schoolId={schoolId}
+          avatarUrl={avatarUrl}
+          analytics={analytics}
+          onAvatarUpload={handleAvatarUpload}
+          onChangePassword={handleChangePassword}
+          onSwitchRole={handleSwitchRole}
+          onSignOut={handleSignOut}
+          onClose={() => setShowProfile(false)}
+        />
       </div>
 
-      <ProfileModal
-        show={showProfile}
-        userName={adminName}
-        schoolId={schoolId}
-        avatarUrl={avatarUrl}
-        analytics={analytics}
-        onAvatarUpload={handleAvatarUpload}
-        onChangePassword={handleChangePassword}
-        onSwitchRole={handleSwitchRole}
-        onSignOut={handleSignOut}
-        onClose={() => setShowProfile(false)}
-      />
-    </div>
+      {renderStockAlertModal()}
+      {renderStockDetailModal()}
+    </>
   );
 };
 
 export default AdminInfoDashboard2;
-
-

@@ -7,7 +7,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import LandingPage from './pages/LandingPage';
 import RoleSelection from './pages/RoleSelection';
 import UserLoginPage from './pages/UserLoginPage';
-import UserRegisterPage from './pages/UserRegisterPage';
 import POSMain from './pages/pos/POSMain';
 
 // Customer view component (new)
@@ -21,8 +20,8 @@ import SupplierRecords from './pages/pos/SupplierRecords';
 import VoidLogs from './pages/pos/VoidLogs';
 import SuperAdmin from './pages/pos/SuperAdmin';
 import SalesReport from "./pages/pos/SalesReport";
-
 function App() {
+
   return (
     <Router>
       <ErrorBoundary>
@@ -30,7 +29,6 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/roles" element={<RoleSelection />} />
           <Route path="/user-login" element={<UserLoginPage />} />
-          <Route path="/register" element={<UserRegisterPage />} />
           <Route path="/user" element={<POSMain />} />
           <Route path="/pos" element={<POSMain />} />
           <Route path="/customer-view" element={<CustomerView />} />

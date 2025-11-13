@@ -11,3 +11,151 @@
   width: 0;
   height: 0;
 }
+
+:root {
+  color-scheme: light;
+  --dark-page: #05060c;
+  --dark-surface: #0f172a;
+  --dark-panel: #161f32;
+  --dark-elevated: #1d2539;
+  --dark-hover: #26304a;
+  --dark-border: #3a4457;
+  --dark-text: #f8fafc;
+  --dark-muted: #cbd5f5;
+}
+
+.theme-dark,
+.theme-dark body {
+  color-scheme: dark;
+  background-color: var(--dark-page);
+  color: var(--dark-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.theme-dark .bg-white,
+.theme-dark .bg-gray-50,
+.theme-dark .bg-gray-100,
+.theme-dark .bg-gray-200,
+.theme-dark .bg-gray-300,
+.theme-dark [class*="bg-gray-1"],
+.theme-dark [class*="bg-gray-2"],
+.theme-dark [class*="bg-white"],
+.theme-dark [class*="bg-slate-1"],
+.theme-dark [class*="bg-zinc-1"],
+.theme-dark [class*="bg-neutral-1"],
+.theme-dark [class*="bg-\[\#f"],
+.theme-dark [class*="bg-\[\#F"],
+.theme-dark .bg-white\/90,
+.theme-dark [class*="bg-white\/"],
+.theme-dark [style*="#FFF"],
+.theme-dark [style*="#fff"],
+.theme-dark [style*="rgb(255"],
+.theme-dark .bg-[#FFF8E1],
+.theme-dark .bg-[#F6F3EA],
+.theme-dark .bg-[#F6EBCE],
+.theme-dark .bg-[#f9f6ee],
+.theme-dark .bg-[#f8f5f0],
+.theme-dark .bg-[#fdfdfd],
+.theme-dark .bg-[#f1f1f1],
+.theme-dark .bg-[#bfb8b8] {
+  background-color: var(--dark-elevated) !important;
+  color: var(--dark-text) !important;
+}
+
+.theme-dark .modal:not([class*="bg-"]),
+.theme-dark [class*="modal"]:not([class*="bg-"]),
+.theme-dark .panel:not([class*="bg-"]),
+.theme-dark [class*="panel"]:not([class*="bg-"]),
+.theme-dark .sidebar:not([class*="bg-"]),
+.theme-dark [class*="sidebar"]:not([class*="bg-"]),
+.theme-dark .drawer:not([class*="bg-"]),
+.theme-dark [class*="drawer"]:not([class*="bg-"]),
+.theme-dark .card:not([class*="bg-"]),
+.theme-dark [class*="card"]:not([class*="bg-"]) {
+  background-color: var(--dark-panel) !important;
+  color: var(--dark-text) !important;
+}
+
+.theme-dark table:not([class*="bg-"]),
+.theme-dark thead:not([class*="bg-"]),
+.theme-dark tbody:not([class*="bg-"]),
+.theme-dark tr:not([class*="bg-"]),
+.theme-dark th:not([class*="bg-"]),
+.theme-dark td:not([class*="bg-"]) {
+  background-color: var(--dark-panel) !important;
+  color: var(--dark-text) !important;
+  border-color: var(--dark-border) !important;
+}
+
+.theme-dark :is(p, span, li, label, dt, dd, small, strong, h1, h2, h3, h4, h5, h6, a, button) {
+  color: var(--dark-text) !important;
+}
+
+.theme-dark .text-gray-900,
+.theme-dark .text-gray-800,
+.theme-dark .text-gray-700,
+.theme-dark .text-gray-600,
+.theme-dark .text-gray-500,
+.theme-dark .text-gray-400,
+.theme-dark .text-gray-300,
+.theme-dark .text-gray-200,
+.theme-dark .text-gray-100,
+.theme-dark .text-black,
+.theme-dark .text-yellow-500,
+.theme-dark .text-yellow-600,
+.theme-dark .text-red-800,
+.theme-dark .text-red-900,
+.theme-dark .text-[#FFC72C],
+.theme-dark .text-[#800000],
+.theme-dark .text-[#8B0000],
+.theme-dark .text-[#7A0E0E],
+.theme-dark [class*="text-\[\#FFC"],
+.theme-dark [class*="text-\[\#800"],
+.theme-dark [class*="text-\[\#8B0"] {
+  color: var(--dark-text) !important;
+}
+
+.theme-dark input,
+.theme-dark textarea,
+.theme-dark select,
+.theme-dark .bg-white input,
+.theme-dark .bg-white textarea {
+  background-color: var(--dark-surface) !important;
+  border-color: var(--dark-border) !important;
+  color: var(--dark-text) !important;
+}
+
+.theme-dark input::placeholder,
+.theme-dark textarea::placeholder,
+.theme-dark ::placeholder,
+.theme-dark :-ms-input-placeholder,
+.theme-dark ::-ms-input-placeholder {
+  color: var(--dark-muted) !important;
+  opacity: 0.85;
+}
+
+.theme-dark .border,
+.theme-dark .border-gray-100,
+.theme-dark .border-gray-200,
+.theme-dark .border-gray-300,
+.theme-dark .border-gray-400,
+.theme-dark .border-gray-500,
+.theme-dark .border-gray-600,
+.theme-dark .border-yellow-300,
+.theme-dark .border-yellow-400,
+.theme-dark .border-yellow-500,
+.theme-dark .border-[#8B0000],
+.theme-dark .border-[#800000],
+.theme-dark [class*="border-yellow"],
+.theme-dark [class*="border-\[\#8B"],
+.theme-dark [class*="border-\[\#80"] {
+  border-color: var(--dark-border) !important;
+}
+
+.theme-dark .bg-gray-300,
+.theme-dark .bg-gray-400,
+.theme-dark [class*="hover:bg-"]:hover,
+.theme-dark [class*="focus:bg-"]:focus {
+  background-color: var(--dark-hover) !important;
+  color: var(--dark-text) !important;
+}

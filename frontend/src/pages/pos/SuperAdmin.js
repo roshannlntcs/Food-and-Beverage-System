@@ -21,20 +21,56 @@ const ROLE_LABEL = {
   CASHIER: "Cashier",
 };
 
+const BASE_RESET_SCOPES = [
+  "transactions",
+  "voids",
+  "users",
+  "categories",
+  "products",
+  "stock",
+];
+
+const RESET_SCOPE_INFO = {
+  transactions: {
+    title: "Transactions",
+    helper: "Clears orders, order items, and payment history.",
+  },
+  voids: {
+    title: "Void Logs",
+    helper: "Clears manager-approved void entries.",
+  },
+  users: {
+    title: "Users",
+    helper: "Removes every non–super admin account.",
+  },
+  categories: {
+    title: "Categories",
+    helper: "Restores the seeded categories and associated products.",
+  },
+  products: {
+    title: "Products",
+    helper: "Restores the default product catalog and inventory logs.",
+  },
+  stock: {
+    title: "Stock",
+    helper:
+      "Sets each product quantity to the configured default without deleting data.",
+  },
+};
+
 const RESET_WARNINGS = {
   transactions:
-    "This will remove all transaction records (orders, order items, and payments). Do you want to continue?",
-  voids: "This will remove all void logs. Do you want to continue?",
+    "This removes all transaction records (orders, items, and payments). Continue?",
+  voids: "This removes every void log entry. Continue?",
   users:
-    "This will remove non-super-admin accounts. The current super admin will remain signed in. Do you want to continue?",
+    "This removes non-super-admin accounts. The current super admin stays signed in. Continue?",
   categories:
-    "This will remove all categories and products, then restore the default set. Transactions and void logs will also be cleared. Continue?",
+    "This removes all categories and products, then restores the default set. Transactions and void logs will also be cleared. Continue?",
   products:
-    "This will remove all products and inventory logs, then restore the default catalog. Transactions and void logs will also be cleared. Continue?",
-  stock:
-   "This resets all product quantities to 100. Continue?",
-    all:
-    "This will remove all transactions, void logs, products, categories, and non-super-admin users. Do you want to continue?",
+    "This removes all products and inventory logs, then restores the default catalog. Transactions and void logs will also be cleared. Continue?",
+  stock: "This resets every product’s quantity to the configured value. Continue?",
+  all:
+    "This removes transactions, void logs, products, categories, and non-super-admin users. Continue?",
 };
 
 const RESET_SUCCESS = {
@@ -43,9 +79,12 @@ const RESET_SUCCESS = {
   users: "User accounts have been reset.",
   categories: "Categories and products have been restored to defaults.",
   products: "Products have been restored to defaults.",
-  stock: "All product quantities were reset to 100.",
+  stock: "All product quantities were reset to the configured level.",
   all: "System data has been reset to defaults.",
+  partial: "Selected reset scopes have completed.",
 };
+
+const DEFAULT_STOCK_QTY = 100;
 
 const formatDateTime = (value) => {
   if (!value) return "Never";
@@ -87,7 +126,12 @@ const SuperAdmin = () => {
     type: "success",
   });
   const [showResetMenu, setShowResetMenu] = useState(false);
-  const [pendingResetScope, setPendingResetScope] = useState("all");
+  const [selectedResetScopes, setSelectedResetScopes] = useState(
+    BASE_RESET_SCOPES
+  );
+  const [stockResetQty, setStockResetQty] = useState(
+    String(DEFAULT_STOCK_QTY)
+  );
   const [editUserModalOpen, setEditUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [deleteUserModalOpen, setDeleteUserModalOpen] = useState(false);
@@ -96,38 +140,19 @@ const SuperAdmin = () => {
   const fileInputRef = useRef(null);
   const resetMenuRef = useRef(null);
 
+  const baseScopeOptions = useMemo(
+    () =>
+      BASE_RESET_SCOPES.map((scope) => ({
+        scope,
+        label: `Reset ${RESET_SCOPE_INFO[scope].title}`,
+        helper: RESET_SCOPE_INFO[scope].helper,
+      })),
+    []
+  );
+
   const resetOptions = useMemo(
     () => [
-      {
-        scope: "transactions",
-        label: "Reset Transactions",
-        helper: "Clears orders and payments.",
-      },
-      {
-        scope: "voids",
-        label: "Reset Void Logs",
-        helper: "Clears manager-approved void logs.",
-      },
-      {
-        scope: "users",
-        label: "Reset Users",
-        helper: "Removes non-super-admin accounts.",
-      },
-      {
-        scope: "categories",
-        label: "Reset Categories",
-        helper: "Restores default categories and products.",
-      },
-      {
-        scope: "products",
-        label: "Reset Products",
-        helper: "Restores the default product catalog.",
-      },
-      {
-    scope: "stock",
-    label: "Reset Stock",
-    helper: "Sets every product’s quantity back to 100 without deleting data.",
-  },
+      ...baseScopeOptions,
       {
         scope: "all",
         label: "Reset All Data",
@@ -135,8 +160,27 @@ const SuperAdmin = () => {
         accent: true,
       },
     ],
-    []
+    [baseScopeOptions]
   );
+
+  const openResetModal = useCallback((scope) => {
+    const preset = scope === "all" ? BASE_RESET_SCOPES : [scope];
+    setSelectedResetScopes(preset);
+    setStockResetQty(String(DEFAULT_STOCK_QTY));
+    setResetModalOpen(true);
+  }, []);
+
+  const toggleScopeSelection = useCallback((scope) => {
+    setSelectedResetScopes((prev) =>
+      prev.includes(scope)
+        ? prev.filter((item) => item !== scope)
+        : [...prev, scope]
+    );
+  }, []);
+
+  const handleSelectAllScopes = useCallback(() => {
+    setSelectedResetScopes(BASE_RESET_SCOPES);
+  }, []);
 
   const showMessage = useCallback((title, message, type = "success") => {
     setMessageModal({
@@ -251,12 +295,41 @@ const SuperAdmin = () => {
   );
 
   const handleReset = async () => {
-    const scope = pendingResetScope || "all";
+    const uniqueScopes = Array.from(new Set(selectedResetScopes));
+
+    if (!uniqueScopes.length) {
+      showMessage(
+        "Select Reset Scope",
+        "Choose at least one reset option before confirming.",
+        "error"
+      );
+      return;
+    }
+
+    const payload = {
+      scope: uniqueScopes.length === 1 ? uniqueScopes[0] : uniqueScopes,
+    };
+
+    if (uniqueScopes.includes("stock")) {
+      const parsedQty = Number(stockResetQty);
+      const safeQty =
+        Number.isFinite(parsedQty) && parsedQty >= 0
+          ? Math.min(parsedQty, 9999)
+          : DEFAULT_STOCK_QTY;
+      payload.qty = safeQty;
+    }
+
     try {
-      await resetSystem(scope);
+      await resetSystem(payload);
+      const successKey =
+        uniqueScopes.length === BASE_RESET_SCOPES.length
+          ? "all"
+          : uniqueScopes.length === 1
+          ? uniqueScopes[0]
+          : "partial";
       showMessage(
         "Reset Complete",
-        RESET_SUCCESS[scope] || RESET_SUCCESS.all,
+        RESET_SUCCESS[successKey] || RESET_SUCCESS.all,
         "success"
       );
       await loadUsers();
@@ -270,7 +343,6 @@ const SuperAdmin = () => {
     } finally {
       setResetModalOpen(false);
       setShowResetMenu(false);
-      setPendingResetScope("all");
     }
   };
 
@@ -623,7 +695,7 @@ const SuperAdmin = () => {
       <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
         <div className="px-8 pt-8 pb-3 flex justify-between items-center">
           <h1 className="text-3xl font-bold">System Administrator</h1>
-          <AdminInfoDashboard2 />
+          <AdminInfoDashboard2 enableStockAlerts />
         </div>
 
         <div className="flex-1 min-h-0 px-8 pb-8 overflow-hidden flex flex-col gap-6">
@@ -644,9 +716,8 @@ const SuperAdmin = () => {
                       key={option.scope}
                       type="button"
                       onClick={() => {
-                        setPendingResetScope(option.scope);
                         setShowResetMenu(false);
-                        setResetModalOpen(true);
+                        openResetModal(option.scope);
                       }}
                       className={`block w-full text-left px-4 py-2 text-sm ${option.accent ? "text-red-700 font-semibold hover:bg-red-50" : "text-gray-700 hover:bg-gray-100"}`}
                     >
@@ -836,10 +907,15 @@ const SuperAdmin = () => {
         onClose={() => {
           setResetModalOpen(false);
           setShowResetMenu(false);
-          setPendingResetScope("all");
         }}
         onConfirm={handleReset}
-        warningText={RESET_WARNINGS[pendingResetScope] || RESET_WARNINGS.all}
+        scopeOptions={baseScopeOptions}
+        selectedScopes={selectedResetScopes}
+        onToggleScope={toggleScopeSelection}
+        stockQty={stockResetQty}
+        onStockQtyChange={setStockResetQty}
+        onSelectAll={handleSelectAllScopes}
+        warnings={RESET_WARNINGS}
       />
 
       <AddUserModal

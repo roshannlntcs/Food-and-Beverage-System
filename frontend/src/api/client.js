@@ -1,6 +1,13 @@
 // frontend/src/api/client.js
-// CRA doesn't support import.meta.*. Use REACT_APP_API_URL.
-export const BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+// CRA doesn't support import.meta.*. Use REACT_APP_API_URL for web builds,
+// but prefer the Electron-provided origin when running inside the desktop shell.
+const desktopOrigin =
+  typeof window !== 'undefined' && window.desktop && window.desktop.backendOrigin
+    ? window.desktop.backendOrigin
+    : null;
+
+const FALLBACK_BASE = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+export const BASE_URL = (desktopOrigin || FALLBACK_BASE).replace(/\/$/, '');
 
 let authToken = null;
 

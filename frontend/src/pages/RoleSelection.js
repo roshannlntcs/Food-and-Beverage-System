@@ -1,37 +1,18 @@
 // src/pages/RoleSelection.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCashRegister, FaWrench, FaUser } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
+import resolveUserAvatar from "../utils/avatarHelper";
 
 export default function RoleSelection() {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
 
   const [selectedRole, setSelectedRole] = useState(null);
-  const [fullName, setFullName] = useState("");
-  const [sex, setSex] = useState(null); // "M" | "F" | null
 
-  // Normalize various sex values -> "M" / "F" / null
-  const normalizeSex = (val) => {
-    if (!val || typeof val !== "string") return null;
-    const v = val.trim().toLowerCase();
-    if (v === "m" || v === "male") return "M";
-    if (v === "f" || v === "female") return "F";
-    return null;
-  };
-
-  useEffect(() => {
-    if (!currentUser) {
-      setFullName("");
-      setSex(null);
-      return;
-    }
-    setFullName(currentUser.fullName || "");
-    // Prefer value from user record; fallback to any stored local value if you use one elsewhere
-    const localSex = typeof window !== "undefined" ? localStorage.getItem("sex") : null;
-    setSex(normalizeSex(currentUser.sex) || normalizeSex(localSex));
-  }, [currentUser]);
+  const resolvedAvatar = resolveUserAvatar(currentUser);
+  const fullName = currentUser?.fullName || "";
 
   const handleContinue = () => {
     if (selectedRole === "admin") {
@@ -49,62 +30,57 @@ export default function RoleSelection() {
     >
       <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-sm" />
 
-      <div className="relative z-10 bg-white p-10 rounded-xl shadow-lg w-[500px] text-center">
+      <div className="relative z-10 bg-white px-8 py-9 rounded-2xl shadow-2xl w-full max-w-[440px] text-center">
         {fullName && (
           <h1 className="text-2xl font-semibold text-gray-700 mb-6">
             Hello, <span className="text-yellow-500">{fullName}</span>!
           </h1>
         )}
 
-        {/* Gender-based profile image (same size/structure as your second file) */}
         <div className="flex justify-center mb-6">
-          {sex === "M" || sex === "F" ? (
-            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
+          {resolvedAvatar ? (
+            <div className="w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-transform duration-300">
               <img
-                src={sex === "M" ? "/male_user.png" : "/female_user.png"}
-                alt={sex === "M" ? "Male Icon" : "Female Icon"}
-                className="w-24 h-24 object-contain -m-4"
+                src={resolvedAvatar}
+                alt="Profile avatar"
+                className="w-full h-full object-cover"
               />
             </div>
           ) : (
-            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-              <FaUser size={64} className="text-gray-500" />
+            <div className="w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg flex items-center justify-center bg-white">
+              <FaUser size={60} className="text-gray-400" />
             </div>
           )}
         </div>
 
         <h2 className="text-lg font-medium mb-6 text-gray-800">Please select your role</h2>
 
-        <div className="flex justify-center gap-12 mb-6">
-          <div
-            onClick={() => setSelectedRole("admin")}
-            className={`group cursor-pointer w-28 h-28 flex flex-col items-center justify-center rounded-xl transition-all duration-300 ${
-              selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-700 hover:text-[#FFC72C]"
-            }`}
-          >
-            <FaWrench
-              size={30}
-              className={`mb-2 transition-colors duration-300 ${
-                selectedRole === "admin" ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
-              }`}
-            />
-            <span className="font-medium">ADMIN</span>
-          </div>
-
-          <div
-            onClick={() => setSelectedRole("cashier")}
-            className={`group cursor-pointer w-28 h-28 flex flex-col items-center justify-center rounded-xl transition-all duration-300 ${
-              selectedRole === "cashier" ? "text-[#FFC72C]" : "text-gray-700 hover:text-[#FFC72C]"
-            }`}
-          >
-            <FaCashRegister
-              size={30}
-              className={`mb-2 transition-colors duration-300 ${
-                selectedRole === "cashier" ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
-              }`}
-            />
-            <span className="font-medium">CASHIER</span>
-          </div>
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {[
+            { id: "admin", label: "ADMIN", Icon: FaWrench },
+            { id: "cashier", label: "CASHIER", Icon: FaCashRegister },
+          ].map(({ id, label, Icon }) => {
+            const active = selectedRole === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSelectedRole(id)}
+                className={`group w-full max-w-[150px] mx-auto h-28 sm:h-32 flex flex-col items-center justify-center rounded-2xl border transition-[box-shadow,transform] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 ${
+                  active ? "bg-[#FFF8E1] border-yellow-400 shadow-xl" : "bg-white border-gray-200 hover:shadow-lg"
+                }`}
+                aria-pressed={active}
+              >
+                <Icon
+                  size={32}
+                  className={`mb-3 transition-colors duration-200 ${
+                    active ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
+                  }`}
+                />
+                <span className="font-semibold tracking-wide">{label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex justify-center gap-4 mt-2">
@@ -115,7 +91,7 @@ export default function RoleSelection() {
             Cancel
           </button>
 
-        <button
+          <button
             onClick={handleContinue}
             disabled={!selectedRole}
             className={`px-6 py-1.5 rounded-full text-sm text-black font-medium transition ${
