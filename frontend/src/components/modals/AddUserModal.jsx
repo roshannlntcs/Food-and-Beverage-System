@@ -5,7 +5,7 @@ const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
 ];
 
-const AddUserModal = ({ isOpen, onClose, onSave }) => {
+const AddUserModal = ({ isOpen, onClose, onSave, onValidationError }) => {
   const [form, setForm] = useState({
     schoolId: "",
     username: "",
@@ -36,19 +36,28 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
   };
 
   const handleSubmit = () => {
-    if (
-      !form.schoolId ||
-      !form.username ||
-      !form.schoolId ||
-      !form.fullName ||
-      !form.password ||
-      !form.program ||
-      !form.section ||
-      !form.sex
-    ) {
-      alert("Please fill in all fields.");
+    const requiredFields = [
+      "schoolId",
+      "username",
+      "fullName",
+      "password",
+      "program",
+      "section",
+      "sex",
+    ];
+
+    const hasMissing = requiredFields.some((key) => {
+      const value = form[key];
+      return !value || String(value).trim() === "";
+    });
+
+    if (hasMissing) {
+      if (typeof onValidationError === "function") {
+        onValidationError("Please fill in all required fields before saving.");
+      }
       return;
     }
+
     onSave(form);
     onClose();
     setForm({
@@ -176,5 +185,3 @@ const AddUserModal = ({ isOpen, onClose, onSave }) => {
 };
 
 export default AddUserModal;
-
-

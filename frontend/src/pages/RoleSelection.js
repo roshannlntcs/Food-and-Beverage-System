@@ -1,5 +1,5 @@
 // src/pages/RoleSelection.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCashRegister, FaWrench, FaUser } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
@@ -10,9 +10,8 @@ export default function RoleSelection() {
 
   const [selectedRole, setSelectedRole] = useState(null);
   const [fullName, setFullName] = useState("");
-  const [sex, setSex] = useState(null); // "M" | "F" | null
 
-  // Normalize various sex values -> "M" / "F" / null
+  // Normalize "sex" -> "M" | "F" | null
   const normalizeSex = (val) => {
     if (!val || typeof val !== "string") return null;
     const v = val.trim().toLowerCase();
@@ -21,16 +20,26 @@ export default function RoleSelection() {
     return null;
   };
 
+  // Derive once per render from source-of-truth user object
+  const { sex, avatarUrl } = useMemo(() => {
+    const localSex =
+      typeof window !== "undefined" ? localStorage.getItem("sex") : null;
+    const s = normalizeSex(currentUser?.sex) || normalizeSex(localSex);
+    const genderAvatar = s === "M" ? "/male_user.png" : s === "F" ? "/female_user.png" : null;
+
+    // avatarUrl wins, then gender fallback, then none
+    return {
+      sex: s,
+      avatarUrl: currentUser?.avatarUrl || genderAvatar || null,
+    };
+  }, [currentUser]);
+
   useEffect(() => {
     if (!currentUser) {
       setFullName("");
-      setSex(null);
       return;
     }
     setFullName(currentUser.fullName || "");
-    // Prefer value from user record; fallback to any stored local value if you use one elsewhere
-    const localSex = typeof window !== "undefined" ? localStorage.getItem("sex") : null;
-    setSex(normalizeSex(currentUser.sex) || normalizeSex(localSex));
   }, [currentUser]);
 
   const handleContinue = () => {
@@ -56,13 +65,13 @@ export default function RoleSelection() {
           </h1>
         )}
 
-        {/* Gender-based profile image (same size/structure as your second file) */}
+        {/* Avatar preview synced with AdminInfoDashboard2 */}
         <div className="flex justify-center mb-6">
-          {sex === "M" || sex === "F" ? (
+          {avatarUrl ? (
             <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
               <img
-                src={sex === "M" ? "/male_user.png" : "/female_user.png"}
-                alt={sex === "M" ? "Male Icon" : "Female Icon"}
+                src={avatarUrl}
+                alt="Profile"
                 className="w-24 h-24 object-contain -m-4"
               />
             </div>
@@ -73,7 +82,9 @@ export default function RoleSelection() {
           )}
         </div>
 
-        <h2 className="text-lg font-medium mb-6 text-gray-800">Please select your role</h2>
+        <h2 className="text-lg font-medium mb-6 text-gray-800">
+          Please select your role
+        </h2>
 
         <div className="flex justify-center gap-12 mb-6">
           <div
@@ -115,7 +126,7 @@ export default function RoleSelection() {
             Cancel
           </button>
 
-        <button
+          <button
             onClick={handleContinue}
             disabled={!selectedRole}
             className={`px-6 py-1.5 rounded-full text-sm text-black font-medium transition ${

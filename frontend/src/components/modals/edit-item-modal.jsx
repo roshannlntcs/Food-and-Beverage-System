@@ -110,17 +110,17 @@ export default function EditItemModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
         <div className="bg-[#8B0000] text-white text-center py-2 rounded-t-lg text-lg font-semibold">
           Edit Item
         </div>
 
         <div
-          className="p-4 grid grid-cols-2 gap-2
+          className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2
             [&_input]:px-2 [&_input]:py-1 [&_input]:text-sm [&_input]:border [&_input]:border-gray-300 [&_input]:rounded [&_input]:focus:border-gray-500 [&_input]:focus:ring-1 [&_input]:focus:ring-gray-400
             [&_textarea]:px-2 [&_textarea]:py-1 [&_textarea]:text-sm [&_textarea]:border [&_textarea]:border-gray-300 [&_textarea]:rounded [&_textarea]:focus:border-gray-500 [&_textarea]:focus:ring-1 [&_textarea]:focus:ring-gray-400
             [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm [&_select]:border [&_select]:border-gray-300 [&_select]:rounded [&_select]:focus:border-gray-500 [&_select]:focus:ring-1 [&_select]:focus:ring-gray-400
-            [&_label]:text-base [&_label]:font-semibold [&_label]:mb-1"
+            [&_label]:text-sm [&_label]:font-semibold [&_label]:mb-1"
         >
           <div>
             <label className="block font-semibold">Name</label>
@@ -149,7 +149,7 @@ export default function EditItemModal({
           <div className="col-span-2">
             <label className="block font-semibold">Description</label>
             <textarea
-              className="w-full h-24 resize-y"
+              className="w-full h-20 resize-y"
               value={newItem.description}
               onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
             />
@@ -229,7 +229,7 @@ export default function EditItemModal({
                   <img
                     src={imagePreview}
                     alt="Preview"
-                    className="mx-auto h-16 w-16 rounded object-cover"
+                    className="mx-auto h-12 w-12 rounded object-cover"
                   />
                 </div>
               ) : (
