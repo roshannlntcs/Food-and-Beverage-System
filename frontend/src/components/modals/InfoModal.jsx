@@ -77,7 +77,7 @@ const CONTENT = {
           {/* Frontend Developer */}
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-neutral-300 overflow-hidden shrink-0">
-              <img src="/team/frontend.jpg" alt="Frontend Developer" className="h-full w-full object-cover" />
+              <img src="gjm.jpg" alt="Frontend Developer" className="h-full w-full object-cover" />
             </div>
             <div>
               <div className="text-sm">Frontend Developer</div>
