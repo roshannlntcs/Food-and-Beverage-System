@@ -35,7 +35,7 @@ const CONTENT = {
           {/* Project Leader (center, spans both columns) */}
           <div className="md:col-span-2 flex flex-col items-center gap-1">
             <div className="h-14 w-14 rounded-full bg-neutral-300 overflow-hidden">
-              <img src="/team/leader.jpg" alt="Project Leader" className="h-full w-full object-cover" />
+              <img src="rnl.jpg" alt="Project Leader" className="h-full w-full object-cover" />
             </div>
             <div className="text-sm opacity-90 mt-1">Project Leader</div>
             <div className="text-[13px] mt-0.5">Lanticse, Rose Ann</div>
@@ -66,7 +66,7 @@ const CONTENT = {
           {/* Technical Writer */}
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-neutral-300 overflow-hidden shrink-0">
-              <img src="/team/writer.jpg" alt="Technical Writer" className="h-full w-full object-cover" />
+              <img src="pl.jpg" alt="Technical Writer" className="h-full w-full object-cover" />
             </div>
             <div>
               <div className="text-sm">Technical Writer</div>
