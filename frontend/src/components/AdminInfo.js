@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaUser, FaSignOutAlt, FaCog } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
-import resolveUserAvatar from '../utils/avatarHelper';
+import useOptimizedAvatar from '../hooks/useOptimizedAvatar';
 import { useNavigate } from 'react-router-dom';
 
 const AdminInfo = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const adminName = currentUser?.fullName || 'Admin';
-  const avatarUrl = resolveUserAvatar(currentUser);
+  const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -42,12 +42,16 @@ const AdminInfo = () => {
   };
 
   const renderAvatar = () => {
-    if (avatarUrl) {
+    if (avatarSrc) {
       return (
         <img
-          src={avatarUrl}
+          src={avatarSrc}
           alt="Admin Avatar"
-          className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+          loading="lazy"
+          decoding="async"
+          className={`w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm ${
+            avatarLoading ? 'animate-pulse' : ''
+          }`}
         />
       );
     }

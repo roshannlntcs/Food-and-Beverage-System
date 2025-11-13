@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaUser, FaChevronDown, FaCog } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
-import resolveUserAvatar from '../utils/avatarHelper';
+import useOptimizedAvatar from '../hooks/useOptimizedAvatar';
 
 const AdminInfo = () => {
   const { currentUser, logout } = useAuth() || {};
   const adminName = currentUser?.fullName || 'Admin';
-  const profileImage = resolveUserAvatar(currentUser);
+  const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -94,11 +94,15 @@ const AdminInfo = () => {
         ref={dropdownRef}
       >
         {/* Profile Image / Fallback */}
-        {profileImage ? (
+        {avatarSrc ? (
           <img
-            src={profileImage}
+            src={avatarSrc}
             alt="Profile"
-            className="w-8 h-8 rounded-full object-cover border border-white"
+            loading="lazy"
+            decoding="async"
+            className={`w-8 h-8 rounded-full object-cover border border-white ${
+              avatarLoading ? 'animate-pulse' : ''
+            }`}
           />
         ) : (
           <div className="w-8 h-8 flex items-center justify-center bg-white/30 rounded-full">

@@ -706,7 +706,7 @@ const SuperAdmin = () => {
       <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
         <div className="px-8 pt-8 pb-3 flex justify-between items-center">
           <h1 className="text-3xl font-bold">System Administrator</h1>
-          <AdminInfoDashboard2 enableStockAlerts />
+          <AdminInfoDashboard2 />
         </div>
 
         <div className="flex-1 min-h-0 px-8 pb-8 overflow-hidden flex flex-col gap-6">

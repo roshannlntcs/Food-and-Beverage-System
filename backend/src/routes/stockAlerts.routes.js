@@ -22,8 +22,22 @@ router.get('/state', async (req, res) => {
     return res.status(400).json({ error: 'Invalid user context' });
   }
   try {
-    const state = await prisma.stockAlertState.findUnique({
-      where: { userId },
+    const state = await prisma.$transaction(async (tx) => {
+      const existing = await tx.stockAlertState.findUnique({
+        where: { userId },
+      });
+      if (existing) return existing;
+
+      const fallback = await tx.stockAlertState.findFirst({
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      return tx.stockAlertState.create({
+        data: {
+          userId,
+          signature: fallback?.signature || '',
+        },
+      });
     });
     res.json({
       signature: state?.signature || '',
@@ -43,14 +57,24 @@ router.post('/state', async (req, res) => {
   try {
     const { signature } = StockAlertPayload.parse(req.body || {});
     const normalizedSignature = (signature || '').trim();
-    const state = await prisma.stockAlertState.upsert({
-      where: { userId },
-      update: { signature: normalizedSignature },
-      create: { userId, signature: normalizedSignature },
+    const state = await prisma.$transaction(async (tx) => {
+      await tx.stockAlertState.upsert({
+        where: { userId },
+        update: { signature: normalizedSignature },
+        create: { userId, signature: normalizedSignature },
+      });
+
+      await tx.stockAlertState.updateMany({
+        data: { signature: normalizedSignature },
+      });
+
+      return tx.stockAlertState.findFirst({
+        orderBy: { updatedAt: 'desc' },
+      });
     });
     res.json({
-      signature: state.signature || '',
-      dismissedAt: state.updatedAt,
+      signature: state?.signature || '',
+      dismissedAt: state?.updatedAt || null,
     });
   } catch (error) {
     console.error('POST /stock-alerts/state failed:', error);

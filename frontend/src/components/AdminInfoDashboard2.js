@@ -12,8 +12,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "./ToastProvider";
 import ProfileModal from "./modals/ProfileModal";
-import images from "../utils/images";
-import resolveUserAvatar from "../utils/avatarHelper";
+import useOptimizedAvatar from "../hooks/useOptimizedAvatar";
 import { useInventory } from "../contexts/InventoryContext";
 import { fetchOrders } from "../api/orders";
 import { fetchStockAlertState as fetchStockAlertStateApi, updateStockAlertState as updateStockAlertStateApi } from "../api/stockAlerts";
@@ -68,7 +67,7 @@ const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics, enableStock
   const { currentUser, updateProfile, changePassword, logout } =
     useAuth() || {};
   const { showToast } = useToast();
-  const { inventory = [] } = useInventory() || {};
+  const { inventory = [], loading: inventoryLoading } = useInventory() || {};
 
   // Normalize various sex values -> "M" / "F" / null
 const normalizeSex = (val) => {
@@ -80,8 +79,7 @@ const normalizeSex = (val) => {
 };
 
   const adminName = currentUser?.fullName || "Admin";
-  const avatarUrl =
-    currentUser?.avatarUrl || images["avatar-ph.png"] || "https://i.pravatar.cc/100?img=68";
+  const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -473,53 +471,53 @@ const normalizeSex = (val) => {
     [displayNotifications]
   );
 
+  const stockNotifications = useMemo(
+    () => buildStockNotifications(),
+    [buildStockNotifications]
+  );
+
   const stockAlertCounts = useMemo(() => {
-    if (!Array.isArray(displayNotifications)) return { low: 0, out: 0 };
-    return displayNotifications.reduce(
+    if (!Array.isArray(stockNotifications) || !stockNotifications.length) {
+      return { low: 0, out: 0 };
+    }
+    return stockNotifications.reduce(
       (acc, notif) => {
-        if (notif?.type !== "stock") return acc;
-        const text = (notif.text || "").toLowerCase();
-        if (text.includes("out of stock")) acc.out += 1;
+        const text = (notif?.text || "").toLowerCase();
+        const severity =
+          notif?.severity === "out" || text.includes("out of stock")
+            ? "out"
+            : "low";
+        if (severity === "out") acc.out += 1;
         else acc.low += 1;
         return acc;
       },
       { low: 0, out: 0 }
     );
-  }, [displayNotifications]);
+  }, [stockNotifications]);
 
-  const stockAlertTargets = useMemo(() => {
-    if (!Array.isArray(displayNotifications)) return [];
-    return displayNotifications
-      .filter((notif) => notif?.type === "stock")
-      .map((notif) => {
-        const identifier =
-          notif.itemId ??
-          notif.stockId ??
-          notif.productId ??
-          notif.product?.id ??
-          notif.id ??
-          notif.itemName ??
-          notif.stockName ??
-          notif.text ??
-          notif.time ??
-          "";
-        const severity =
-          notif.severity ||
-          ((notif.text || "").toLowerCase().includes("out of stock")
-            ? "out"
-            : "low");
-        const normalizedId = String(identifier).trim();
-        if (!normalizedId) return null;
-        return `${normalizedId}|${severity}`;
-      })
-      .filter(Boolean)
-      .sort();
-  }, [displayNotifications]);
-
-  const stockAlertSignature = useMemo(
-    () => (stockAlertTargets.length ? stockAlertTargets.join("::") : ""),
-    [stockAlertTargets]
-  );
+  const stockAlertSignature = useMemo(() => {
+    if (!Array.isArray(stockNotifications) || !stockNotifications.length) {
+      return "";
+    }
+    const uniqueTargets = new Set();
+    stockNotifications.forEach((notif) => {
+      const identifier =
+        notif?.itemId ??
+        notif?.stockId ??
+        notif?.productId ??
+        notif?.product?.id ??
+        notif?.itemName ??
+        notif?.stockName ??
+        null;
+      if (!identifier) return;
+      const normalized = String(identifier).trim().toLowerCase();
+      if (normalized) {
+        uniqueTargets.add(normalized);
+      }
+    });
+    if (!uniqueTargets.size) return "";
+    return Array.from(uniqueTargets).sort().join("::");
+  }, [stockNotifications]);
 
   const hasStockAlert = stockAlertCounts.low > 0 || stockAlertCounts.out > 0;
 
@@ -541,11 +539,24 @@ const normalizeSex = (val) => {
   ]);
 
   useEffect(() => {
+    if (!enableStockAlerts) {
+      previousStockSignatureRef.current = stockAlertSignature;
+      return;
+    }
+    if (inventoryLoading) {
+      previousStockSignatureRef.current = stockAlertSignature;
+      return;
+    }
     if (!stockAlertSignature && previousStockSignatureRef.current) {
       persistStockAlertSignature("");
     }
     previousStockSignatureRef.current = stockAlertSignature;
-  }, [stockAlertSignature, persistStockAlertSignature]);
+  }, [
+    enableStockAlerts,
+    inventoryLoading,
+    stockAlertSignature,
+    persistStockAlertSignature,
+  ]);
 
   const unreadCount = useMemo(() => {
     if (!Array.isArray(displayNotifications) || !displayNotifications.length) {
@@ -678,14 +689,11 @@ const normalizeSex = (val) => {
     if (!showStockAlert || !portalTarget) return null;
     return createPortal(
       <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4">
-        <div className="w-full max-w-md rounded-2xl border-2 border-[#800000] bg-white shadow-2xl p-6 space-y-4 text-center">
+        <div className="w-full max-w-sm rounded-2xl border-2 border-[#800000] bg-white shadow-2xl p-5 space-y-3 text-center">
           <div className="flex flex-col items-center justify-center gap-3 text-[#800000]">
             <FaExclamationTriangle className="text-3xl" aria-hidden="true" />
             <div className="text-center">
               <p className="text-xl font-bold">Stock Alerts</p>
-              <p className="text-sm text-gray-700">
-                Items need your attention right away.
-              </p>
             </div>
           </div>
 
@@ -707,18 +715,18 @@ const normalizeSex = (val) => {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <button
               type="button"
               onClick={handleStockAlertView}
-              className="flex-1 rounded-full bg-[#FFC72C] px-4 py-2 text-sm font-semibold text-black shadow hover:bg-yellow-500 transition-colors"
+              className="flex-1 rounded-full bg-[#FFC72C] px-3 py-2 text-sm font-semibold text-black shadow hover:bg-yellow-500 transition-colors"
             >
               View Notifications
             </button>
             <button
               type="button"
               onClick={handleStockAlertDismiss}
-              className="flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+              className="flex-1 rounded-full border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
             >
               Dismiss
             </button>
@@ -867,9 +875,13 @@ const normalizeSex = (val) => {
           className="flex items-center space-x-3 cursor-pointer select-none"
         >
           <img
-            src={avatarUrl}
+            src={avatarSrc}
             alt="Admin Avatar"
-            className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm"
+            loading="lazy"
+            decoding="async"
+            className={`w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm ${
+              avatarLoading ? "animate-pulse" : ""
+            }`}
           />
           <div className="hidden md:block leading-tight text-current">
             <div className="text-sm font-semibold">{adminName}</div>
@@ -911,7 +923,7 @@ const normalizeSex = (val) => {
           show={showProfile}
           userName={adminName}
           schoolId={schoolId}
-          avatarUrl={avatarUrl}
+          avatarUrl={avatarSrc}
           analytics={analytics}
           onAvatarUpload={handleAvatarUpload}
           onChangePassword={handleChangePassword}

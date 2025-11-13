@@ -13,7 +13,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import { fetchOrders } from "../../api/orders";
 import { fetchUsers } from "../../api/users";
 import { mapOrderToTx } from "../../utils/mapOrder";
-import resolveUserAvatar from "../../utils/avatarHelper";
 import {
   BarChart,
   Bar,

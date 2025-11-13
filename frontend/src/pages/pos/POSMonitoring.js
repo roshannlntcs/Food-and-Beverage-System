@@ -148,7 +148,7 @@ const formatDateTime = (value) => {
             >
               Sales Report
             </button>
-          <AdminInfoDashboard2 enableStockAlerts />
+            <AdminInfoDashboard2 />
           </div>
         </div>
 

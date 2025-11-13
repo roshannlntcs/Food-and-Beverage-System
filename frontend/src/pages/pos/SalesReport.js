@@ -434,7 +434,7 @@ export default function SalesReport() {
               <Download size={16} />
               Export CSV
             </button>
-            <AdminInfoDashboard2 enableStockAlerts />
+            <AdminInfoDashboard2 />
           </div>
         </div>
 

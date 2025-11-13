@@ -194,7 +194,7 @@ export default function VoidLogs() {
       <div className="ml-20 w-full h-screen flex flex-col overflow-hidden">
         <div className="px-6 pt-6 pb-2 flex justify-between items-center">
           <h1 className="text-3xl font-bold">Void Logs</h1>
-          <AdminInfoDashboard2 enableStockAlerts />
+          <AdminInfoDashboard2 />
         </div>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">

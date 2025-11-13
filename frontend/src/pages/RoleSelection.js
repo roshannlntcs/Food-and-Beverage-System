@@ -1,57 +1,32 @@
 // src/pages/RoleSelection.jsx
-<<<<<<< HEAD
-import React, { useState } from "react";
-=======
-import React, { useEffect, useMemo, useState } from "react";
->>>>>>> 7c1d42891335635ff78164231f4af2e9ac015d5d
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCashRegister, FaWrench, FaUser } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
-import resolveUserAvatar from "../utils/avatarHelper";
+import useOptimizedAvatar from "../hooks/useOptimizedAvatar";
+
+const ROLE_OPTIONS = [
+  { id: "admin", label: "ADMIN", Icon: FaWrench },
+  { id: "cashier", label: "CASHIER", Icon: FaCashRegister },
+];
 
 export default function RoleSelection() {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
 
   const [selectedRole, setSelectedRole] = useState(null);
-<<<<<<< HEAD
-
-  const resolvedAvatar = resolveUserAvatar(currentUser);
   const fullName = currentUser?.fullName || "";
-=======
-  const [fullName, setFullName] = useState("");
-
-  // Normalize "sex" -> "M" | "F" | null
-  const normalizeSex = (val) => {
-    if (!val || typeof val !== "string") return null;
-    const v = val.trim().toLowerCase();
-    if (v === "m" || v === "male") return "M";
-    if (v === "f" || v === "female") return "F";
-    return null;
-  };
-
-  // Derive once per render from source-of-truth user object
-  const { sex, avatarUrl } = useMemo(() => {
-    const localSex =
-      typeof window !== "undefined" ? localStorage.getItem("sex") : null;
-    const s = normalizeSex(currentUser?.sex) || normalizeSex(localSex);
-    const genderAvatar = s === "M" ? "/male_user.png" : s === "F" ? "/female_user.png" : null;
-
-    // avatarUrl wins, then gender fallback, then none
-    return {
-      sex: s,
-      avatarUrl: currentUser?.avatarUrl || genderAvatar || null,
-    };
-  }, [currentUser]);
+  const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
 
   useEffect(() => {
-    if (!currentUser) {
-      setFullName("");
-      return;
-    }
-    setFullName(currentUser.fullName || "");
-  }, [currentUser]);
->>>>>>> 7c1d42891335635ff78164231f4af2e9ac015d5d
+    if (typeof Image === "undefined") return undefined;
+    const bg = new Image();
+    bg.src = "/b.jpg";
+    return () => {
+      bg.onload = null;
+      bg.onerror = null;
+    };
+  }, []);
 
   const handleContinue = () => {
     if (selectedRole === "admin") {
@@ -76,31 +51,27 @@ export default function RoleSelection() {
           </h1>
         )}
 
-<<<<<<< HEAD
         <div className="flex justify-center mb-6">
-          {resolvedAvatar ? (
-            <div className="w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-transform duration-300">
+          <div
+            className={`w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-all duration-300 ${
+              avatarLoading ? "animate-pulse" : ""
+            }`}
+          >
+            {avatarSrc ? (
               <img
-                src={resolvedAvatar}
+                src={avatarSrc}
                 alt="Profile avatar"
-                className="w-full h-full object-cover"
-=======
-        {/* Avatar preview synced with AdminInfoDashboard2 */}
-        <div className="flex justify-center mb-6">
-          {avatarUrl ? (
-            <div className="border-4 border-gray-300 rounded-full p-4 shadow-md flex items-center justify-center bg-white">
-              <img
-                src={avatarUrl}
-                alt="Profile"
-                className="w-24 h-24 object-contain -m-4"
->>>>>>> 7c1d42891335635ff78164231f4af2e9ac015d5d
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                className="w-full h-full object-cover select-none"
               />
-            </div>
-          ) : (
-            <div className="w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg flex items-center justify-center bg-white">
-              <FaUser size={60} className="text-gray-400" />
-            </div>
-          )}
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <FaUser size={60} className="text-gray-400" />
+              </div>
+            )}
+          </div>
         </div>
 
         <h2 className="text-lg font-medium mb-6 text-gray-800">
@@ -108,10 +79,7 @@ export default function RoleSelection() {
         </h2>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
-          {[
-            { id: "admin", label: "ADMIN", Icon: FaWrench },
-            { id: "cashier", label: "CASHIER", Icon: FaCashRegister },
-          ].map(({ id, label, Icon }) => {
+          {ROLE_OPTIONS.map(({ id, label, Icon }) => {
             const active = selectedRole === id;
             return (
               <button
@@ -119,14 +87,18 @@ export default function RoleSelection() {
                 type="button"
                 onClick={() => setSelectedRole(id)}
                 className={`group w-full max-w-[150px] mx-auto h-28 sm:h-32 flex flex-col items-center justify-center rounded-2xl border transition-[box-shadow,transform] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 ${
-                  active ? "bg-[#FFF8E1] border-yellow-400 shadow-xl" : "bg-white border-gray-200 hover:shadow-lg"
+                  active
+                    ? "bg-[#FFF8E1] border-yellow-400 shadow-xl"
+                    : "bg-white border-gray-200 hover:shadow-lg"
                 }`}
                 aria-pressed={active}
               >
                 <Icon
                   size={32}
                   className={`mb-3 transition-colors duration-200 ${
-                    active ? "text-[#FFC72C]" : "text-gray-500 group-hover:text-[#FFC72C]"
+                    active
+                      ? "text-[#FFC72C]"
+                      : "text-gray-500 group-hover:text-[#FFC72C]"
                   }`}
                 />
                 <span className="font-semibold tracking-wide">{label}</span>
@@ -147,7 +119,9 @@ export default function RoleSelection() {
             onClick={handleContinue}
             disabled={!selectedRole}
             className={`px-6 py-1.5 rounded-full text-sm text-black font-medium transition ${
-              selectedRole ? "bg-[#FFC72C] hover:bg-yellow-600" : "bg-gray-300 cursor-not-allowed"
+              selectedRole
+                ? "bg-[#FFC72C] hover:bg-yellow-600"
+                : "bg-gray-300 cursor-not-allowed"
             }`}
           >
             Continue
