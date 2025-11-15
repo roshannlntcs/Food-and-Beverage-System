@@ -106,7 +106,6 @@ export default function SalesReport() {
         const baseParams = {};
         if (dateFrom) baseParams.from = dateFrom;
         if (dateTo) baseParams.to = dateTo;
-        if (cashierFilter) baseParams.cashierId = Number(cashierFilter);
 
         const aggregated = [];
         let cursor = undefined;
@@ -164,7 +163,7 @@ export default function SalesReport() {
     return () => {
       active = false;
     };
-  }, [dateFrom, dateTo, cashierFilter]);
+  }, [dateFrom, dateTo]);
 
   const cashierOptions = useMemo(() => {
     const map = new Map();
@@ -179,12 +178,16 @@ export default function SalesReport() {
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
-    if (!methodFilter) return orders;
-    const normalized = methodFilter.toUpperCase();
-    return orders.filter(
-      (order) => String(order.method || "").toUpperCase() === normalized
-    );
-  }, [orders, methodFilter]);
+    return orders.filter((order) => {
+      const methodMatch =
+        !methodFilter ||
+        String(order.method || "").toUpperCase() === methodFilter.toUpperCase();
+      const cashierMatch =
+        !cashierFilter ||
+        String(order.cashierId ?? "") === cashierFilter;
+      return methodMatch && cashierMatch;
+    });
+  }, [orders, methodFilter, cashierFilter]);
 
   const summary = useMemo(() => {
     const totalRevenue = filteredOrders.reduce(

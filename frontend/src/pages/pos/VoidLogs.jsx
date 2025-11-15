@@ -87,6 +87,9 @@ export default function VoidLogs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedVoidLog, setSelectedVoidLog] = useState(null);
+  const [voidTypeFilter, setVoidTypeFilter] = useState("All");
+  const [managerFilter, setManagerFilter] = useState("All");
+  const [cashierFilter, setCashierFilter] = useState("All");
 
   useEffect(() => {
     let active = true;
@@ -149,19 +152,68 @@ export default function VoidLogs() {
     });
   }, [rows]);
 
+  const voidTypeOptions = useMemo(() => {
+    const values = new Set();
+    normalizedRows.forEach((row) => {
+      const type = String(row.voidType || row.type || "").toUpperCase();
+      if (type) values.add(type);
+    });
+    return Array.from(values).sort();
+  }, [normalizedRows]);
+
+  const managerOptions = useMemo(() => {
+    const values = new Set();
+    normalizedRows.forEach((row) => {
+      const manager = String(row.managerName || "").trim();
+      if (manager) values.add(manager);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [normalizedRows]);
+
+  const cashierOptions = useMemo(() => {
+    const values = new Set();
+    normalizedRows.forEach((row) => {
+      const cashier = String(row.cashierName || "").trim();
+      if (cashier) values.add(cashier);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [normalizedRows]);
+
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return normalizedRows;
     return normalizedRows.filter((row) => {
-      const matchesTx = String(row.transactionId || "").toLowerCase().includes(query);
-      const matchesVoidId = String(row.voidId || row.id || "").toLowerCase().includes(query);
-      const matchesReason = String(row.reason || "").toLowerCase().includes(query);
-      const matchesItem =
-        Array.isArray(row.items) &&
-        row.items.some((item) => String(item?.name || "").toLowerCase().includes(query));
-      return matchesTx || matchesVoidId || matchesReason || matchesItem;
+      const matchesSearch =
+        !query ||
+        String(row.transactionId || "").toLowerCase().includes(query) ||
+        String(row.voidId || row.id || "").toLowerCase().includes(query) ||
+        String(row.reason || "").toLowerCase().includes(query) ||
+        (Array.isArray(row.items) &&
+          row.items.some((item) =>
+            String(item?.name || "").toLowerCase().includes(query)
+          ));
+      const normalizedType = String(row.voidType || row.type || "")
+        .toUpperCase()
+        .trim();
+      const typeMatch =
+        voidTypeFilter === "All" ||
+        normalizedType === String(voidTypeFilter).toUpperCase();
+      const managerMatch =
+        managerFilter === "All" ||
+        String(row.managerName || "") === managerFilter;
+      const cashierMatch =
+        cashierFilter === "All" ||
+        String(row.cashierName || "") === cashierFilter;
+      return matchesSearch && typeMatch && managerMatch && cashierMatch;
     });
-  }, [normalizedRows, searchQuery]);
+  }, [normalizedRows, searchQuery, voidTypeFilter, managerFilter, cashierFilter]);
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setVoidTypeFilter("All");
+    setManagerFilter("All");
+    setCashierFilter("All");
+    setCurrentPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / entriesPerPage) || 1);
   const safePage = Math.min(currentPage, totalPages);
@@ -198,7 +250,7 @@ export default function VoidLogs() {
         </div>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap gap-4">
             <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
               <FaSearch className="text-gray-500 mr-2" />
               <input
@@ -212,15 +264,66 @@ export default function VoidLogs() {
                 }}
               />
             </div>
-            <ShowEntries
-              entriesPerPage={entriesPerPage}
-              setEntriesPerPage={setEntriesPerPage}
-              setCurrentPage={setCurrentPage}
-            />
+
+            <select
+              value={voidTypeFilter}
+              onChange={(e) => {
+                setVoidTypeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white min-w-[160px]"
+            >
+              <option value="All">All void types</option>
+              {voidTypeOptions.map((type) => (
+                <option key={type} value={type}>
+                  {type === "TRANSACTION" ? "Transaction" : "Item"}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={managerFilter}
+              onChange={(e) => {
+                setManagerFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white min-w-[180px]"
+            >
+              <option value="All">All managers</option>
+              {managerOptions.map((manager) => (
+                <option key={manager} value={manager}>
+                  {manager}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={cashierFilter}
+              onChange={(e) => {
+                setCashierFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white min-w-[180px]"
+            >
+              <option value="All">All cashiers</option>
+              {cashierOptions.map((cashier) => (
+                <option key={cashier} value={cashier}>
+                  {cashier}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="px-4 py-2 text-sm font-semibold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Reset Filters
+            </button>
           </div>
 
           <div className="flex-none bg-white rounded-xl shadow overflow-hidden">
-            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+            <div className="overflow-y-auto no-scrollbar max-h-[73vh]">
               <table className="w-full text-sm">
                 <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                   <tr>
@@ -292,6 +395,19 @@ export default function VoidLogs() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <ShowEntries
+              entriesPerPage={entriesPerPage}
+              setEntriesPerPage={setEntriesPerPage}
+              setCurrentPage={setCurrentPage}
+            />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+            />
           </div>
 
           <div className="flex justify-end">

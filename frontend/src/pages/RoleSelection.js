@@ -16,6 +16,7 @@ export default function RoleSelection() {
 
   const [selectedRole, setSelectedRole] = useState(null);
   const fullName = currentUser?.fullName || "";
+  const schoolId = currentUser?.schoolId || currentUser?.employeeId || "";
   const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function RoleSelection() {
           </h1>
         )}
 
-        <div className="flex justify-center mb-6">
+        <div className="flex flex-col items-center justify-center mb-6 space-y-3">
           <div
             className={`w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-all duration-300 ${
               avatarLoading ? "animate-pulse" : ""
@@ -72,13 +73,19 @@ export default function RoleSelection() {
               </div>
             )}
           </div>
+          {schoolId && (
+            <div className="text-sm font-semibold tracking-wide text-gray-600">
+              <span className="opacity-70 mr-1">School ID:</span>
+              <span>{schoolId}</span>
+            </div>
+          )}
         </div>
 
         <h2 className="text-lg font-medium mb-6 text-gray-800">
-          Please select your role
+          Please select your role:
         </h2>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-1 mb-6">
           {ROLE_OPTIONS.map(({ id, label, Icon }) => {
             const active = selectedRole === id;
             return (
@@ -110,7 +117,7 @@ export default function RoleSelection() {
         <div className="flex justify-center gap-4 mt-2">
           <button
             onClick={() => navigate("/")}
-            className="px-6 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-black text-sm font-medium transition"
+            className="px-9 py-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-black text-sm font-medium transition"
           >
             Cancel
           </button>

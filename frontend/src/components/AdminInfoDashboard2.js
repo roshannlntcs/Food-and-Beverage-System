@@ -14,14 +14,25 @@ import { useToast } from "./ToastProvider";
 import ProfileModal from "./modals/ProfileModal";
 import useOptimizedAvatar from "../hooks/useOptimizedAvatar";
 import { useInventory } from "../contexts/InventoryContext";
-import { fetchOrders } from "../api/orders";
-import { fetchStockAlertState as fetchStockAlertStateApi, updateStockAlertState as updateStockAlertStateApi } from "../api/stockAlerts";
+import { fetchOrders, fetchVoidLogs } from "../api/orders";
+import {
+  fetchStockAlertState as fetchStockAlertStateApi,
+  updateStockAlertState as updateStockAlertStateApi,
+} from "../api/stockAlerts";
+import { fetchReadNotifications, markNotificationsRead } from "../api/notifications";
+import {
+  normalizeNotifications,
+  notificationKey,
+  getRestockStore,
+  persistRestockStore,
+  mergeNotificationLists,
+  notificationListSignature,
+} from "../utils/notificationHelpers";
 import { mapOrderToTx } from "../utils/mapOrder";
 
 const DEFAULT_LOW_THRESHOLD = 10;
 const STOCK_ALERT_RESET = 100;
 const MAX_ORDER_FETCH = 100;
-const READ_STORAGE_KEY = "dashboard.readNotifications";
 const STOCK_DETAIL_EVENT = "dashboard-stock-detail-request";
 
 const pesoFormatter = new Intl.NumberFormat("en-PH", {
@@ -32,51 +43,70 @@ const pesoFormatter = new Intl.NumberFormat("en-PH", {
 
 const formatCurrency = (value) => pesoFormatter.format(Number(value || 0));
 
-const normalizeNotifications = (list = []) => {
-  return [...list]
-    .filter(Boolean)
-    .map((item) => {
-      const baseType = item.type || "general";
-      const text = item.text || "";
-      const timestamp =
-        item.timestamp ||
-        (item.time ? new Date(item.time).toISOString() : null) ||
-        new Date().toISOString();
-      const id =
-        item.id || `${baseType}|${text}|${timestamp}`;
-
-      return {
-        ...item,
-        type: baseType,
-        text,
-        id,
-        timestamp,
-        time: item.time || new Date(timestamp).toLocaleString(),
-      };
-    })
-    .sort(
-      (a, b) =>
-        new Date(b.timestamp || 0).getTime() -
-        new Date(a.timestamp || 0).getTime()
-    )
-    .slice(0, 10);
+const ANALYTICS_DEFAULT_KEY = "__global__";
+const getAnalyticsStore = () => {
+  if (typeof window === "undefined") return null;
+  if (!window.__dashboardProfileAnalyticsStore) {
+    window.__dashboardProfileAnalyticsStore = {};
+  }
+  return window.__dashboardProfileAnalyticsStore;
 };
 
-const AdminInfoDashboard2 = ({ notifications = [], profileAnalytics, enableStockAlerts = false }) => {
+const resolveStockIdentifier = (item = {}) => {
+  const parts = [
+    item.id,
+    item._id,
+    item.uuid,
+    item.productId,
+    item.sku,
+    item.code,
+    item.name,
+  ]
+    .map((value) => (value ? String(value).trim() : ""))
+    .filter(Boolean);
+  if (!parts.length) return null;
+  return parts.join("|").toLowerCase();
+};
+
+const MAX_RESTOCK_NOTIFICATIONS = 20;
+
+const parseDateSafe = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const filterVoidLogsForUser = (logs, userId) => {
+  if (!userId) return logs;
+  const numericId = Number(userId);
+  return logs.filter((log) => {
+    const cashierId =
+      log.cashierId ?? log.cashier?.id ?? log.cashier?.userId ?? null;
+    const managerId =
+      log.managerId ?? log.manager?.id ?? log.manager?.userId ?? null;
+    return (
+      String(cashierId ?? "") === String(userId) ||
+      (Number.isFinite(numericId) && Number(managerId) === numericId) ||
+      String(managerId ?? "") === String(userId)
+    );
+  });
+};
+
+const AdminInfoDashboard2 = ({
+  notifications = [],
+  profileAnalytics,
+  enableStockAlerts = false,
+}) => {
   const navigate = useNavigate();
   const { currentUser, updateProfile, changePassword, logout } =
     useAuth() || {};
   const { showToast } = useToast();
   const { inventory = [], loading: inventoryLoading } = useInventory() || {};
-
-  // Normalize various sex values -> "M" / "F" / null
-const normalizeSex = (val) => {
-  if (!val || typeof val !== "string") return null;
-  const v = val.trim().toLowerCase();
-  if (v === "m" || v === "male") return "M";
-  if (v === "f" || v === "female") return "F";
-  return null;
-};
+  const currentUserId = currentUser?.id ? String(currentUser.id) : "";
+  const currentUserKey = currentUserId || ANALYTICS_DEFAULT_KEY;
 
   const adminName = currentUser?.fullName || "Admin";
   const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
@@ -87,25 +117,38 @@ const normalizeSex = (val) => {
   const [showStockAlert, setShowStockAlert] = useState(false);
   const [selectedStockNotif, setSelectedStockNotif] = useState(null);
   const [readIds, setReadIds] = useState(() => new Set());
-  const [displayNotifications, setDisplayNotifications] = useState(() => {
+  const initialNotifications = (() => {
+    const restockStore = getRestockStore() || [];
     if (Array.isArray(notifications) && notifications.length) {
-      return normalizeNotifications(notifications);
+      return normalizeNotifications(
+        mergeNotificationLists(restockStore, notifications)
+      );
     }
     if (
       typeof window !== "undefined" &&
       Array.isArray(window.__dashboardNotifications)
     ) {
-      return normalizeNotifications(window.__dashboardNotifications);
+      return normalizeNotifications(
+        mergeNotificationLists(restockStore, window.__dashboardNotifications)
+      );
     }
-    return [];
-  });
+    return normalizeNotifications(restockStore);
+  })();
+
+  const [displayNotifications, setDisplayNotifications] = useState(
+    initialNotifications
+  );
+  const [notificationSignature, setNotificationSignature] = useState(() =>
+    notificationListSignature(initialNotifications)
+  );
   const [lastSeenStockSignature, setLastSeenStockSignature] = useState("");
   const [stockAlertStateLoaded, setStockAlertStateLoaded] = useState(false);
+  const [lastRestockSignature, setLastRestockSignature] = useState("");
+  const [restockVersion, setRestockVersion] = useState(0);
   const [analyticsState, setAnalyticsState] = useState(() => {
     if (profileAnalytics) return profileAnalytics;
-    if (typeof window !== "undefined" && window.__dashboardProfileAnalytics) {
-      return window.__dashboardProfileAnalytics;
-    }
+    const store = getAnalyticsStore();
+    if (store?.[currentUserKey]) return store[currentUserKey];
     const summary = currentUser?.analytics || {};
     return {
       totalSold: Number(summary.totalSold || 0),
@@ -121,34 +164,100 @@ const normalizeSex = (val) => {
   const dropdownBtnRef = useRef(null);
   const notifRef = useRef(null);
   const previousStockSignatureRef = useRef("");
+  const previousStockLevelsRef = useRef(new Map());
+  const restockNotificationsRef = useRef(
+    (() => {
+      const store = getRestockStore();
+      return store ? [...store] : [];
+    })()
+  );
   const portalTarget = typeof document !== "undefined" ? document.body : null;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(READ_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setReadIds(new Set(parsed));
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to load read notifications:", err);
+  const dispatchNotificationUpdate = useCallback((list) => {
+    if (typeof window !== "undefined") {
+      window.__dashboardNotifications = list;
+      window.dispatchEvent(
+        new CustomEvent("dashboard-notifications-update", { detail: list })
+      );
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(
-        READ_STORAGE_KEY,
-        JSON.stringify(Array.from(readIds))
-      );
-    } catch (err) {
-      console.warn("Failed to persist read notifications:", err);
+    let mounted = true;
+    (async () => {
+      try {
+        const ids = await fetchReadNotifications();
+        if (mounted && Array.isArray(ids)) {
+          setReadIds(new Set(ids.map((id) => String(id))));
+        }
+      } catch (err) {
+        console.warn("Failed to load read notifications:", err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(inventory)) return;
+    const prev = previousStockLevelsRef.current;
+    const updates = [];
+    const seenIds = new Set();
+    inventory.forEach((item) => {
+      if (!item) return;
+      const identifier = resolveStockIdentifier(item);
+      if (!identifier) return;
+      seenIds.add(identifier);
+      const currentQty = Number(item.quantity ?? 0);
+      const prevQty = prev.has(identifier) ? prev.get(identifier) : null;
+      if (prevQty !== null && currentQty > prevQty) {
+        const delta = currentQty - prevQty;
+        const parsedStamp =
+          parseDateSafe(item.updatedAt) ||
+          parseDateSafe(item.updated_at) ||
+          parseDateSafe(item.lastUpdated) ||
+          parseDateSafe(item.createdAt) ||
+          new Date();
+        const timestamp = parsedStamp.toISOString();
+        updates.push({
+          type: "stock",
+          severity: "restock",
+          variant: "restock",
+          text: `Stock replenished: ${item.name || "Item"} (+${delta})`,
+          itemId: item.id ?? null,
+          itemName: item.name || "Item",
+          category:
+            item.category ||
+            item.categoryName ||
+            item.categoryId ||
+            item.categoryKey ||
+            "Uncategorized",
+          quantity: currentQty,
+          threshold:
+            Number(item.lowThreshold ?? DEFAULT_LOW_THRESHOLD) ||
+            DEFAULT_LOW_THRESHOLD,
+          timestamp,
+          time: parsedStamp.toLocaleString(),
+          id: `stock|restock|${identifier}|${timestamp}`,
+        });
+      }
+      prev.set(identifier, currentQty);
+    });
+    prev.forEach((_, key) => {
+      if (!seenIds.has(key)) {
+        prev.delete(key);
+      }
+    });
+    if (updates.length) {
+      const next = [
+        ...updates,
+        ...(restockNotificationsRef.current || []),
+      ].slice(0, MAX_RESTOCK_NOTIFICATIONS);
+      restockNotificationsRef.current = next;
+      persistRestockStore(next);
+      setRestockVersion((version) => version + 1);
     }
-  }, [readIds]);
+  }, [inventory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,8 +342,7 @@ const normalizeSex = (val) => {
   }, []);
 
   const buildStockNotifications = useCallback(() => {
-    const now = new Date();
-    return (inventory || []).reduce((acc, item) => {
+    const base = (inventory || []).reduce((acc, item) => {
       if (!item) return acc;
       const current = Number(item.quantity ?? 0);
       if (current >= STOCK_ALERT_RESET) return acc;
@@ -242,6 +350,16 @@ const normalizeSex = (val) => {
         Number(item.lowThreshold ?? DEFAULT_LOW_THRESHOLD) || DEFAULT_LOW_THRESHOLD;
       const severity = current <= 0 ? "out" : "low";
       if (severity === "low" && current > threshold) return acc;
+      const baseStamp =
+        parseDateSafe(item.updatedAt) ||
+        parseDateSafe(item.updated_at) ||
+        parseDateSafe(item.lastUpdated) ||
+        parseDateSafe(item.createdAt) ||
+        new Date();
+      const timestamp = baseStamp.toISOString();
+      const identifier = resolveStockIdentifier(item) || "item";
+      const stockId = ["stock", severity, identifier].join("|");
+
       acc.push({
         type: "stock",
         severity,
@@ -259,11 +377,13 @@ const normalizeSex = (val) => {
           "Uncategorized",
         quantity: current,
         threshold,
-        timestamp: now.toISOString(),
-        time: now.toLocaleTimeString(),
+        timestamp,
+        time: baseStamp.toLocaleString(),
+        id: stockId,
       });
       return acc;
     }, []);
+    return [...(restockNotificationsRef.current || []), ...base];
   }, [inventory]);
 
   const buildOrderNotifications = useCallback((ordersList = []) => {
@@ -292,24 +412,58 @@ const normalizeSex = (val) => {
   }, []);
 
   useEffect(() => {
+    const restocks = restockNotificationsRef.current || [];
+    let baseList = [];
     if (Array.isArray(notifications) && notifications.length) {
-      const normalized = normalizeNotifications(notifications);
-      setDisplayNotifications(normalized);
-      if (typeof window !== "undefined") {
-        window.__dashboardNotifications = normalized;
-      }
+      baseList = notifications;
+    } else if (
+      typeof window !== "undefined" &&
+      Array.isArray(window.__dashboardNotifications)
+    ) {
+      baseList = window.__dashboardNotifications;
     }
-  }, [notifications]);
+    const outgoing = normalizeNotifications(
+      mergeNotificationLists(restocks, baseList)
+    );
+    const signature = notificationListSignature(outgoing);
+    if (signature !== notificationSignature) {
+      setDisplayNotifications(outgoing);
+      setNotificationSignature(signature);
+      dispatchNotificationUpdate(outgoing);
+    }
+  }, [
+    notifications,
+    restockVersion,
+    notificationSignature,
+    dispatchNotificationUpdate,
+  ]);
+
+  useEffect(() => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      (displayNotifications || []).forEach((notif) => {
+        if (notif?.read) {
+          const key = notificationKey(notif);
+          if (key) next.add(key);
+        }
+      });
+      return next;
+    });
+  }, [displayNotifications]);
 
   useEffect(() => {
     setReadIds((prev) => {
       if (!prev.size) return prev;
-      const ids = new Set(displayNotifications.map((notif) => notif.id));
+      const ids = new Set(
+        displayNotifications
+          .map((notif) => notificationKey(notif))
+          .filter(Boolean)
+      );
       let changed = false;
       const next = new Set();
-      prev.forEach((id) => {
-        if (ids.has(id)) {
-          next.add(id);
+      prev.forEach((key) => {
+        if (ids.has(key)) {
+          next.add(key);
         } else {
           changed = true;
         }
@@ -319,13 +473,20 @@ const normalizeSex = (val) => {
   }, [displayNotifications]);
 
   useEffect(() => {
-    if (profileAnalytics) {
-      setAnalyticsState(profileAnalytics);
-      if (typeof window !== "undefined") {
-        window.__dashboardProfileAnalytics = profileAnalytics;
-      }
+    if (!profileAnalytics) return;
+    setAnalyticsState(profileAnalytics);
+    const store = getAnalyticsStore();
+    if (store) {
+      store[currentUserKey] = profileAnalytics;
     }
-  }, [profileAnalytics]);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("dashboard-profile-analytics-update", {
+          detail: { userId: currentUserKey, summary: profileAnalytics },
+        })
+      );
+    }
+  }, [profileAnalytics, currentUserKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -339,96 +500,223 @@ const normalizeSex = (val) => {
   }, []);
 
   useEffect(() => {
-    if (profileAnalytics) return;
     if (typeof window === "undefined") return undefined;
     const handler = (event) => {
-      if (event?.detail) {
-        setAnalyticsState(event.detail);
+      const summary = event?.detail?.summary || event?.detail;
+      const targetKey = event?.detail?.userId || ANALYTICS_DEFAULT_KEY;
+      if (!summary) return;
+      if (targetKey !== currentUserKey) return;
+      setAnalyticsState(summary);
+      const store = getAnalyticsStore();
+      if (store) {
+        store[currentUserKey] = summary;
       }
     };
     window.addEventListener("dashboard-profile-analytics-update", handler);
-    return () => window.removeEventListener("dashboard-profile-analytics-update", handler);
-  }, [profileAnalytics]);
+    return () =>
+      window.removeEventListener("dashboard-profile-analytics-update", handler);
+  }, [currentUserKey]);
 
   useEffect(() => {
-    if (Array.isArray(notifications) && notifications.length) return;
     let active = true;
     let timer;
     const load = async () => {
       try {
-        const params = { take: MAX_ORDER_FETCH };
-        const response = await fetchOrders(params);
-        const orderList = Array.isArray(response?.data)
-          ? response.data
-          : Array.isArray(response?.orders)
-          ? response.orders
-          : Array.isArray(response)
-          ? response
-          : [];
+        const fetchPaginatedOrders = async () => {
+          const aggregated = [];
+          let cursor;
+          let safety = 0;
+          while (true) {
+            const params = { take: MAX_ORDER_FETCH };
+            if (currentUser?.id) {
+              params.cashierId = currentUser.id;
+            }
+            if (cursor) params.cursor = cursor;
+            const response = await fetchOrders(params);
+            const list = Array.isArray(response?.data)
+              ? response.data
+              : Array.isArray(response?.orders)
+              ? response.orders
+              : Array.isArray(response)
+              ? response
+              : [];
+            aggregated.push(...list);
+            const nextCursor =
+              response?.nextCursor ??
+              response?.pagination?.nextCursor ??
+              response?.cursor?.next ??
+              null;
+            if (!nextCursor || !list.length) break;
+            cursor = nextCursor;
+            safety += 1;
+            if (safety > 50) break;
+          }
+          const unique = new Map();
+          aggregated.forEach((order) => {
+            const key =
+              order.id || order.orderCode || order.transactionId || order.uuid;
+            if (!key) {
+              unique.set(
+                `idx-${unique.size}`,
+                order
+              );
+            } else {
+              unique.set(String(key), order);
+            }
+          });
+          return Array.from(unique.values());
+        };
+
+        const fetchPaginatedVoidLogs = async (paramKey) => {
+          const aggregated = [];
+          let cursor;
+          let safety = 0;
+          while (true) {
+            const params = { take: MAX_ORDER_FETCH };
+            if (paramKey && currentUser?.id) {
+              params[paramKey] = currentUser.id;
+            }
+            if (cursor) params.cursor = cursor;
+            const response = await fetchVoidLogs(params);
+            const list = Array.isArray(response?.data)
+              ? response.data
+              : Array.isArray(response?.voidLogs)
+              ? response.voidLogs
+              : Array.isArray(response)
+              ? response
+              : [];
+            aggregated.push(...list);
+            const nextCursor =
+              response?.nextCursor ??
+              response?.pagination?.nextCursor ??
+              response?.cursor?.next ??
+              null;
+            if (!nextCursor || !list.length) break;
+            cursor = nextCursor;
+            safety += 1;
+            if (safety > 50) break;
+          }
+          return aggregated;
+        };
+
+        const [orderList, rawVoidLogs] = await Promise.all([
+          fetchPaginatedOrders(),
+          currentUser?.id
+            ? (async () => {
+                const [cashierLogs, managerLogs] = await Promise.all([
+                  fetchPaginatedVoidLogs("cashierId"),
+                  fetchPaginatedVoidLogs("managerId"),
+                ]);
+                const merged = [...cashierLogs, ...managerLogs];
+                const unique = new Map();
+                merged.forEach((log) => {
+                  const key =
+                    log.id ||
+                    log.voidId ||
+                    `${log.transactionId || "VOID"}:${log.approvedAt || log.createdAt || unique.size}`;
+                  unique.set(String(key), log);
+                });
+                return Array.from(unique.values());
+              })()
+            : fetchPaginatedVoidLogs(null),
+        ]);
+
         const stockNotifs = buildStockNotifications();
         const orderNotifs = buildOrderNotifications(orderList);
-        const combined = normalizeNotifications([...stockNotifs, ...orderNotifs]);
-        if (active) {
-          setDisplayNotifications(combined);
-          if (typeof window !== "undefined") {
-            window.__dashboardNotifications = combined;
-          }
+      const combined = normalizeNotifications(
+        mergeNotificationLists(restockNotificationsRef.current, [
+          ...stockNotifs,
+          ...orderNotifs,
+        ])
+      );
+      if (
+        active &&
+        (!Array.isArray(notifications) || notifications.length === 0)
+      ) {
+        setDisplayNotifications(combined);
+        if (typeof window !== "undefined") {
+          window.__dashboardNotifications = combined;
+          window.dispatchEvent(
+            new CustomEvent("dashboard-notifications-update", { detail: combined })
+          );
         }
-        if (!profileAnalytics) {
-          const mapped = orderList
-            .map((order) => {
-              try {
-                return mapOrderToTx(order);
-              } catch (err) {
-                return null;
-              }
+      }
+        const mapped = orderList
+          .map((order) => {
+            try {
+              return mapOrderToTx(order);
+            } catch (err) {
+              return null;
+            }
+          })
+          .filter(Boolean);
+        const relevantOrders = currentUser?.id
+          ? mapped.filter(
+              (tx) =>
+                String(tx.cashierId ?? tx.cashier?.id ?? "") ===
+                String(currentUser.id)
+            )
+          : mapped;
+        const totalTransactions = relevantOrders.length;
+        const totalRevenue = relevantOrders.reduce(
+          (sum, tx) => sum + Number(tx.total || 0),
+          0
+        );
+        const totalSold = relevantOrders.reduce((sum, tx) => {
+          const items = Array.isArray(tx.items) ? tx.items : [];
+          return (
+            sum +
+            items.reduce(
+              (acc, item) => acc + Number(item?.quantity || item?.qty || 0),
+              0
+            )
+          );
+        }, 0);
+        const filteredVoidLogs = filterVoidLogsForUser(
+          rawVoidLogs,
+          currentUser?.id ?? null
+        );
+        const totalVoids = filteredVoidLogs.length;
+        const avgPerTransaction = totalTransactions
+          ? totalRevenue / totalTransactions
+          : 0;
+        const itemTotals = new Map();
+        relevantOrders.forEach((tx) => {
+          (tx.items || []).forEach((item) => {
+            if (!item) return;
+            const key = item.name || item.productId || item.id;
+            if (!key) return;
+            const current = itemTotals.get(key) || {
+              name: item.name || String(key),
+              qty: 0,
+            };
+            current.qty += Number(item.quantity || item.qty || 0);
+            itemTotals.set(key, current);
+          });
+        });
+        const bestSeller = Array.from(itemTotals.values()).reduce(
+          (best, entry) => (entry.qty > (best?.qty || 0) ? entry : best),
+          null
+        );
+        const summaryPayload = {
+          totalSold,
+          totalRevenue,
+          totalTransactions,
+          totalVoids,
+          avgPerTransaction,
+          bestSeller,
+        };
+        setAnalyticsState(summaryPayload);
+        const store = getAnalyticsStore();
+        if (store) {
+          store[currentUserKey] = summaryPayload;
+        }
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("dashboard-profile-analytics-update", {
+              detail: { userId: currentUserKey, summary: summaryPayload },
             })
-            .filter(Boolean);
-          const totalTransactions = mapped.length;
-          const totalRevenue = mapped.reduce(
-            (sum, tx) => sum + Number(tx.total || 0),
-            0
           );
-          const totalSold = mapped.reduce((sum, tx) => {
-            const items = Array.isArray(tx.items) ? tx.items : [];
-            return (
-              sum +
-              items.reduce(
-                (acc, item) => acc + Number(item?.quantity || item?.qty || 0),
-                0
-              )
-            );
-          }, 0);
-          const totalVoids = mapped.filter((tx) => tx.voided).length;
-          const avgPerTransaction = totalTransactions
-            ? totalRevenue / totalTransactions
-            : 0;
-          const itemTotals = new Map();
-          mapped.forEach((tx) => {
-            (tx.items || []).forEach((item) => {
-              if (!item) return;
-              const key = item.name || item.productId || item.id;
-              if (!key) return;
-              const current = itemTotals.get(key) || {
-                name: item.name || String(key),
-                qty: 0,
-              };
-              current.qty += Number(item.quantity || item.qty || 0);
-              itemTotals.set(key, current);
-            });
-          });
-          const bestSeller = Array.from(itemTotals.values()).reduce(
-            (best, entry) => (entry.qty > (best?.qty || 0) ? entry : best),
-            null
-          );
-          setAnalyticsState({
-            totalSold,
-            totalRevenue,
-            totalTransactions,
-            totalVoids,
-            avgPerTransaction,
-            bestSeller,
-          });
         }
       } catch (err) {
         console.warn("Admin header notification fetch failed:", err);
@@ -445,6 +733,8 @@ const normalizeSex = (val) => {
     profileAnalytics,
     buildStockNotifications,
     buildOrderNotifications,
+    currentUserId,
+    currentUserKey,
   ]);
 
   const analytics = useMemo(() => {
@@ -463,13 +753,21 @@ const normalizeSex = (val) => {
   const schoolId =
     currentUser?.schoolId || currentUser?.employeeId || currentUser?.username || "";
 
-  const bellNotifications = useMemo(
-    () =>
-      Array.isArray(displayNotifications)
-        ? displayNotifications.slice(0, 8)
-        : [],
-    [displayNotifications]
+  const recentRestocks = useMemo(
+    () => (restockNotificationsRef.current || []).slice(0, 3),
+    [restockVersion]
   );
+
+  const restockSignature = useMemo(() => {
+    if (!recentRestocks.length) return "";
+    return recentRestocks.map((entry) => entry.id).join("::");
+  }, [recentRestocks]);
+
+  const bellNotifications = useMemo(() => {
+    const restocks = restockNotificationsRef.current || [];
+    const merged = mergeNotificationLists(restocks, displayNotifications || []);
+    return normalizeNotifications(merged).slice(0, 8);
+  }, [displayNotifications, restockVersion]);
 
   const stockNotifications = useMemo(
     () => buildStockNotifications(),
@@ -482,13 +780,9 @@ const normalizeSex = (val) => {
     }
     return stockNotifications.reduce(
       (acc, notif) => {
-        const text = (notif?.text || "").toLowerCase();
-        const severity =
-          notif?.severity === "out" || text.includes("out of stock")
-            ? "out"
-            : "low";
+        const severity = String(notif?.severity || "").toLowerCase();
         if (severity === "out") acc.out += 1;
-        else acc.low += 1;
+        else if (severity === "low") acc.low += 1;
         return acc;
       },
       { low: 0, out: 0 }
@@ -501,6 +795,8 @@ const normalizeSex = (val) => {
     }
     const uniqueTargets = new Set();
     stockNotifications.forEach((notif) => {
+      const severity = String(notif?.severity || "").toLowerCase();
+      if (severity && severity !== "low" && severity !== "out") return;
       const identifier =
         notif?.itemId ??
         notif?.stockId ??
@@ -519,22 +815,35 @@ const normalizeSex = (val) => {
     return Array.from(uniqueTargets).sort().join("::");
   }, [stockNotifications]);
 
-  const hasStockAlert = stockAlertCounts.low > 0 || stockAlertCounts.out > 0;
+  const hasRestockAlert = recentRestocks.length > 0;
+  const hasStockAlert =
+    stockAlertCounts.low > 0 || stockAlertCounts.out > 0 || hasRestockAlert;
 
   useEffect(() => {
-    if (!enableStockAlerts || !hasStockAlert || !stockAlertSignature) {
+    if (!enableStockAlerts) {
       setShowStockAlert(false);
       return;
     }
     if (!stockAlertStateLoaded) return;
-    if (stockAlertSignature !== lastSeenStockSignature) {
+    if (!hasStockAlert) {
+      setShowStockAlert(false);
+      return;
+    }
+    const lowOutChanged =
+      stockAlertSignature &&
+      stockAlertSignature !== lastSeenStockSignature;
+    const restockChanged =
+      restockSignature && restockSignature !== lastRestockSignature;
+    if (lowOutChanged || restockChanged) {
       setShowStockAlert(true);
     }
   }, [
-    hasStockAlert,
     enableStockAlerts,
+    hasStockAlert,
     stockAlertSignature,
     lastSeenStockSignature,
+    restockSignature,
+    lastRestockSignature,
     stockAlertStateLoaded,
   ]);
 
@@ -563,8 +872,9 @@ const normalizeSex = (val) => {
       return 0;
     }
     return displayNotifications.reduce((count, notif) => {
-      if (!notif?.id) return count + 1;
-      return readIds.has(notif.id) ? count : count + 1;
+      const key = notificationKey(notif);
+      if (!key) return count + 1;
+      return readIds.has(key) ? count : count + 1;
     }, 0);
   }, [displayNotifications, readIds]);
 
@@ -589,9 +899,15 @@ const normalizeSex = (val) => {
 
   const markStockAlertAsHandled = useCallback(() => {
     setShowStockAlert(false);
-    if (!stockAlertSignature) return;
-    persistStockAlertSignature(stockAlertSignature);
-  }, [stockAlertSignature, persistStockAlertSignature]);
+    if (stockAlertSignature) {
+      persistStockAlertSignature(stockAlertSignature);
+    } else {
+      persistStockAlertSignature("");
+    }
+    if (restockSignature) {
+      setLastRestockSignature(restockSignature);
+    }
+  }, [stockAlertSignature, restockSignature, persistStockAlertSignature]);
 
   const handleStockAlertView = useCallback(() => {
     markStockAlertAsHandled();
@@ -661,15 +977,21 @@ const normalizeSex = (val) => {
   );
 
   const handleBellNotificationClick = useCallback(
-    (notif) => {
+    async (notif) => {
       if (!notif) return;
-      if (notif.id) {
+      const key = notificationKey(notif);
+      if (key) {
         setReadIds((prev) => {
-          if (prev.has(notif.id)) return prev;
+          if (prev.has(key)) return prev;
           const next = new Set(prev);
-          next.add(notif.id);
+          next.add(key);
           return next;
         });
+        try {
+          await markNotificationsRead([key]);
+        } catch (err) {
+          console.warn("Failed to mark notification read:", err);
+        }
       }
       if (typeof window !== "undefined") {
         if (notif.type === "stock") {
@@ -697,7 +1019,7 @@ const normalizeSex = (val) => {
             </div>
           </div>
 
-          <div className="space-y-2 text-sm text-gray-700">
+          <div className="space-y-3 text-sm text-gray-700">
             {stockAlertCounts.out > 0 && (
               <p className="font-semibold text-red-700">
                 {stockAlertCounts.out} item
@@ -709,6 +1031,19 @@ const normalizeSex = (val) => {
                 {stockAlertCounts.low} item
                 {stockAlertCounts.low > 1 ? "s are" : " is"} running low.
               </p>
+            )}
+            {recentRestocks.length > 0 && (
+              <div className="text-left text-green-700">
+                <p className="text-xs uppercase font-semibold">Recent Restocks</p>
+                <ul className="mt-1 space-y-1">
+                  {recentRestocks.map((entry) => (
+                    <li key={entry.id} className="flex items-start gap-2">
+                      <span className="text-green-600">•</span>
+                      <span>{entry.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
             <p className="text-xs text-gray-500">
               Check the Notifications panel for details.
@@ -806,6 +1141,25 @@ const normalizeSex = (val) => {
     );
   };
 
+  const handleMarkAllRead = useCallback(async () => {
+    const unreadKeys = displayNotifications
+      .map((notif) => notificationKey(notif))
+      .filter((key) => key && !readIds.has(key));
+    if (!unreadKeys.length) return;
+
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      unreadKeys.forEach((key) => next.add(key));
+      return next;
+    });
+
+    try {
+      await markNotificationsRead(unreadKeys);
+    } catch (err) {
+      console.warn("Failed to mark notifications read:", err);
+    }
+  }, [displayNotifications, readIds]);
+
   return (
     <>
       <div className="flex items-center space-x-4 relative z-50">
@@ -823,7 +1177,18 @@ const normalizeSex = (val) => {
           </button>
           {notifOpen && (
             <div className="absolute right-0 top-10 w-64 bg-white border rounded shadow-lg z-50 text-gray-800">
-              <div className="p-3 border-b font-semibold">Notifications</div>
+              <div className="p-3 border-b flex items-center justify-between">
+                <span className="font-semibold">Notifications</span>
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllRead}
+                    className="text-[11px] text-blue-600 hover:text-blue-800"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
               <div className="max-h-64 overflow-y-auto no-scrollbar">
                 {bellNotifications.length === 0 ? (
                   <p className="p-4 text-sm text-gray-400">
@@ -837,10 +1202,12 @@ const normalizeSex = (val) => {
                       ) : (
                         <FaCube className="text-orange-500" />
                       );
-                    const isRead = notif.id ? readIds.has(notif.id) : false;
+                    const key = notificationKey(notif);
+                    const listKey = key || `${idx}`;
+                    const isRead = key ? readIds.has(key) : false;
                     return (
                       <div
-                        key={`${notif.id || notif.text}-${idx}`}
+                        key={listKey}
                         role="button"
                         tabIndex={0}
                         onClick={() => handleBellNotificationClick(notif)}
@@ -868,26 +1235,26 @@ const normalizeSex = (val) => {
           )}
         </div>
 
-      <div className="relative">
-        <button
-          ref={dropdownBtnRef}
-          onClick={() => setDropdownOpen((prev) => !prev)}
-          className="flex items-center space-x-3 cursor-pointer select-none"
-        >
-          <img
-            src={avatarSrc}
-            alt="Admin Avatar"
-            loading="lazy"
-            decoding="async"
-            className={`w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm ${
-              avatarLoading ? "animate-pulse" : ""
-            }`}
-          />
-          <div className="hidden md:block leading-tight text-current">
-            <div className="text-sm font-semibold">{adminName}</div>
-            <div className="text-xs opacity-80">Administrator</div>
-          </div>
-        </button>
+        <div className="relative">
+          <button
+            ref={dropdownBtnRef}
+            onClick={() => setDropdownOpen((prev) => !prev)}
+            className="flex items-center space-x-3 cursor-pointer select-none"
+          >
+            <img
+              src={avatarSrc}
+              alt="Admin Avatar"
+              loading="lazy"
+              decoding="async"
+              className={`w-10 h-10 rounded-full object-cover border-2 border-gray-300 shadow-sm ${
+                avatarLoading ? "animate-pulse" : ""
+              }`}
+            />
+            <div className="hidden md:block leading-tight text-current">
+              <div className="text-sm font-semibold">{adminName}</div>
+              <div className="text-xs opacity-80">Administrator</div>
+            </div>
+          </button>
 
           {dropdownOpen && (
             <div

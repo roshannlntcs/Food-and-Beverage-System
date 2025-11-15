@@ -5,7 +5,7 @@ import Sidebar from "../../components/Sidebar";
 import AdminInfoDashboard2 from "../../components/AdminInfoDashboard2";
 import Pagination from "../../components/Pagination";
 import ShowEntries from "../../components/ShowEntries";
-import { FaSearch, FaTimes } from "react-icons/fa";
+import { FaSearch } from "react-icons/fa";
 import { fetchOrders } from "../../api/orders";
 import { mapOrderToTx } from "../../utils/mapOrder";
 import ReceiptModal from "../../components/modals/ReceiptModal";
@@ -16,7 +16,8 @@ export default function POSMonitoring() {
   const [rows, setRows] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDate, setFilterDate] = useState("");
-  const [userQuery, setUserQuery] = useState("");
+  const [cashierFilter, setCashierFilter] = useState("");
+  const [methodFilter, setMethodFilter] = useState("");
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -65,23 +66,42 @@ const formatDateTime = (value) => {
     };
   }, []);
 
-  const userOptions = useMemo(() => {
-    const seen = new Set();
+  const cashierOptions = useMemo(() => {
+    const seen = new Map();
     rows.forEach((tx) => {
-      const name = String(tx?.cashier || "").trim();
-      if (name) {
-        seen.add(name);
-      }
+      const id =
+        tx.cashierId != null
+          ? String(tx.cashierId)
+          : String(tx.cashier || "").trim();
+      if (!id) return;
+      if (seen.has(id)) return;
+      seen.set(id, tx.cashier || `Cashier ${id}`);
     });
-    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+    return Array.from(seen.entries()).map(([id, label]) => ({ id, label }));
+  }, [rows]);
+
+  const paymentOptions = useMemo(() => {
+    const set = new Set();
+    rows.forEach((tx) => {
+      const method = String(tx?.method || "").toUpperCase();
+      if (method) set.add(method);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
   const filteredData = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const userFilter = userQuery.trim().toLowerCase();
     return rows.filter((t) => {
       const idMatch = String(t.transactionID || "").toLowerCase().includes(q);
-      const cashierMatch = !userFilter || String(t.cashier || "").toLowerCase().includes(userFilter);
+      const normalizedCashier =
+        t.cashierId != null
+          ? String(t.cashierId)
+          : String(t.cashier || "").trim();
+      const cashierMatch =
+        !cashierFilter || normalizedCashier === cashierFilter;
+      const methodMatch =
+        !methodFilter ||
+        String(t.method || "").toUpperCase() === methodFilter;
       const createdStamp = t.createdAt || t.date || null;
       const dateObj = createdStamp ? new Date(createdStamp) : null;
       const dayKey =
@@ -89,9 +109,17 @@ const formatDateTime = (value) => {
           ? dateObj.toISOString().split("T")[0]
           : "";
       const dateMatch = !filterDate || dayKey === filterDate;
-      return idMatch && cashierMatch && dateMatch;
+      return idMatch && cashierMatch && dateMatch && methodMatch;
     });
-  }, [rows, searchQuery, filterDate, userQuery]);
+  }, [rows, searchQuery, filterDate, cashierFilter, methodFilter]);
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setFilterDate("");
+    setCashierFilter("");
+    setMethodFilter("");
+    setCurrentPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / entriesPerPage) || 1);
   const safePage = Math.min(currentPage, totalPages);
@@ -155,7 +183,7 @@ const formatDateTime = (value) => {
         <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center border rounded-md px-4 py-2 w-80 bg-white">
+              <div className="flex items-center border rounded-md px-4 py-2 w-72 bg-white">
                 <FaSearch className="text-gray-500 mr-2" />
                 <input
                   type="text"
@@ -169,33 +197,37 @@ const formatDateTime = (value) => {
                 />
               </div>
 
-              <div className="flex items-center border rounded-md px-4 py-2 w-72 bg-white">
-                <FaSearch className="text-gray-500 mr-2" />
-                <input
-                  type="text"
-                  list="pos-monitoring-cashiers"
-                  placeholder="Filter by cashier"
-                  className="outline-none w-full text-sm"
-                  value={userQuery}
-                  onChange={(e) => {
-                    setUserQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-                {userQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserQuery("");
-                      setCurrentPage(1);
-                    }}
-                    className="ml-2 flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    <FaTimes />
-                    Clear
-                  </button>
-                )}
-              </div>
+              <select
+                value={cashierFilter}
+                onChange={(e) => {
+                  setCashierFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="border rounded-md px-3 py-2 text-sm bg-white min-w-[180px]"
+              >
+                <option value="">All cashiers</option>
+                {cashierOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={methodFilter}
+                onChange={(e) => {
+                  setMethodFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="border rounded-md px-3 py-2 text-sm bg-white min-w-[160px]"
+              >
+                <option value="">All methods</option>
+                {paymentOptions.map((method) => (
+                  <option key={method} value={method}>
+                    {method.charAt(0) + method.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
 
               <input
                 type="date"
@@ -206,22 +238,19 @@ const formatDateTime = (value) => {
                   setCurrentPage(1);
                 }}
               />
+
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="px-4 py-2 text-sm font-semibold rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
+              >
+                Reset Filters
+              </button>
             </div>
-            <ShowEntries
-              entriesPerPage={entriesPerPage}
-              setEntriesPerPage={setEntriesPerPage}
-              setCurrentPage={setCurrentPage}
-            />
           </div>
 
-          <datalist id="pos-monitoring-cashiers">
-            {userOptions.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-
           <div className="flex-none bg-white rounded-xl shadow overflow-hidden">
-            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+            <div className="overflow-y-auto no-scrollbar max-h-[73vh]">
               <table className="w-full text-sm">
                 <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                   <tr>
@@ -285,7 +314,12 @@ const formatDateTime = (value) => {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <ShowEntries
+              entriesPerPage={entriesPerPage}
+              setEntriesPerPage={setEntriesPerPage}
+              setCurrentPage={setCurrentPage}
+            />
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

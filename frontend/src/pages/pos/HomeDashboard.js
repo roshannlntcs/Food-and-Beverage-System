@@ -14,6 +14,11 @@ import { fetchOrders } from "../../api/orders";
 import { fetchUsers } from "../../api/users";
 import { mapOrderToTx } from "../../utils/mapOrder";
 import {
+  getRestockStore,
+  mergeNotificationLists,
+  notificationListSignature,
+} from "../../utils/notificationHelpers";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -26,6 +31,7 @@ import {
   LabelList,
 } from "recharts";
 import { Package, ShoppingCart, User, ChevronDown } from "lucide-react";
+import defaultAvatar from "../../assets/avatar-ph.png";
 
 const DEFAULT_LOW_THRESHOLD = 10;
 const DEFAULT_MAX_QUANTITY = 100;
@@ -96,6 +102,7 @@ const normalizeSex = (val) => {
 
   const { inventory: inventoryFromCtx = [] } = useInventory() || {};
   const { currentUser } = useAuth() || {};
+  const currentUserId = currentUser?.id ? String(currentUser.id) : "";
   const currentUserName = currentUser?.fullName || "Admin";
 
   const categories = useMemo(() => {
@@ -162,6 +169,9 @@ const normalizeSex = (val) => {
   const highlightTimeoutRef = useRef(null);
   const [highlightedStockId, setHighlightedStockId] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [restockSignature, setRestockSignature] = useState(() =>
+    notificationListSignature(getRestockStore() || [])
+  );
 
   const appliedFromDate = useMemo(
     () => makeInclusiveDate(appliedFrom),
@@ -235,6 +245,16 @@ const normalizeSex = (val) => {
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const handler = () => {
+      const store = getRestockStore() || [];
+      setRestockSignature(notificationListSignature(store));
+    };
+    window.addEventListener("dashboard-notifications-update", handler);
+    return () => window.removeEventListener("dashboard-notifications-update", handler);
   }, []);
 
   const resolveInventoryItem = useCallback(
@@ -470,13 +490,21 @@ const normalizeSex = (val) => {
     return entries;
   }, [users]);
 
+  const transactionsForProfile = useMemo(() => {
+    if (!currentUserId) return transactionsWithinDates;
+    return transactionsWithinDates.filter((tx) => {
+      if (!tx?.cashierId) return false;
+      return String(tx.cashierId) === currentUserId;
+    });
+  }, [transactionsWithinDates, currentUserId]);
+
   const profileAnalytics = useMemo(() => {
-    const totalTransactions = transactionsWithinDates.length;
-    const totalRevenue = transactionsWithinDates.reduce(
+    const totalTransactions = transactionsForProfile.length;
+    const totalRevenue = transactionsForProfile.reduce(
       (sum, tx) => sum + Number(tx.total || 0),
       0
     );
-    const totalSold = transactionsWithinDates.reduce((sum, tx) => {
+    const totalSold = transactionsForProfile.reduce((sum, tx) => {
       const items = Array.isArray(tx.items) ? tx.items : [];
       return (
         sum +
@@ -486,13 +514,13 @@ const normalizeSex = (val) => {
         )
       );
     }, 0);
-    const totalVoids = transactionsWithinDates.filter((tx) => tx.voided).length;
+    const totalVoids = transactionsForProfile.filter((tx) => tx.voided).length;
     const avgPerTransaction = totalTransactions
       ? totalRevenue / totalTransactions
       : 0;
 
     const bestSellerMap = new Map();
-    transactionsWithinDates.forEach((tx) => {
+    transactionsForProfile.forEach((tx) => {
       (tx.items || []).forEach((item) => {
         const invItem = resolveInventoryItem(item);
         const key = invItem?.name || item.name || item.productId || item.id;
@@ -518,12 +546,15 @@ const normalizeSex = (val) => {
       avgPerTransaction,
       bestSeller,
     };
-  }, [transactionsWithinDates, resolveInventoryItem]);
+  }, [transactionsForProfile, resolveInventoryItem]);
 
   const notifications = useMemo(() => {
     const previousQuantities = stockQuantityRef.current || new Map();
     const nextQuantities = new Map();
     const stockNotifs = [];
+
+    const stockIdFor = (variant, key, stamp) =>
+      `${variant}|${key || "stock"}|${stamp || ""}`;
 
     (inventoryFromCtx || []).forEach((item) => {
       if (!item) return;
@@ -559,6 +590,7 @@ const normalizeSex = (val) => {
           text: `Out of stock: ${item.name}`,
           timestamp,
           time: formatTimestamp(timestamp),
+          id: stockIdFor("out", key, timestamp),
           ...stockMeta,
         });
       } else if (qty <= threshold) {
@@ -568,6 +600,7 @@ const normalizeSex = (val) => {
           text: `Low stock: ${item.name} (${qty} left)`,
           timestamp,
           time: formatTimestamp(timestamp),
+          id: stockIdFor("low", key, timestamp),
           ...stockMeta,
         });
       }
@@ -587,6 +620,7 @@ const normalizeSex = (val) => {
               : `Stock updated: ${item.name}`,
           timestamp,
           time: formatTimestamp(timestamp),
+          id: stockIdFor("restock", key, timestamp),
           ...stockMeta,
           delta,
         });
@@ -594,6 +628,40 @@ const normalizeSex = (val) => {
       nextQuantities.set(key, qty);
     });
     stockQuantityRef.current = nextQuantities;
+
+    stockQuantityRef.current = nextQuantities;
+
+    nextQuantities.forEach((entry, stockKey) => {
+      if (entry.status === "out" && entry.statusTimestamp) {
+        stockNotifs.push({
+          type: "stock",
+          variant: "out",
+          text: `Out of stock: ${entry.name}`,
+          timestamp: entry.statusTimestamp,
+          time: formatTimestamp(entry.statusTimestamp),
+          id: stockIdFor("out", stockKey, entry.statusTimestamp),
+          stockId: stockKey,
+          stockName: entry.name,
+          stockCategory: entry.category,
+          currentQty: entry.qty,
+          threshold: entry.threshold,
+        });
+      } else if (entry.status === "low" && entry.statusTimestamp) {
+        stockNotifs.push({
+          type: "stock",
+          variant: "low",
+          text: `Low stock: ${entry.name} (${entry.qty} left)`,
+          timestamp: entry.statusTimestamp,
+          time: formatTimestamp(entry.statusTimestamp),
+          id: stockIdFor("low", stockKey, entry.statusTimestamp),
+          stockId: stockKey,
+          stockName: entry.name,
+          stockCategory: entry.category,
+          currentQty: entry.qty,
+          threshold: entry.threshold,
+        });
+      }
+    });
 
     const transactionNotifs = transactionsWithinDates
       .slice(0, 50)
@@ -629,12 +697,14 @@ const normalizeSex = (val) => {
             ...base,
             variant: "voided",
             text: `Transaction ${label} voided`,
+            id: `${base.transactionId || label}:voided:${iso}`,
           });
         } else if (status.includes("cancel")) {
           entries.push({
             ...base,
             variant: "cancelled",
             text: `Transaction ${label} cancelled`,
+            id: `${base.transactionId || label}:cancelled:${iso}`,
           });
         } else {
           entries.push({
@@ -643,6 +713,7 @@ const normalizeSex = (val) => {
             text: `Transaction ${label} completed - ${formatCurrency(
               tx.total || 0
             )}`,
+            id: `${base.transactionId || label}:completed:${iso}`,
           });
         }
 
@@ -651,19 +722,26 @@ const normalizeSex = (val) => {
             ...base,
             variant: "voided-items",
             text: `Item(s) voided in transaction ${label}`,
+            id: `${base.transactionId || label}:voided-items:${iso}`,
           });
         }
         return entries;
       });
 
-    return [...stockNotifs, ...transactionNotifs]
+    const restockStore = getRestockStore() || [];
+    const combined = mergeNotificationLists(restockStore, [
+      ...stockNotifs,
+      ...transactionNotifs,
+    ]);
+
+    return combined
       .sort(
         (a, b) =>
           new Date(b.timestamp || 0).getTime() -
           new Date(a.timestamp || 0).getTime()
       )
       .slice(0, MAX_DASHBOARD_NOTIFICATIONS);
-  }, [inventoryFromCtx, transactionsWithinDates]);
+  }, [inventoryFromCtx, transactionsWithinDates, restockSignature]);
 
   const stockNotificationList = useMemo(
     () =>
@@ -742,21 +820,25 @@ const normalizeSex = (val) => {
   }, [handleNotificationClick]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.__dashboardNotifications = notifications;
-      window.dispatchEvent(
-        new CustomEvent("dashboard-notifications-update", {
-          detail: notifications,
-        })
-      );
-      window.__dashboardProfileAnalytics = profileAnalytics;
-      window.dispatchEvent(
-        new CustomEvent("dashboard-profile-analytics-update", {
-          detail: profileAnalytics,
-        })
-      );
+    if (typeof window === "undefined") return;
+    const userKey =
+      currentUser?.id != null ? String(currentUser.id) : "__global__";
+    window.__dashboardNotifications = notifications;
+    window.dispatchEvent(
+      new CustomEvent("dashboard-notifications-update", {
+        detail: notifications,
+      })
+    );
+    if (!window.__dashboardProfileAnalyticsStore) {
+      window.__dashboardProfileAnalyticsStore = {};
     }
-  }, [notifications, profileAnalytics]);
+    window.__dashboardProfileAnalyticsStore[userKey] = profileAnalytics;
+    window.dispatchEvent(
+      new CustomEvent("dashboard-profile-analytics-update", {
+        detail: { userId: userKey, summary: profileAnalytics },
+      })
+    );
+  }, [notifications, profileAnalytics, currentUser?.id]);
   const handleApplyFilters = useCallback(() => {
     if (filterFrom && filterTo) {
       const from = new Date(filterFrom);
@@ -1311,39 +1393,46 @@ const normalizeSex = (val) => {
                     style={{ maxHeight: 79 }}
                   >
                     <div className="space-y-3 pb-1">
-                      {recentLoginEntries.map((entry) => (
-                        <div key={entry.id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {entry.avatar ? (
-                             <div className="h-9 w-9 rounded-full overflow-hidden bg-white ring-1 ring-gray-200 flex items-center justify-center">
-  <img src={entry.avatar} alt={entry.name} className="h-8 w-8 object-contain" />
-</div>
-
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-600 border border-gray-200">
-                                {(entry.name || "U")
-                                  .split(" ")
-                                  .filter(Boolean)
-                                  .slice(0, 2)
-                                  .map((part) => part.charAt(0).toUpperCase())
-                                  .join("")}
+                      {recentLoginEntries.map((entry) => {
+                        const avatarSrc = entry.avatar || defaultAvatar;
+                        const initials = (entry.name || "U")
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part.charAt(0).toUpperCase())
+                          .join("");
+                        return (
+                          <div key={entry.id} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1">
+                              {avatarSrc ? (
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-white ring-1 ring-gray-200">
+                                  <img
+                                    src={avatarSrc}
+                                    alt={entry.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-600 border border-gray-200">
+                                  {initials}
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-medium leading-tight text-gray-900">
+                                  {entry.name}
+                                </p>
+                                <p className="text-gray-500 text-sm leading-tight">
+                                  {entry.username || entry.date.toLocaleDateString()}
+                                </p>
                               </div>
-                            )}
-                            <div>
-                              <p className="font-medium leading-tight text-gray-900">
-                                {entry.name}
-                              </p>
-                              <p className="text-gray-500 text-sm leading-tight">
-                                {entry.username || entry.date.toLocaleDateString()}
-                              </p>
+                            </div>
+                            <div className="text-right text-gray-400 text-xs leading-tight">
+                              <div>{entry.relativeLabel}</div>
+                              <div>{entry.timeLabel}</div>
                             </div>
                           </div>
-                          <div className="text-right text-gray-400 text-xs leading-tight">
-                            <div>{entry.relativeLabel}</div>
-                            <div>{entry.timeLabel}</div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (

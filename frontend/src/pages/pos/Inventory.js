@@ -6,7 +6,6 @@ import AdminInfoDashboard2 from '../../components/AdminInfoDashboard2';
 import AddItemModal from '../../components/modals/add-item-modal';
 import EditItemModal from '../../components/modals/edit-item-modal';
 import LogsModal from '../../components/modals/logs-modal';
-import CategoryFilterModal from '../../components/modals/category-filter-modal';
 import ItemSaveSuccessModal from '../../components/modals/ItemSaveSuccessModal';
 import ValidationErrorModal from '../../components/modals/ValidationErrorModal';
 import ManageCategoryModal from '../../components/modals/ManageCategoryModal';
@@ -138,7 +137,6 @@ export default function Inventory() {
   const [filterDate, setFilterDate] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
-  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isEditSuccess, setIsEditSuccess] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -146,6 +144,12 @@ export default function Inventory() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [showManageCategories, setShowManageCategories] = useState(false);
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setSelectedStatus('');
+    setCurrentPage(1);
+  };
   const [itemToDelete, setItemToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -412,48 +416,59 @@ export default function Inventory() {
         </div>
 
         <div className="flex flex-col gap-4 flex-1 min-h-0 px-6 pb-6 overflow-hidden">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center border rounded-md px-4 py-2 w-96 bg-white">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center border rounded-md px-4 py-2 w-72 bg-white">
                 <input
                   type="text"
                   placeholder="Search"
                   className="outline-none w-full text-sm"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
                 />
                 <FaSearch className="text-gray-500 text-sm" />
               </div>
 
-              {selectedCategory && (
-                <div className="text-sm text-gray-700 flex items-center">
-                  Filter: <span className="font-semibold ml-1">{selectedCategory}</span>
-                  <button
-                    onClick={() => setSelectedCategory('')}
-                    className="ml-2 text-blue-600 hover:underline"
-                  >
-                    Clear
-                  </button>
-                </div>
-              )}
-
-              <button
-                onClick={() => setShowCategoryFilter(true)}
-                className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-100"
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white min-w-[180px]"
               >
-                Filter Category
-              </button>
+                <option value="">All Categories</option>
+                {mergedCategoryKeys.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
 
               <select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white"
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-1 border border-gray-300 rounded-md text-sm bg-white min-w-[160px]"
               >
                 <option value="">All Statuses</option>
                 <option value="Available">Available</option>
                 <option value="Low Stock">Low Stock</option>
                 <option value="Unavailable">Unavailable</option>
               </select>
+
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="px-4 py-1 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+              >
+                Reset Filters
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -477,7 +492,7 @@ export default function Inventory() {
           </div>
 
           <div className="flex-none border rounded-md overflow-hidden">
-            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+            <div className="overflow-y-auto no-scrollbar max-h-[73vh]">
               <table className="w-full table-auto border-collapse text-sm">
               <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left">
@@ -598,15 +613,6 @@ export default function Inventory() {
             onClose={() => setShowEditModal(false)}
             onSave={handleEditItem}
             deriveStatus={deriveStatusFromQuantity}
-          />
-        )}
-
-        {showCategoryFilter && (
-          <CategoryFilterModal
-            selectedCategory={selectedCategory}
-            uniqueCategories={mergedCategoryKeys}
-            onSelect={(cat) => { setSelectedCategory(cat === 'All' ? '' : cat); setShowCategoryFilter(false); }}
-            onClose={() => setShowCategoryFilter(false)}
           />
         )}
 

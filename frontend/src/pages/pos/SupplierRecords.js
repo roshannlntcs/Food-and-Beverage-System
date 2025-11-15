@@ -426,7 +426,7 @@ const SupplierRecords = () => {
           )}
 
           <div className="flex-none bg-white shadow rounded-lg overflow-hidden">
-            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+            <div className="overflow-y-auto no-scrollbar max-h-[73vh]">
               <table className="table-auto w-full text-sm">
                 <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr>

@@ -73,6 +73,7 @@ model User {
   inventoryLogs     InventoryLog[]
   supplierLogs      SupplierLog[]
   stockAlertState   StockAlertState?
+  notificationReads NotificationRead[]
 }
 
 model Category {
@@ -246,4 +247,14 @@ model StockAlertState {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationRead {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationKey String
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, notificationKey])
 }

@@ -1,6 +1,12 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom";
-import { FaCheckCircle } from "react-icons/fa";
+import {
+  FaCheckCircle,
+  FaExchangeAlt,
+  FaKey,
+  FaSignOutAlt,
+  FaTimes,
+} from "react-icons/fa";
 import images from "../../utils/images";
 import ChangePasswordModal from "./ChangePasswordModal"; // Import the new modal
 
@@ -96,10 +102,10 @@ export default function ProfileModal({
   return ReactDOM.createPortal(
     <>
       <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[50] text-gray-900">
-        <div className="bg-white rounded-2xl shadow-xl p-6 w-[460px] border border-[#800000]">
+        <div className="bg-white rounded-2xl shadow-xl p-6 w-[460px] min-h-[80vh] max-h-[95vh] border border-[#800000] flex flex-col gap-4">
           {/* Profile Section */}
-          <div className="text-center mb-6">
-            <div className="relative w-28 h-28 mx-auto mb-4">
+          <div className="text-center space-y-1">
+            <div className="relative w-28 h-28 mx-auto">
               <img
                 src={displayAvatar}
                 alt="Avatar"
@@ -120,7 +126,7 @@ export default function ProfileModal({
           </div>
 
           {/* Analytics Section */}
-          <div className="bg-gray-50 rounded-lg p-5 mb-6">
+          <div className="bg-gray-50 rounded-lg p-4 ">
             <h3 className="text-lg font-semibold text-center mb-4">Today's Overview</h3>
             <div className="grid grid-cols-2 gap-4 text-center text-gray-900">
               <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -160,39 +166,39 @@ export default function ProfileModal({
           </div>
 
           {/* Actions */}
-          <div className="flex justify-between gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 bg-gray-200 py-2 rounded-lg font-semibold hover:bg-gray-300"
-            >
-              Close
-            </button>
-            <button
+          <div className="mt-1 flex w-full items-center justify-center gap-4">
+            <ProfileActionButton
+              label="Change Password"
+              icon={<FaKey />}
+              accent="text-white bg-blue-500 border-blue-500 hover:bg-blue-600 focus:ring-blue-500"
               onClick={() => setShowChangePassword(true)}
-              className="flex-1 bg-blue-500 text-white py-2 rounded-lg font-semibold hover:bg-blue-600"
-            >
-              Change Password
-            </button>
-            <button
+            />
+            <ProfileActionButton
+              label="Switch Role"
+              icon={<FaExchangeAlt />}
+              accent="text-gray-900 bg-yellow-400 border-yellow-400 hover:bg-yellow-500 focus:ring-yellow-500"
               onClick={() => {
                 if (typeof onSwitchRole === "function") {
                   onSwitchRole();
                 }
               }}
-              className="flex-1 bg-yellow-400 py-2 rounded-lg font-semibold border border-yellow-500 hover:bg-yellow-500"
-            >
-              Switch Role
-            </button>
-            <button
+            />
+            <ProfileActionButton
+              label="Sign Out"
+              icon={<FaSignOutAlt />}
+              accent="text-white bg-red-600 border-red-600 hover:bg-red-700 focus:ring-red-600"
               onClick={() => {
                 if (typeof onSignOut === "function") {
                   onSignOut();
                 }
               }}
-              className="flex-1 bg-red-800 text-white py-2 rounded-lg font-semibold hover:bg-red-900"
-            >
-              Sign Out
-            </button>
+            />
+            <ProfileActionButton
+              label="Close"
+              icon={<FaTimes />}
+              accent="text-gray-800 bg-gray-100 border-gray-300 hover:bg-gray-200 focus:ring-gray-400"
+              onClick={onClose}
+            />
           </div>
         </div>
       </div>
@@ -220,3 +226,15 @@ export default function ProfileModal({
     document.body
   );
 }
+
+const ProfileActionButton = ({ label, icon, onClick, accent }) => (
+  <button
+    type="button"
+    aria-label={label}
+    onClick={onClick}
+    className={`flex h-16 w-20 flex-col items-center justify-center rounded-lg border text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 ${accent}`}
+  >
+    <span className="text-lg">{icon}</span>
+    <span className="mt-1 leading-tight">{label}</span>
+  </button>
+);

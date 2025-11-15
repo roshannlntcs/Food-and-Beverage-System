@@ -42,6 +42,9 @@ import { useInventory } from "../../contexts/InventoryContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../components/ToastProvider";
 import resolveUserAvatar from "../../utils/avatarHelper";
+import { normalizeNotifications } from "../../utils/notificationHelpers";
+
+const DEFAULT_LOW_THRESHOLD = 10;
 
 // assets helper
 const importAll = (r) =>
@@ -144,6 +147,7 @@ export default function POSMain() {
   const [activeTab, setActiveTab] = useState("Menu");
   const [searchTerm, setSearchTerm] = useState("");
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [pendingOrderSuccess, setPendingOrderSuccess] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
@@ -283,6 +287,90 @@ export default function POSMain() {
       bestSeller,
     };
   }, [transactions, voidLogs]);
+
+  const pesoFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 2,
+      }),
+    []
+  );
+
+  const stockNotifications = useMemo(() => {
+    const parseStamp = (value) => {
+      if (!value) return null;
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    return (inventory || []).reduce((acc, item) => {
+      if (!item) return acc;
+      const currentQty = Number(item.quantity ?? 0);
+      const threshold =
+        Number(item.lowThreshold ?? DEFAULT_LOW_THRESHOLD) || DEFAULT_LOW_THRESHOLD;
+      if (currentQty > threshold && currentQty > 0) return acc;
+      const severity = currentQty <= 0 ? "out" : "low";
+      const baseStamp =
+        parseStamp(item.updatedAt) ||
+        parseStamp(item.updated_at) ||
+        parseStamp(item.lastUpdated) ||
+        parseStamp(item.createdAt);
+      const timestamp = baseStamp ? baseStamp.toISOString() : new Date().toISOString();
+      const stockKey =
+        item.id ||
+        item._id ||
+        item.uuid ||
+        item.productId ||
+        item.sku ||
+        item.code ||
+        item.name ||
+        "stock";
+      const notifId = ["stock", severity, stockKey].filter(Boolean).join("|");
+      acc.push({
+        type: "stock",
+        severity,
+        text:
+          severity === "out"
+            ? `Out of stock: ${item.name}`
+            : `Low stock: ${item.name} (${currentQty} left)`,
+        timestamp,
+        time: (baseStamp ? baseStamp.toLocaleString() : null) || new Date().toLocaleString(),
+        stockId: stockKey,
+        stockName: item.name || "Item",
+        currentQty,
+        threshold,
+        id: notifId,
+      });
+      return acc;
+    }, []);
+  }, [inventory]);
+
+  const orderNotifications = useMemo(() => {
+    return transactions.map((tx) => {
+      const iso = tx.createdAt || tx.date || new Date().toISOString();
+      return {
+        type: "order",
+        text: `Transaction ${tx.transactionID || tx.id || "Order"} - ${pesoFormatter.format(
+          tx.total || 0
+        )}`,
+        timestamp: iso,
+        time: new Date(iso).toLocaleString(),
+      };
+    });
+  }, [transactions, pesoFormatter]);
+
+  const dashboardNotifications = useMemo(() => {
+    return normalizeNotifications([...stockNotifications, ...orderNotifications]);
+  }, [stockNotifications, orderNotifications]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.__dashboardNotifications = dashboardNotifications;
+    window.dispatchEvent(
+      new CustomEvent("dashboard-notifications-update", { detail: dashboardNotifications })
+    );
+  }, [dashboardNotifications]);
 
   // Customer view refs & state
   const customerWinRef = React.useRef(null);
@@ -732,8 +820,9 @@ export default function POSMain() {
       };
       setLastPaymentInfo(paymentSummary);
       setSelectedTransaction(mappedTx);
+      setPendingOrderSuccess(true);
       setShowReceiptModal(true);
-      setShowOrderSuccess(true);
+      setShowOrderSuccess(false);
 
       setCart([]);
       setPaymentMethod('');
@@ -746,6 +835,12 @@ export default function POSMain() {
         payload: null,
         amount: 0,
       });
+      if (customerWinRef.current && !customerWinRef.current.closed) {
+        try {
+          customerWinRef.current.close();
+        } catch (_e) {}
+      }
+      setCustomerViewOpened(false);
 
       await refreshOrdersAndVoids();
     } catch (error) {
@@ -844,6 +939,15 @@ export default function POSMain() {
       setCustomerViewOpened(false);
     }
   }, [cart.length]);
+
+  const handleReceiptClose = useCallback(() => {
+    setShowReceiptModal(false);
+    setSelectedTransaction(null);
+    if (pendingOrderSuccess) {
+      setPendingOrderSuccess(false);
+      setShowOrderSuccess(true);
+    }
+  }, [pendingOrderSuccess]);
 
   // --- VOID FLOW (server-backed) ---
   const triggerVoid = useCallback(
@@ -1291,7 +1395,7 @@ export default function POSMain() {
       {showReceiptModal && selectedTransaction && (
         <ReceiptModal
           transaction={selectedTransaction}
-          onClose={() => { setShowReceiptModal(false); setSelectedTransaction(null); }}
+          onClose={handleReceiptClose}
           shopDetails={shopDetails}
         />
       )}
@@ -1412,7 +1516,10 @@ export default function POSMain() {
       <OrderSuccessModal
         show={showOrderSuccess}
         paymentSummary={lastPaymentInfo}
-        onClose={() => setShowOrderSuccess(false)}
+        onClose={() => {
+          setShowOrderSuccess(false);
+          setPendingOrderSuccess(false);
+        }}
         onPrintReceipt={() => {
           const tx = selectedTransaction || transactions[0];
           if (tx) { setSelectedTransaction(tx); setShowReceiptModal(true); } else { alert("No transaction available to print."); }

@@ -112,10 +112,23 @@ const SuperAdmin = () => {
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [entriesPerPage, setEntriesPerPage] = useState(8);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterSection, setFilterSection] = useState("All");
+  const [filterProgram, setFilterProgram] = useState("All");
+  const [filterSex, setFilterSex] = useState("All");
+  const [filterRole, setFilterRole] = useState("All");
+  const [filterLogin, setFilterLogin] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const handleResetFilters = () => {
+    setFilterSection("All");
+    setFilterProgram("All");
+    setFilterSex("All");
+    setFilterRole("All");
+    setFilterLogin("All");
+    setSearchTerm("");
+    setCurrentPage(1);
+  };
 
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -270,15 +283,67 @@ const SuperAdmin = () => {
     ).sort((a, b) => a.localeCompare(b));
   }, [users]);
 
+  const programs = useMemo(() => {
+    return Array.from(
+      new Set(
+        users
+          .map((user) => (user.program || "").trim())
+          .filter((program) => program)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+  const sexOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        users
+          .map((user) => (user.sex || "").trim())
+          .filter((sex) => sex)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+  const roleOptions = useMemo(() => {
+    const roles = new Set(
+      users
+        .map((user) => String(user.role || "").toUpperCase())
+        .filter((role) => role)
+    );
+    return Array.from(roles).sort((a, b) => {
+      const labelA = ROLE_LABEL[a] || a;
+      const labelB = ROLE_LABEL[b] || b;
+      return labelA.localeCompare(labelB);
+    });
+  }, [users]);
+
   const filteredUsers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     const section = filterSection.toLowerCase();
+    const program = filterProgram.toLowerCase();
+    const sex = filterSex.toLowerCase();
+    const role = filterRole.toUpperCase();
     return users.filter((user) => {
       const matchesSection =
         filterSection === "All" ||
         String(user.section || "")
           .toLowerCase()
           .includes(section);
+      const matchesProgram =
+        filterProgram === "All" ||
+        String(user.program || "")
+          .toLowerCase()
+          .includes(program);
+      const matchesSex =
+        filterSex === "All" ||
+        String(user.sex || "").toLowerCase() === sex;
+      const matchesRole =
+        filterRole === "All" ||
+        String(user.role || "").toUpperCase() === role;
+      const matchesLogin =
+        filterLogin === "All" ||
+        (filterLogin === "Logged"
+          ? Boolean(user.lastLogin)
+          : !user.lastLogin);
       const matchesSearch =
         !query ||
         String(user.fullName || "")
@@ -291,9 +356,24 @@ const SuperAdmin = () => {
           .toLowerCase()
           .includes(query);
 
-      return matchesSection && matchesSearch;
+      return (
+        matchesSection &&
+        matchesProgram &&
+        matchesSex &&
+        matchesRole &&
+        matchesLogin &&
+        matchesSearch
+      );
     });
-  }, [users, searchTerm, filterSection]);
+  }, [
+    users,
+    searchTerm,
+    filterSection,
+    filterProgram,
+    filterSex,
+    filterRole,
+    filterLogin,
+  ]);
 
   const totalPages = Math.max(
     1,
@@ -762,13 +842,13 @@ const SuperAdmin = () => {
           />
         </div>
 
-        <section className="flex flex-col bg-white rounded-lg shadow flex-none max-h-[65vh]">
+        <section className="flex flex-col bg-white rounded-lg shadow flex-1 min-h-0">
           <header className="flex items-center justify-between px-6 py-4 border-b">
             <h2 className="font-semibold flex items-center gap-2 text-base">
               <FaUsers /> Users
             </h2>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 justify-end">
               <input
                 type="text"
                 placeholder="Search by name, ID, or username..."
@@ -777,7 +857,7 @@ const SuperAdmin = () => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm min-w-[255px]"
               />
 
               <select
@@ -795,14 +875,84 @@ const SuperAdmin = () => {
                   </option>
                 ))}
               </select>
+
+              <select
+                className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-xs text-gray-700"
+                value={filterProgram}
+                onChange={(e) => {
+                  setFilterProgram(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="All">All Programs</option>
+                {programs.map((program) => (
+                  <option key={program} value={program}>
+                    {program}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-xs text-gray-700"
+                value={filterSex}
+                onChange={(e) => {
+                  setFilterSex(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="All">All Sexes</option>
+                {sexOptions.map((sex) => (
+                  <option key={sex} value={sex}>
+                    {sex}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-xs text-gray-700"
+                value={filterRole}
+                onChange={(e) => {
+                  setFilterRole(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="All">All Roles</option>
+                {roleOptions.map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABEL[role] || role}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-xs text-gray-700"
+                value={filterLogin}
+                onChange={(e) => {
+                  setFilterLogin(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="All">All Logins</option>
+                <option value="Logged">Has Logged In</option>
+                <option value="Never">Never Logged In</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-4 py-2 text-xs font-semibold border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+              >
+                Reset Filters
+              </button>
             </div>
           </header>
 
           <div className="flex-1 min-h-0 overflow-hidden">
-            <div className="overflow-y-auto no-scrollbar max-h-[65vh]">
+            <div className="h-full overflow-y-auto no-scrollbar">
               <table className="min-w-full border-collapse text-sm">
                 <thead className="bg-[#8B0000] text-white sticky top-0 z-10">
                 <tr className="text-left border-b">
+                  <th className="py-3 px-4 text-center w-14">No.</th>
                   <th className="py-3 px-4">School ID</th>
                   <th className="py-3 px-4">Username</th>
                   <th className="py-3 px-4">Name</th>
@@ -817,24 +967,28 @@ const SuperAdmin = () => {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={9} className="py-6 text-center text-gray-500">
+                    <td colSpan={10} className="py-6 text-center text-gray-500">
                       Loading...
                     </td>
                   </tr>
                 )}
                 {!loading && paginatedUsers.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-6 text-center text-gray-500">
+                    <td colSpan={10} className="py-6 text-center text-gray-500">
                       No users found.
                     </td>
                   </tr>
                 )}
                 {!loading &&
-                  paginatedUsers.map((user) => {
+                  paginatedUsers.map((user, idx) => {
                     const isSuperAdmin =
                       String(user.role || "").toUpperCase() === "SUPER_ADMIN";
+                    const rowNumber = startIndex + idx + 1;
                     return (
                       <tr key={user.id} className="border-b odd:bg-white even:bg-gray-50 hover:bg-[#f1f1f1]">
+                        <td className="py-3 px-4 text-center">
+                          {rowNumber}
+                        </td>
                         <td className="py-3 px-4">{user.schoolId || "N/A"}</td>
                         <td className="py-3 px-4">{user.username || "N/A"}</td>
                         <td className="py-3 px-4">{user.fullName || "N/A"}</td>
