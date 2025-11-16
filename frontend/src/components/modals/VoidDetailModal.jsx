@@ -59,7 +59,7 @@ export default function VoidDetailModal({ voidLog, onClose }) {
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto flex-1 space-y-4">
+        <div className="p-4 overflow-y-auto flex-1 space-y-4 no-scrollbar">
           {/* Metadata */}
           <div className="p-3 border rounded-lg bg-gray-50 hover:shadow-md transition-shadow duration-150 space-y-1">
             <div className="flex justify-between">

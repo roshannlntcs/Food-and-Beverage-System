@@ -223,12 +223,12 @@ export default function VoidReasonModal({
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-gray-500">Subtotal</span>
-                    <span className="font-medium">{formatMoney(displayTx.subtotal || 0)}</span>
+                    <span className="text-gray-500 text-center">Subtotal</span>
+                    <span className="font-medium text-center">{formatMoney(displayTx.subtotal || 0)}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-gray-500">Discount Type</span>
-                    <span className="font-medium">{discountTypeLabel || "-"}</span>
+                    <span className="text-gray-500 text-center">Discount Type</span>
+                    <span className="font-medium text-center">{discountTypeLabel || "-"}</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-gray-500">Cashier</span>
@@ -239,8 +239,8 @@ export default function VoidReasonModal({
                     <span className="font-medium">{formatMoney(displayTx.tax || 0)}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-gray-500">Discount %</span>
-                    <span className="font-medium">
+                    <span className="text-gray-500 text-center">Discount %</span>
+                    <span className="font-medium text-center">
                       {discountPct != null
                         ? `${discountPct}% ${
                             discountAmt
@@ -261,8 +261,8 @@ export default function VoidReasonModal({
                     <span className="font-medium">{formatMoney(displayTx.total || 0)}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-gray-500">Coupon</span>
-                    <span className="font-medium">{couponCode || "-"}</span>
+                    <span className="text-gray-500 text-center">Coupon</span>
+                    <span className="font-medium text-center">{couponCode || "-"}</span>
                   </div>
                 </div>
 

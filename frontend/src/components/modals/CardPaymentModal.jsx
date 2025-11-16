@@ -203,20 +203,6 @@ export default function CardPaymentModal({
                 Swipe
               </button>
             </div>
-            <button
-              onClick={() => {
-                cancelledRef.current = true;
-                if (timerRef.current) {
-                  clearTimeout(timerRef.current);
-                  timerRef.current = null;
-                }
-                onClose && onClose();
-              }}
-              className="text-gray-600"
-              aria-label="Close"
-            >
-              ✕
-            </button>
           </div>
         </div>
 

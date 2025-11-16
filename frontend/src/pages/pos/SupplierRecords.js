@@ -542,7 +542,7 @@ const SupplierRecords = () => {
 
         {showLogsModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] flex flex-col">
+              <div className="bg-white p-6 rounded shadow w-[90%] max-h-[90vh] flex flex-col border border-[#800000]">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                 <h2 className="text-xl font-bold">Supplier Logs</h2>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">

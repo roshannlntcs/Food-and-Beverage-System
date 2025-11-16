@@ -110,7 +110,7 @@ export default function EditItemModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md border border-[#800000]">
         <div className="bg-[#8B0000] text-white text-center py-2 rounded-t-lg text-lg font-semibold">
           Edit Item
         </div>

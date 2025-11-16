@@ -161,7 +161,6 @@ export default function CashPaymentModal({ isOpen, total = 0, onClose, onSuccess
               <div className="text-xs text-gray-700">Simulated cash flow</div>
             </div>
           </div>
-          <button className="text-gray-700" onClick={() => onClose && onClose()}>✕</button>
         </div>
 
         <div className="p-4 overflow-auto">
@@ -194,7 +193,7 @@ export default function CashPaymentModal({ isOpen, total = 0, onClose, onSuccess
           </div>
 
           {/* quick buttons */}
-          <div className="mb-3 flex gap-2 flex-wrap">
+          <div className="mb-3 flex gap-3 flex-wrap">
             {[20,50,100,200,500,1000].map(b => (
               <button key={b} onClick={() => quickAdd(b)} className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">+₱{b}</button>
             ))}
@@ -204,7 +203,7 @@ export default function CashPaymentModal({ isOpen, total = 0, onClose, onSuccess
           {/* keypad */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             {["1","2","3","4","5","6","7","8","9",".","0","<"].map(k => (
-              <button key={k} onClick={() => handleKeypad(k)} className="py-3 rounded bg-gray-50 hover:bg-gray-100 text-lg">{k === "<" ? "⌫" : k}</button>
+              <button key={k} onClick={() => handleKeypad(k)} className="py-1 rounded bg-gray-50 hover:bg-gray-100 text-lg">{k === "<" ? "⌫" : k}</button>
             ))}
             <button onClick={() => handleKeypad("C")} className="col-span-3 py-2 rounded bg-red-100 hover:bg-red-200">Clear</button>
           </div>

@@ -12,6 +12,12 @@
   height: 0;
 }
 
+@layer base {
+  .fixed.inset-0 > div {
+    border: 1px solid #800000;
+  }
+}
+
 :root {
   color-scheme: light;
   --dark-page: #05060c;

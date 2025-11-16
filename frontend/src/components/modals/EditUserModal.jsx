@@ -130,7 +130,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSave }) => {
             />
           </div>
           <div>
-            <label>Sex</label>
+            <label>Sex  </label>
             <select
               value={form.sex}
               onChange={(event) => updateField("sex", normalizeSex(event.target.value))}
@@ -141,7 +141,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSave }) => {
             </select>
           </div>
           <div>
-            <label>Role</label>
+            <label>Role  </label>
             <select
               value={form.role}
               onChange={(event) => updateField("role", normalizeRole(event.target.value))}
@@ -154,7 +154,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSave }) => {
             </select>
           </div>
           <div className="col-span-2">
-            <label>Reset Password</label>
+            <label>Reset Password   </label>
             <input
               type="password"
               value={form.resetPassword}

@@ -191,7 +191,6 @@ export default function HistoryModal({
                   <option value="CASH">Cash</option>
                   <option value="CARD">Card</option>
                   <option value="QR">QR</option>
-                  <option value="QRS">QRS</option>
                 </select>
               </div>
               <div>
@@ -252,10 +251,10 @@ export default function HistoryModal({
             return (
               <div
                 key={tx.id || tx.transactionID}
-                className={`p-4 rounded-lg border ${
+                className={`p-4 rounded-lg border transition-shadow duration-150 ${
                   tx.voided
                     ? "bg-gray-100 opacity-70"
-                    : "hover:shadow-md transition-shadow duration-150"
+                    : "bg-white hover:shadow-md hover:bg-[#fff7eb]"
                 }`}
               >
                 <div className="flex justify-between items-start mb-3">

@@ -1,9 +1,9 @@
-// src/components/modals/QRSPaymentModal.jsx
+﻿// src/components/modals/QRSPaymentModal.jsx
 import React, { useEffect, useState } from "react";
 import QRCode from "qrcode";
 
 /**
- * QRSPaymentModal — generates QR code for "Gcash" style
+ * QRSPaymentModal â€” generates QR code for "Gcash" style
  * Props: isOpen, total, onClose, onScanned, onSuccess
  *
  * Behavior:
@@ -69,16 +69,9 @@ export default function QRSPaymentModal({
       <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-4 max-h-[90vh] overflow-auto">
         <div className="flex justify-between items-center mb-3">
           <div>
-            <div className="text-sm font-semibold">QR Payment (Gcash)</div>
+            <div className="text-lg font-semibold mb-1">QR Payment</div>
             <div className="text-xs text-gray-500">Ask customer to scan</div>
           </div>
-          <button
-            onClick={() => onClose && onClose()}
-            className="text-gray-500 hover:text-gray-700 text-xl leading-none"
-            aria-label="Close QR modal"
-          >
-            &times;
-          </button>
         </div>
 
         <div className="text-sm text-gray-600 mb-2">Amount</div>
@@ -89,10 +82,8 @@ export default function QRSPaymentModal({
             {qrDataUrl ? (
               <div className="relative w-56 h-56 overflow-hidden rounded">
                 <img src={qrDataUrl} alt="QR Code" className="w-56 h-56 object-contain block" />
-                {/* vertical scanning line confined to QR box */}
                 <div
-                  className={`absolute left-0 right-0 h-1 bg-green-400/90 ${status === "scanned" ? "animate-scan-vertical" : "opacity-0"}`}
-                  style={{ top: 8 }}
+                  className={`absolute left-0 right-0 h-1.5 bg-green-400/90 rounded-full ${status === "scanned" ? "scan-line" : "opacity-0"}`}
                 />
               </div>
             ) : (
@@ -133,7 +124,7 @@ export default function QRSPaymentModal({
 
         <div className="text-sm text-center text-gray-600 mb-2">
           {status === "waiting" && "Waiting for the customer to scan the QR"}
-          {status === "scanned" && "QR scanned � awaiting payment confirmation"}
+          {status === "scanned" && "QR scanned ï¿½ awaiting payment confirmation"}
           {status === "paid" && "Payment received!"}
         </div>
 
@@ -152,16 +143,18 @@ export default function QRSPaymentModal({
 
         <style>{`
           @keyframes scanVertical {
-            0% { transform: translateY(-100%); opacity: 0; }
+            0% { top: 0; opacity: 0; }
             10% { opacity: 1; }
+            50% { top: calc(100% - 6px); opacity: 1; }
             90% { opacity: 1; }
-            100% { transform: translateY(100%); opacity: 0; }
+            100% { top: 0; opacity: 0; }
           }
-          .animate-scan-vertical {
-            animation: scanVertical 1s linear infinite;
+          .scan-line {
+            animation: scanVertical 1.6s ease-in-out infinite;
           }
         `}</style>
       </div>
     </div>
   );
 }
+

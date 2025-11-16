@@ -41,11 +41,11 @@ const Sidebar = () => {
       <div className="fixed top-0 left-0 h-full w-20 bg-white text-gray-800 flex flex-col items-center py-6 shadow-md z-50">
         {/* Logo */}
         <div className="mb-10">
-          <img src="../splice.png" alt="Logo" className="w-18 h-16" />
+          <img src="../splice.png" alt="Logo" className="w-20 h-18" />
         </div>
 
         {/* Nav Icons */}
-        <nav className="flex flex-col gap-8 text-xl">
+        <nav className="flex flex-col gap-10 text-3xl">
           <NavLink
             to="/admin/home"
             className={({ isActive }) =>

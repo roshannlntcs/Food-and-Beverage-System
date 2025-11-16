@@ -48,7 +48,12 @@ export default function TransactionsPanel({
         if (txTo && txDate > txTo) return false;
       }
 
-      if (txMethod && t.method !== txMethod) return false;
+      if (
+        txMethod &&
+        String(t.method || "").toUpperCase() !== txMethod.toUpperCase()
+      ) {
+        return false;
+      }
 
       // ─── New Void Filter Logic ─────────────────
       if (txVoidFilter === "full" && !t.voided) return false;
@@ -156,9 +161,9 @@ export default function TransactionsPanel({
                   <label className="font-medium text-gray-700 block mb-1">Payment Method:</label>
                   <select value={txMethod} onChange={e => setTxMethod(e.target.value)} className="w-full border rounded px-2 py-1">
                     <option value="">All</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Card">Card</option>
-                    <option value="QRS">QRS</option>
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                    <option value="QR">QR</option>
                   </select>
                 </div>
                 <div>
@@ -194,7 +199,9 @@ export default function TransactionsPanel({
             <button
               key={tx.transactionID}
               onClick={() => onTransactionSelect(tx)}
-              className={`bg-white w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md ${tx.voided ? "bg-red-300" : ""}`}
+              className={`bg-white w-full text-left p-2 rounded-lg border transition duration-150 hover:shadow-md hover:bg-[#fff7eb] ${
+                tx.voided ? "bg-red-300" : ""
+              }`}
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2">
@@ -266,7 +273,9 @@ export default function TransactionsPanel({
             <div
               key={vl.voidId}
               onClick={() => onVoidSelect && onVoidSelect(vl)}
-              className={`bg-white p-2 rounded-lg border transition duration-150 hover:shadow-md flex justify-between items-center ${vl.fullyVoided ? "bg-red-50" : ""}`}
+              className={`bg-white p-2 rounded-lg border transition duration-150 hover:shadow-md hover:bg-[#fff7eb] flex justify-between items-center ${
+                vl.fullyVoided ? "bg-red-50" : ""
+              }`}
             >
               <div className="flex items-center space-x-2">
                 <img

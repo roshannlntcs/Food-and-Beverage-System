@@ -349,7 +349,7 @@ export default function VoidLogs() {
                     currentPageRows.map((row, idx) => (
                       <tr
                         key={row.id ?? row.voidId}
-                        className="border-b align-top odd:bg-white even:bg-gray-50 hover:bg-[#f1f1f1] cursor-pointer transition-colors"
+                        className="border-b align-top odd:bg-white even:bg-gray-50 cursor-pointer transition-shadow duration-150 hover:shadow-md hover:bg-[#fff7eb]"
                         onClick={() => handleRowClick(row)}
                       >
                         <td className="p-3 text-center">{startIndex + idx + 1}</td>

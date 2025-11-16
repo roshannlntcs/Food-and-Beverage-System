@@ -289,7 +289,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       {!showSuccess && !showConfirm && !showEditModal && (
-        <div className="bg-white w-[480px] rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white w-[480px] rounded-2xl shadow-lg border border-[#800000] overflow-hidden">
           <div className="bg-[#8B0000] text-white text-center py-4 rounded-t-2xl">
             <h2 className="text-lg font-bold">Manage Category</h2>
           </div>
@@ -407,7 +407,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 px-8 pb-6">
+          <div className="flex justify-end gap-3 px-6 pb-4">
             <button
               type="button"
               onClick={onClose}
@@ -479,11 +479,10 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
       )}
 
       {showEditModal && (
-        <div className="bg-white w-[500px] rounded-2xl shadow-lg overflow-hidden p-8">
-          <h3 className="text-lg font-bold mb-6 text-left">Edit Category</h3>
-
+        <div className="bg-white w-[500px] rounded-2xl shadow-lg border border-[#800000] overflow-hidden p-8">
+            <h3 className=" text-lg font-bold mb-6 text-left">Edit Category</h3>
           <div className="mb-4 text-left">
-            <label className="block text-sm font-semibold mb-1">
+            <label className="block text-sm font-semibold mb-2">
               Change Category name :
             </label>
             <input
@@ -496,7 +495,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
           </div>
 
           <div className="mb-4 text-left">
-            <label className="block text-sm font-semibold mb-1">
+            <label className="block text-sm font-semibold mb-2">
               Change Image :
             </label>
             <div className="flex items-center gap-3">

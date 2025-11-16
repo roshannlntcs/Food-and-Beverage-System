@@ -3,7 +3,7 @@ import React, { useState } from "react";
 const SaveSuccessModal = ({ onClose, message }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-lg w-[350px] text-center p-6">
+      <div className="bg-white rounded-2xl shadow-lg w-[350px] text-center p-6 border border-[#800000]">
         <div className="flex justify-center mb-4">
           <div className="bg-green-100 p-4 rounded-full">
             <svg

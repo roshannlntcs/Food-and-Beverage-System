@@ -56,7 +56,7 @@ export default function TransactionDetailModal({
           </div>
 
           {/* Scrollable Content */}
-          <div className="p-4 overflow-y-auto flex-1 space-y-4">
+          <div className="p-4 overflow-y-auto no-scrollbar flex-1 space-y-4">
             {/* Metadata (like VoidDetailModal) */}
             <div className="p-3 border rounded-lg bg-gray-50 hover:shadow-md transition-shadow duration-150 space-y-1">
               <div className="flex justify-between">
@@ -94,7 +94,9 @@ export default function TransactionDetailModal({
               return (
                 <div
                   key={idx}
-                  className={`p-3 border rounded-lg ${it.voided ? "bg-red-200" : "hover:shadow-md transition-shadow duration-150"} bg-white`}
+                  className={`p-3 border rounded-lg transition-shadow duration-150 ${
+                    it.voided ? "bg-red-200" : "bg-white hover:shadow-md hover:bg-[#fff7eb]"
+                  }`}
                 >
                   <div className={`flex justify-between ${it.voided ? "line-through text-gray-500" : ""}`}>
                     <span className="font-semibold">{it.name} {it.voided && "(Voided)"}</span>
