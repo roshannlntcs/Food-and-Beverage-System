@@ -41,7 +41,7 @@ const Sidebar = () => {
       <div className="fixed top-0 left-0 h-full w-20 bg-white text-gray-800 flex flex-col items-center py-6 shadow-md z-50">
         {/* Logo */}
         <div className="mb-10">
-          <img src="../splice.png" alt="Logo" className="w-20 h-18" />
+          <img src="../logo-pos.png" alt="SPLICE POS" className="w-16 h-16" />
         </div>
 
         {/* Nav Icons */}
