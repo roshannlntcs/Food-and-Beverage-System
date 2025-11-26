@@ -50,6 +50,13 @@ export const normalizeNotifications = (list = []) => {
 };
 
 export const RESTOCK_STORE_KEY = "__dashboardRestockNotifications";
+export const READ_STORE_KEY = "__dashboardReadNotifications";
+const READ_STORE_DEFAULT_SCOPE = "__global__";
+
+const buildReadStoreKey = (scope = READ_STORE_DEFAULT_SCOPE) => {
+  const normalized = String(scope || READ_STORE_DEFAULT_SCOPE).trim();
+  return `${READ_STORE_KEY}:${normalized || READ_STORE_DEFAULT_SCOPE}`;
+};
 
 export const getRestockStore = () => {
   if (typeof window === "undefined") return null;
@@ -100,3 +107,66 @@ export const mergeNotificationLists = (primary = [], secondary = []) => {
 
 export const notificationListSignature = (list = []) =>
   list.map((item) => notificationKey(item)).join("::");
+
+export const getReadStore = (scope = READ_STORE_DEFAULT_SCOPE) => {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = sessionStorage.getItem(buildReadStoreKey(scope));
+    if (!raw) {
+      // migrate legacy unscoped store if present
+      const legacy = sessionStorage.getItem(READ_STORE_KEY);
+      if (legacy) {
+        const parsedLegacy = JSON.parse(legacy);
+        if (Array.isArray(parsedLegacy)) {
+          const migrated = new Set(parsedLegacy);
+          persistReadStore(migrated, scope);
+          sessionStorage.removeItem(READ_STORE_KEY);
+          return migrated;
+        }
+      }
+      return new Set();
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return new Set(parsed);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to parse read store:", err);
+  }
+  return new Set();
+};
+
+const normalizeReadKeys = (input) => {
+  if (!input) return [];
+  if (Array.isArray(input)) return input;
+  if (input instanceof Set) return Array.from(input);
+  if (typeof input === "string") return [input];
+  if (typeof input[Symbol.iterator] === "function") {
+    return Array.from(input);
+  }
+  return [];
+};
+
+export const persistReadStore = (
+  keys = [],
+  scope = READ_STORE_DEFAULT_SCOPE
+) => {
+  if (typeof window === "undefined") return;
+  const normalized = normalizeReadKeys(keys);
+  const arr = Array.from(new Set(normalized.filter(Boolean).map(String)));
+  try {
+    sessionStorage.setItem(buildReadStoreKey(scope), JSON.stringify(arr));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to persist read store:", err);
+  }
+};
+
+export const clearReadStore = (scope = READ_STORE_DEFAULT_SCOPE) => {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(buildReadStoreKey(scope));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to clear read store:", err);
+  }
+};

@@ -9,6 +9,8 @@ import {
   notificationKey,
   getRestockStore,
   mergeNotificationLists,
+  getReadStore,
+  persistReadStore,
 } from "../utils/notificationHelpers";
 
 const formatRole = (role) => {
@@ -32,6 +34,7 @@ export default function Header({
   onSearchChange,
 }) {
   const displayRole = formatRole(roleLabel);
+  const readScope = userName || roleLabel || "cashier";
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState(() => {
     const restocks = getRestockStore() || [];
@@ -42,8 +45,12 @@ export default function Header({
     }
     return normalizeNotifications(restocks);
   });
-  const [readIds, setReadIds] = useState(() => new Set());
+  const [readIds, setReadIds] = useState(() => getReadStore(readScope));
   const notifRef = useRef(null);
+
+  useEffect(() => {
+    setReadIds(getReadStore(readScope));
+  }, [readScope]);
 
   useEffect(() => {
     let active = true;
@@ -51,7 +58,12 @@ export default function Header({
       try {
         const ids = await fetchReadNotifications();
         if (active && Array.isArray(ids)) {
-          setReadIds(new Set(ids.map((id) => String(id))));
+          const combined = new Set([
+            ...getReadStore(readScope),
+            ...ids.map((id) => String(id)),
+          ]);
+          setReadIds(combined);
+          persistReadStore(combined, readScope);
         }
       } catch (err) {
         console.warn("POS header: failed to load read notifications", err);
@@ -60,7 +72,7 @@ export default function Header({
     return () => {
       active = false;
     };
-  }, []);
+  }, [readScope]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -83,9 +95,10 @@ export default function Header({
           if (key) next.add(key);
         }
       });
+      if (next.size !== prev.size) persistReadStore(next, readScope);
       return next;
     });
-  }, [notifications]);
+  }, [notifications, readScope]);
 
   useEffect(() => {
     setReadIds((prev) => {
@@ -104,9 +117,13 @@ export default function Header({
           changed = true;
         }
       });
-      return changed ? next : prev;
+      if (changed) {
+        persistReadStore(next, readScope);
+        return next;
+      }
+      return prev;
     });
-  }, [notifications]);
+  }, [notifications, readScope]);
 
   useEffect(() => {
     const handleClickAway = (event) => {
@@ -138,6 +155,7 @@ export default function Header({
       if (prev.has(key)) return prev;
       const next = new Set(prev);
       next.add(key);
+      persistReadStore(next, readScope);
       return next;
     });
     try {
@@ -155,6 +173,7 @@ export default function Header({
     setReadIds((prev) => {
       const next = new Set(prev);
       unreadKeys.forEach((key) => next.add(key));
+      persistReadStore(next, readScope);
       return next;
     });
     try {

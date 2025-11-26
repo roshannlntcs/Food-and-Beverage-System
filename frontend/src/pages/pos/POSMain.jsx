@@ -46,11 +46,6 @@ import { normalizeNotifications } from "../../utils/notificationHelpers";
 
 const DEFAULT_LOW_THRESHOLD = 10;
 
-// assets helper
-const importAll = (r) =>
-  r.keys().reduce((acc, k) => ({ ...acc, [k.replace("./", "")]: r(k) }), {});
-const images = importAll(require.context("../../assets", false, /\.(png|jpe?g|svg)$/));
-
 const toDateTimeString = (value) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -1447,17 +1442,50 @@ export default function POSMain() {
           const qty = Number(quantity || 1);
           const basePrice = Number(modalProduct.price || 0);
           const price = (basePrice + addonsCost + sizeCost) * qty;
-          setCart((prev) => [
-            ...prev,
-            {
-              ...modalProduct,
-              quantity: qty,
-              size,
-              selectedAddons: addonList,
-              notes,
-              totalPrice: price,
-            },
-          ]);
+          setCart((prev) => {
+            const matchIndex = prev.findIndex((item) => {
+              const sameId = String(item.id ?? "") === String(modalProduct.id ?? "");
+              const sameSize =
+                (item.size?.label || "") === (size?.label || "") &&
+                (item.size?.price || 0) === (size?.price || 0);
+              const normalizeAddons = (list = []) =>
+                list
+                  .map((a) => a?.label || a?.name || "")
+                  .filter(Boolean)
+                  .sort()
+                  .join("|");
+              const sameAddons =
+                normalizeAddons(item.selectedAddons) === normalizeAddons(addonList);
+              const sameNotes = (item.notes || "") === (notes || "");
+              return sameId && sameSize && sameAddons && sameNotes;
+            });
+
+            if (matchIndex >= 0) {
+              return prev.map((item, idx) => {
+                if (idx !== matchIndex) return item;
+                const nextQty = Number(item.quantity || 0) + qty;
+                return {
+                  ...item,
+                  quantity: nextQty,
+                  totalPrice: Number(item.totalPrice || 0) + price,
+                  size,
+                  selectedAddons: addonList,
+                };
+              });
+            }
+
+            return [
+              ...prev,
+              {
+                ...modalProduct,
+                quantity: qty,
+                size,
+                selectedAddons: addonList,
+                notes,
+                totalPrice: price,
+              },
+            ];
+          });
         }}
         onApply={({ quantity, size, addons, notes }, idx) => {
           const addonList = Array.isArray(addons) ? addons : [];

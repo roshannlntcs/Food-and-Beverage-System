@@ -81,9 +81,16 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
+    const updated = await prisma.$transaction(async (tx) => {
+      const refreshed = await tx.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      });
+      await tx.stockAlertState.updateMany({
+        where: { userId: refreshed.id },
+        data: { signature: '' },
+      });
+      return refreshed;
     });
 
     const token = signJwt({

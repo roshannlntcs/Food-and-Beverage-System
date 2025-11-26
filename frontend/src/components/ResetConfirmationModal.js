@@ -23,7 +23,7 @@ const ResetConfirmationModal = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-xl shadow-2xl space-y-5">
+      <div className="bg-white p-6 w-full max-w-xl shadow-2xl rounded-lg border border-[#800000] max-h-[85vh] flex flex-col overflow-hidden">
         <header className="text-center space-y-1">
           <div className="flex justify-center">
             <div className="bg-red-800 rounded-full w-10 h-10 flex items-center justify-center text-white font-semibold">
@@ -37,7 +37,7 @@ const ResetConfirmationModal = ({
           </p>
         </header>
 
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-y-auto no-scrollbar pt-2 pb-4 pr-1" style={{ maxHeight: "32vh" }}>
           {scopeOptions.map((option) => {
             const checked = selectedScopes.includes(option.scope);
             return (
@@ -63,7 +63,7 @@ const ResetConfirmationModal = ({
         </div>
 
         {hasStock && (
-          <div className="space-y-1">
+          <div className="pt-2 space-y-1">
             <label className="text-sm font-semibold text-gray-700">
               Stock quantity to apply
             </label>
@@ -75,14 +75,14 @@ const ResetConfirmationModal = ({
               onChange={(event) => onStockQtyChange?.(event.target.value)}
               className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 pt-2 pb-2">
               Applies only when “Reset Stock” is selected.
             </p>
           </div>
         )}
 
         {warningList.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 pb-2 text-xs text-red-700 space-y-1 overflow-y-auto no-scrollbar" style={{ maxHeight: "20vh" }}>
             <p className="font-semibold text-red-800">What will happen:</p>
             <ul className="list-disc list-inside space-y-1">
               {warningList.map((warning, index) => (
@@ -92,7 +92,7 @@ const ResetConfirmationModal = ({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 pt-2">
+        <div className="flex items-center justify-between gap-2 pt-2 mt-auto">
           <button
             type="button"
             onClick={onSelectAll}
