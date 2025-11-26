@@ -1253,6 +1253,7 @@ export default function POSMain() {
         <Header
           userName={userName}
           profilePic={profilePic}
+          readScopeKey={currentUserId ? String(currentUserId) : null}
           onProfileClick={() => setShowProfileModal(true)}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}

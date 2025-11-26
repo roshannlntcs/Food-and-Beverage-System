@@ -29,12 +29,15 @@ export default function Header({
   userName,
   profilePic = avatar,
   roleLabel = "Cashier",
+  readScopeKey,
   onProfileClick,
   searchTerm,
   onSearchChange,
 }) {
   const displayRole = formatRole(roleLabel);
-  const readScope = userName || roleLabel || "cashier";
+  const readScope = readScopeKey
+    ? String(readScopeKey)
+    : userName || roleLabel || "cashier";
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState(() => {
     const restocks = getRestockStore() || [];

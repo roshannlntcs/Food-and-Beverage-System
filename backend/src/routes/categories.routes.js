@@ -3,6 +3,8 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { z } = require('zod');
 
+const FALLBACK_CATEGORY_NAME = 'Others';
+
 const CategoryInput = z.object({
   name: z.string().min(1),
   active: z.boolean().optional(),
@@ -15,9 +17,34 @@ const DeleteCategoryPayload = z
   })
   .optional();
 
+async function deactivateEmptyFallback(tx) {
+  const fallback = await tx.category.findFirst({
+    where: { name: FALLBACK_CATEGORY_NAME },
+    select: { id: true, active: true },
+  });
+  if (!fallback || !fallback.active) return;
+  const count = await tx.product.count({
+    where: { categoryId: fallback.id },
+  });
+  if (count === 0) {
+    await tx.category.update({
+      where: { id: fallback.id },
+      data: { active: false },
+    });
+  }
+}
+
 router.get('/', async (_req, res) => {
-  const rows = await prisma.category.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
-  res.json(rows);
+  try {
+    const rows = await prisma.$transaction(async (tx) => {
+      await deactivateEmptyFallback(tx);
+      return tx.category.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
+    });
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /categories failed:', err);
+    res.status(500).json({ error: 'Failed to load categories' });
+  }
 });
 
 router.post('/', async (req, res) => {
@@ -54,7 +81,7 @@ router.delete('/:id', async (req, res) => {
   const payload = DeleteCategoryPayload.parse(req.body ?? {});
   const behavior = payload?.behavior || 'delete-items';
   const fallbackName =
-    (payload?.fallbackName && payload.fallbackName.trim()) || 'Others';
+    (payload?.fallbackName && payload.fallbackName.trim()) || FALLBACK_CATEGORY_NAME;
   try {
     await prisma.$transaction(async (tx) => {
       const existing = await tx.category.findUnique({

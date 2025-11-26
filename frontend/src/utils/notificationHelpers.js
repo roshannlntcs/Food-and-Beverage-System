@@ -52,6 +52,56 @@ export const normalizeNotifications = (list = []) => {
 export const RESTOCK_STORE_KEY = "__dashboardRestockNotifications";
 export const READ_STORE_KEY = "__dashboardReadNotifications";
 const READ_STORE_DEFAULT_SCOPE = "__global__";
+const READ_CACHE_KEY = "__dashboardReadCache";
+
+const getStorageHandles = () => {
+  if (typeof window === "undefined") return [];
+  const stores = [];
+  try {
+    if (window.sessionStorage) stores.push(window.sessionStorage);
+  } catch (_err) {
+    // ignore
+  }
+  try {
+    if (window.localStorage) stores.push(window.localStorage);
+  } catch (_err) {
+    // ignore
+  }
+  return stores;
+};
+
+const readStorageValue = (key) => {
+  const stores = getStorageHandles();
+  for (const store of stores) {
+    try {
+      const raw = store.getItem(key);
+      if (raw) return raw;
+    } catch (_err) {
+      // ignore and try next
+    }
+  }
+  return null;
+};
+
+const writeStorageValue = (key, value) => {
+  const stores = getStorageHandles();
+  stores.forEach((store) => {
+    try {
+      if (value === null) store.removeItem(key);
+      else store.setItem(key, value);
+    } catch (_err) {
+      // ignore storage quota errors
+    }
+  });
+};
+
+const getReadCache = () => {
+  if (typeof window === "undefined") return null;
+  if (!window[READ_CACHE_KEY]) {
+    window[READ_CACHE_KEY] = {};
+  }
+  return window[READ_CACHE_KEY];
+};
 
 const buildReadStoreKey = (scope = READ_STORE_DEFAULT_SCOPE) => {
   const normalized = String(scope || READ_STORE_DEFAULT_SCOPE).trim();
@@ -110,24 +160,31 @@ export const notificationListSignature = (list = []) =>
 
 export const getReadStore = (scope = READ_STORE_DEFAULT_SCOPE) => {
   if (typeof window === "undefined") return new Set();
+  const cache = getReadCache();
+  const cacheKey = buildReadStoreKey(scope);
+  if (cache?.[cacheKey]) {
+    return new Set(cache[cacheKey]);
+  }
   try {
-    const raw = sessionStorage.getItem(buildReadStoreKey(scope));
+    let raw = readStorageValue(cacheKey);
     if (!raw) {
       // migrate legacy unscoped store if present
-      const legacy = sessionStorage.getItem(READ_STORE_KEY);
-      if (legacy) {
-        const parsedLegacy = JSON.parse(legacy);
+      raw = readStorageValue(READ_STORE_KEY);
+      if (raw) {
+        const parsedLegacy = JSON.parse(raw);
         if (Array.isArray(parsedLegacy)) {
-          const migrated = new Set(parsedLegacy);
-          persistReadStore(migrated, scope);
-          sessionStorage.removeItem(READ_STORE_KEY);
-          return migrated;
+          persistReadStore(new Set(parsedLegacy), scope);
+          writeStorageValue(READ_STORE_KEY, null);
+          return new Set(parsedLegacy);
         }
       }
       return new Set();
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed);
+    if (Array.isArray(parsed)) {
+      if (cache) cache[cacheKey] = parsed;
+      return new Set(parsed);
+    }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn("Failed to parse read store:", err);
@@ -153,20 +210,19 @@ export const persistReadStore = (
   if (typeof window === "undefined") return;
   const normalized = normalizeReadKeys(keys);
   const arr = Array.from(new Set(normalized.filter(Boolean).map(String)));
-  try {
-    sessionStorage.setItem(buildReadStoreKey(scope), JSON.stringify(arr));
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn("Failed to persist read store:", err);
-  }
+  const key = buildReadStoreKey(scope);
+  const payload = JSON.stringify(arr);
+  writeStorageValue(key, payload);
+  const cache = getReadCache();
+  if (cache) cache[key] = arr;
 };
 
 export const clearReadStore = (scope = READ_STORE_DEFAULT_SCOPE) => {
   if (typeof window === "undefined") return;
-  try {
-    sessionStorage.removeItem(buildReadStoreKey(scope));
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn("Failed to clear read store:", err);
+  const key = buildReadStoreKey(scope);
+  writeStorageValue(key, null);
+  const cache = getReadCache();
+  if (cache) {
+    delete cache[key];
   }
 };
