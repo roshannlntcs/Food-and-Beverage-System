@@ -761,6 +761,7 @@ const SuperAdmin = () => {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      encoding: "windows-1252",
       complete: async (results) => {
         try {
           await handleCsvImport(results.data || [], results.meta?.fields || []);

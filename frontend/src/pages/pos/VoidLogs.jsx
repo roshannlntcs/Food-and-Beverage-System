@@ -410,13 +410,7 @@ export default function VoidLogs() {
             />
           </div>
 
-          <div className="flex justify-end">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-            />
-          </div>
+          
         </div>
       </div>
       {selectedVoidLog && (
