@@ -17,7 +17,20 @@ export default function RoleSelection() {
   const [selectedRole, setSelectedRole] = useState(null);
   const fullName = currentUser?.fullName || "";
   const schoolId = currentUser?.schoolId || currentUser?.employeeId || "";
-  const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
+  const { avatarSrc } = useOptimizedAvatar(currentUser);
+  const [displayAvatar, setDisplayAvatar] = useState(
+    () => currentUser?.avatarUrl || ""
+  );
+
+  useEffect(() => {
+    const uploaded = currentUser?.avatarUrl;
+    const resolved = avatarSrc;
+    if (uploaded) {
+      setDisplayAvatar(uploaded);
+    } else if (resolved && !resolved.includes("avatar-ph")) {
+      setDisplayAvatar(resolved);
+    }
+  }, [avatarSrc, currentUser?.avatarUrl]);
 
   useEffect(() => {
     if (typeof Image === "undefined") return undefined;
@@ -45,22 +58,18 @@ export default function RoleSelection() {
     >
       <div className="absolute inset-0 bg-black bg-opacity-30 backdrop-blur-sm" />
 
-      <div className="relative z-10 bg-white px-8 py-9 rounded-2xl shadow-2xl w-full max-w-[440px] text-center">
+      <div className="relative z-10 bg-white px-7 py-7 rounded-2xl shadow-2xl w-full max-w-[400px] text-center">
         {fullName && (
-          <h1 className="text-2xl font-semibold text-gray-700 mb-6">
+          <h1 className="text-xl font-semibold text-gray-700 mb-5">
             Hello, <span className="text-yellow-500">{fullName}</span>!
           </h1>
         )}
 
-        <div className="flex flex-col items-center justify-center mb-6 space-y-3">
-          <div
-            className={`w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-all duration-300 ${
-              avatarLoading ? "animate-pulse" : ""
-            }`}
-          >
-            {avatarSrc ? (
+        <div className="flex flex-col items-center justify-center mb-5 space-y-3">
+          <div className="w-28 h-28 border-4 border-gray-200 rounded-full shadow-lg overflow-hidden bg-white transition-all duration-300">
+            {displayAvatar ? (
               <img
-                src={avatarSrc}
+                src={displayAvatar}
                 alt="Profile avatar"
                 loading="lazy"
                 decoding="async"
@@ -81,11 +90,11 @@ export default function RoleSelection() {
           )}
         </div>
 
-        <h2 className="text-lg font-medium mb-6 text-gray-800">
+        <h2 className="text-base font-medium mb-5 text-gray-800">
           Please select your role:
         </h2>
 
-        <div className="grid grid-cols-2 gap-1 mb-6">
+        <div className="grid grid-cols-2 gap-2 mb-6">
           {ROLE_OPTIONS.map(({ id, label, Icon }) => {
             const active = selectedRole === id;
             return (
@@ -93,22 +102,24 @@ export default function RoleSelection() {
                 key={id}
                 type="button"
                 onClick={() => setSelectedRole(id)}
-                className={`group w-full max-w-[150px] mx-auto h-28 sm:h-32 flex flex-col items-center justify-center rounded-2xl border transition-[box-shadow,transform] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 ${
+                className={`group w-full max-w-[150px] mx-auto h-24 sm:h-28 flex flex-col items-center justify-center rounded-2xl transition-[box-shadow,transform] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 ${
                   active
-                    ? "bg-[#FFF8E1] border-yellow-400 shadow-xl"
-                    : "bg-white border-gray-200 hover:shadow-lg"
+                    ? "bg-[#FFF8E1] shadow-xl"
+                    : "bg-white border border-gray-200 hover:shadow-lg"
                 }`}
                 aria-pressed={active}
               >
                 <Icon
-                  size={32}
+                  size={30}
                   className={`mb-3 transition-colors duration-200 ${
                     active
                       ? "text-[#FFC72C]"
                       : "text-gray-500 group-hover:text-[#FFC72C]"
                   }`}
                 />
-                <span className="font-semibold tracking-wide">{label}</span>
+                <span className="font-semibold tracking-wide text-sm">
+                  {label}
+                </span>
               </button>
             );
           })}

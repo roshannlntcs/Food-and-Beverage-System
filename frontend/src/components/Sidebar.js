@@ -41,79 +41,91 @@ const Sidebar = () => {
       <div className="fixed top-0 left-0 h-full w-20 bg-white text-gray-800 flex flex-col items-center py-6 shadow-md z-50">
         {/* Logo */}
         <div className="mb-10">
-          <img src="../logo-pos.png" alt="SPLICE POS" className="w-16 h-16" />
+          <img src="/splice_logo.png" alt="SPLICE POS" className="w-20 h-20" />
         </div>
 
         {/* Nav Icons */}
-        <nav className="flex flex-col gap-10 text-3xl">
+        <nav className="flex flex-col gap-5 text-lg text-gray-500">
           <NavLink
             to="/admin/home"
             className={({ isActive }) =>
-              `hover:text-yellow-500 ${
-                isActive ? "text-yellow-500" : "text-gray-500"
-              }`
+              `p-1.5 transition-colors ${
+                isActive ? "text-[#fbbf24]" : "text-gray-500"
+              } hover:text-[#fbbf24]`
             }
-            title="Home"
           >
-            <FaTachometerAlt />
+            <div className="flex flex-col items-center gap-1">
+              <FaTachometerAlt className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">Home</span>
+            </div>
           </NavLink>
 
           <NavLink
             to="/admin/inventory"
             className={({ isActive }) =>
-              `hover:text-yellow-500 ${
-                isActive ? "text-yellow-500" : "text-gray-500"
-              }`
+              `p-1.5 transition-colors ${
+                isActive ? "text-[#fbbf24]" : "text-gray-500"
+              } hover:text-[#fbbf24]`
             }
-            title="Inventory"
           >
-            <FaBoxOpen />
+            <div className="flex flex-col items-center gap-1">
+              <FaBoxOpen className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">Inventory</span>
+            </div>
           </NavLink>
 
           <NavLink
             to="/admin/pos-monitoring"
             className={({ isActive }) =>
-              `hover:text-yellow-500 ${
-                isActive ? "text-yellow-500" : "text-gray-500"
-              }`
+              `p-1.5 transition-colors ${
+                isActive ? "text-[#fbbf24]" : "text-gray-500"
+              } hover:text-[#fbbf24]`
             }
-            title="POS Monitoring"
           >
-            <FaStore />
+            <div className="flex flex-col items-center gap-1">
+              <FaStore className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">POS</span>
+            </div>
           </NavLink>
 
           <NavLink
             to="/admin/supplier-records"
             className={({ isActive }) =>
-              `hover:text-yellow-500 ${
-                isActive ? "text-yellow-500" : "text-gray-500"
-              }`
+              `p-1.5 transition-colors ${
+                isActive ? "text-[#fbbf24]" : "text-gray-500"
+              } hover:text-[#fbbf24]`
             }
-            title="Suppliers"
           >
-            <FaUsers />
+            <div className="flex flex-col items-center gap-1">
+              <FaUsers className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">Suppliers</span>
+            </div>
           </NavLink>
 
           <NavLink
             to="/admin/void-logs"
             className={({ isActive }) =>
-              `hover:text-yellow-500 ${
-                isActive ? "text-yellow-500" : "text-gray-500"
-              }`
+              `p-1.5 transition-colors ${
+                isActive ? "text-[#fbbf24]" : "text-gray-500"
+              } hover:text-[#fbbf24]`
             }
-            title="Void Logs"
           >
-            <FaClipboardList />
+            <div className="flex flex-col items-center gap-1">
+              <FaClipboardList className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">Void Logs</span>
+            </div>
           </NavLink>
 
           {/* Super Admin link - now RED */}
           <a
             href="/admin/super-admin"
             onClick={handleSuperAdminClick}
-            className="text-red-600 hover:text-red-800"
-            title="Super Admin"
+            className="p-1.5 text-gray-500 transition-colors hover:text-[#fbbf24]"
           >
-            <FaUserShield />
+            <div className="flex flex-col items-center gap-1">
+              <FaUserShield className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">Super Admin</span>
+            </div>
           </a>
         </nav>
 
@@ -121,10 +133,12 @@ const Sidebar = () => {
         <div className="mt-auto">
           <NavLink
             to="/"
-            className="text-gray-400 hover:text-red-500 text-xl"
-            title="Logout"
+            className="p-1.5 text-gray-500 transition-colors hover:text-[#fbbf24] text-lg"
           >
-            <FaSignOutAlt />
+            <div className="flex flex-col items-center gap-1">
+              <FaSignOutAlt className="text-[1.1rem]" />
+              <span className="text-[11px] font-medium">Logout</span>
+            </div>
           </NavLink>
         </div>
       </div>

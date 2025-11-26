@@ -1,6 +1,5 @@
 // src/components/Header.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import logo from "../assets/logo-pos2.png";
 import avatar from "../assets/avatar-ph.png";
 import { FaBell, FaShoppingCart, FaCube } from "react-icons/fa";
 import { fetchReadNotifications, markNotificationsRead } from "../api/notifications";
@@ -168,12 +167,18 @@ export default function Header({
     <header className="bg-[#800000] text-white flex justify-between items-center px-6 py-4 h-20 shadow-md border-b border-gray-200">
       {/* Left: Logo + Title */}
       <div className="flex items-center space-x-3">
-        <img
-          src={logo}
-          alt="POS Logo"
-          className="w-12 h-12 object-contain rounded"
-        />
-        <div className="text-xl font-bold tracking-wide">SPLICE</div>
+        <div className="h-12 w-12 overflow-hidden rounded-full flex items-center justify-center">
+          <img
+            src="/splice_logo2.png"
+            alt="SPLICE Logo"
+            className="h-12 w-12 object-cover object-top"
+            style={{
+              filter:
+                "brightness(0) saturate(100%) invert(80%) sepia(10%) saturate(5000%) hue-rotate(5deg) brightness(105%) contrast(105%)",
+            }}
+          />
+        </div>
+        <div className="text-xl font-bold tracking-wide text-white">SPLICE</div>
       </div>
 
       {/* Middle: Search */}
