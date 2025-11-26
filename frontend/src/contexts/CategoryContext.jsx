@@ -110,9 +110,7 @@ export default function CategoryProvider({ children }) {
     try {
       const list = await api('/categories', 'GET');
       const normalized = (list || []).map(normalizeCategory).filter(Boolean);
-      const next = normalized.length
-        ? orderCategories(normalized)
-        : orderCategories(FALLBACK_CATEGORIES);
+      const next = orderCategories(normalized);
       setCategories(next);
       setError(null);
     } catch (err) {
@@ -218,10 +216,18 @@ export default function CategoryProvider({ children }) {
     []
   );
 
-  const removeCategory = useCallback(async (id) => {
+  const removeCategory = useCallback(async (id, options = {}) => {
     if (!id) return false;
     try {
-      await api(`/categories/${id}`, 'DELETE');
+      const payload = {};
+      if (options.behavior) payload.behavior = options.behavior;
+      if (options.fallbackName) payload.fallbackName = options.fallbackName;
+      const hasPayload = Object.keys(payload).length > 0;
+      await api(
+        `/categories/${id}`,
+        'DELETE',
+        hasPayload ? payload : undefined
+      );
       setCategories((prev) =>
         prev.filter((category) => category.id !== id)
       );

@@ -28,14 +28,10 @@ router.get('/state', async (req, res) => {
       });
       if (existing) return existing;
 
-      const fallback = await tx.stockAlertState.findFirst({
-        orderBy: { updatedAt: 'desc' },
-      });
-
       return tx.stockAlertState.create({
         data: {
           userId,
-          signature: fallback?.signature || '',
+          signature: '',
         },
       });
     });
@@ -64,12 +60,8 @@ router.post('/state', async (req, res) => {
         create: { userId, signature: normalizedSignature },
       });
 
-      await tx.stockAlertState.updateMany({
-        data: { signature: normalizedSignature },
-      });
-
-      return tx.stockAlertState.findFirst({
-        orderBy: { updatedAt: 'desc' },
+      return tx.stockAlertState.findUnique({
+        where: { userId },
       });
     });
     res.json({

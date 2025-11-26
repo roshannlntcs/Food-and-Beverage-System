@@ -27,6 +27,8 @@ import {
   persistRestockStore,
   mergeNotificationLists,
   notificationListSignature,
+  getReadStore,
+  persistReadStore,
 } from "../utils/notificationHelpers";
 import { mapOrderToTx } from "../utils/mapOrder";
 
@@ -70,6 +72,33 @@ const resolveStockIdentifier = (item = {}) => {
 
 const MAX_RESTOCK_NOTIFICATIONS = 20;
 
+const STOCK_ALERT_SEEN_PREFIX = "__stockAlertSeen:";
+const stockAlertSeenKey = (user) => {
+  const userId = user?.id;
+  if (!userId && userId !== 0) return null;
+  const stamp = user?.lastLogin || user?.updatedAt || "";
+  return `${STOCK_ALERT_SEEN_PREFIX}${userId}:${stamp}`;
+};
+
+const hasSeenStockAlertOnce = (user) => {
+  if (typeof sessionStorage === "undefined") return false;
+  const key = stockAlertSeenKey(user);
+  if (!key) return false;
+  return sessionStorage.getItem(key) === "1";
+};
+const storeStockAlertSeen = (user) => {
+  if (typeof sessionStorage === "undefined") return;
+  const key = stockAlertSeenKey(user);
+  if (!key) return;
+  sessionStorage.setItem(key, "1");
+};
+const clearStockAlertSeen = (user) => {
+  if (typeof sessionStorage === "undefined") return;
+  const key = stockAlertSeenKey(user);
+  if (!key) return;
+  sessionStorage.removeItem(key);
+};
+
 const parseDateSafe = (value) => {
   if (!value) return null;
   if (value instanceof Date) {
@@ -105,18 +134,35 @@ const AdminInfoDashboard2 = ({
     useAuth() || {};
   const { showToast } = useToast();
   const { inventory = [], loading: inventoryLoading } = useInventory() || {};
-  const currentUserId = currentUser?.id ? String(currentUser.id) : "";
-  const currentUserKey = currentUserId || ANALYTICS_DEFAULT_KEY;
+  const rawUserId = currentUser?.id;
+  const currentUserId =
+    rawUserId !== undefined && rawUserId !== null && Number.isFinite(Number(rawUserId))
+      ? Number(rawUserId)
+      : null;
+  const currentUserKey = currentUserId ? String(currentUserId) : ANALYTICS_DEFAULT_KEY;
+  const readScope = currentUserKey;
 
   const adminName = currentUser?.fullName || "Admin";
   const { avatarSrc, avatarLoading } = useOptimizedAvatar(currentUser);
+  const stableAvatarRef = useRef(null);
+  const lastUserKeyRef = useRef(currentUserKey);
+  useEffect(() => {
+    if (currentUserKey !== lastUserKeyRef.current) {
+      lastUserKeyRef.current = currentUserKey;
+      stableAvatarRef.current = null;
+    }
+  }, [currentUserKey]);
+  useEffect(() => {
+    if (avatarSrc) stableAvatarRef.current = avatarSrc;
+  }, [avatarSrc]);
+  const displayAvatar = avatarSrc || stableAvatarRef.current;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showStockAlert, setShowStockAlert] = useState(false);
   const [selectedStockNotif, setSelectedStockNotif] = useState(null);
-  const [readIds, setReadIds] = useState(() => new Set());
+  const [readIds, setReadIds] = useState(() => getReadStore(readScope));
   const initialNotifications = (() => {
     const restockStore = getRestockStore() || [];
     if (Array.isArray(notifications) && notifications.length) {
@@ -143,7 +189,9 @@ const AdminInfoDashboard2 = ({
   );
   const [lastSeenStockSignature, setLastSeenStockSignature] = useState("");
   const [stockAlertStateLoaded, setStockAlertStateLoaded] = useState(false);
-  const [lastRestockSignature, setLastRestockSignature] = useState("");
+  const [stockAlertSeen, setStockAlertSeen] = useState(() =>
+    hasSeenStockAlertOnce(currentUser)
+  );
   const [restockVersion, setRestockVersion] = useState(0);
   const [analyticsState, setAnalyticsState] = useState(() => {
     if (profileAnalytics) return profileAnalytics;
@@ -172,6 +220,7 @@ const AdminInfoDashboard2 = ({
     })()
   );
   const portalTarget = typeof document !== "undefined" ? document.body : null;
+  const readStoreRef = useRef(getReadStore(readScope));
   const dispatchNotificationUpdate = useCallback((list) => {
     if (typeof window !== "undefined") {
       window.__dashboardNotifications = list;
@@ -182,12 +231,24 @@ const AdminInfoDashboard2 = ({
   }, []);
 
   useEffect(() => {
+    const scopedStore = getReadStore(readScope);
+    readStoreRef.current = scopedStore;
+    setReadIds(scopedStore);
+  }, [readScope]);
+
+  useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const ids = await fetchReadNotifications();
         if (mounted && Array.isArray(ids)) {
-          setReadIds(new Set(ids.map((id) => String(id))));
+          const combined = new Set([
+            ...readStoreRef.current,
+            ...ids.map((id) => String(id)),
+          ]);
+          readStoreRef.current = combined;
+          persistReadStore(combined, readScope);
+          setReadIds(combined);
         }
       } catch (err) {
         console.warn("Failed to load read notifications:", err);
@@ -196,7 +257,7 @@ const AdminInfoDashboard2 = ({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [readScope]);
 
   useEffect(() => {
     if (!Array.isArray(inventory)) return;
@@ -261,9 +322,10 @@ const AdminInfoDashboard2 = ({
 
   useEffect(() => {
     let cancelled = false;
-    if (!currentUser?.id) {
+    if (!currentUserId) {
       setLastSeenStockSignature("");
-      setStockAlertStateLoaded(true);
+      setStockAlertStateLoaded(false);
+      setShowStockAlert(false);
       return undefined;
     }
     setStockAlertStateLoaded(false);
@@ -287,7 +349,7 @@ const AdminInfoDashboard2 = ({
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.id]);
+  }, [currentUserId]);
 
   const persistStockAlertSignature = useCallback(
     async (signature) => {
@@ -295,14 +357,14 @@ const AdminInfoDashboard2 = ({
         typeof signature === "string" ? signature : "";
       if (normalizedSignature === lastSeenStockSignature) return;
       setLastSeenStockSignature(normalizedSignature);
-      if (!currentUser?.id) return;
+      if (!currentUserId) return;
       try {
         await updateStockAlertStateApi(normalizedSignature);
       } catch (err) {
         console.warn("Failed to persist stock alert signature:", err);
       }
     },
-    [currentUser?.id, lastSeenStockSignature]
+    [currentUserId, lastSeenStockSignature]
   );
 
 
@@ -447,9 +509,13 @@ const AdminInfoDashboard2 = ({
           if (key) next.add(key);
         }
       });
+      if (next.size !== prev.size) {
+        readStoreRef.current = next;
+        persistReadStore(next, readScope);
+      }
       return next;
     });
-  }, [displayNotifications]);
+  }, [displayNotifications, readScope]);
 
   useEffect(() => {
     setReadIds((prev) => {
@@ -468,9 +534,14 @@ const AdminInfoDashboard2 = ({
           changed = true;
         }
       });
-      return changed ? next : prev;
+      if (changed) {
+        readStoreRef.current = next;
+        persistReadStore(next, readScope);
+        return next;
+      }
+      return prev;
     });
-  }, [displayNotifications]);
+  }, [displayNotifications, readScope]);
 
   useEffect(() => {
     if (!profileAnalytics) return;
@@ -528,8 +599,8 @@ const AdminInfoDashboard2 = ({
           let safety = 0;
           while (true) {
             const params = { take: MAX_ORDER_FETCH };
-            if (currentUser?.id) {
-              params.cashierId = currentUser.id;
+            if (currentUserId) {
+              params.cashierId = currentUserId;
             }
             if (cursor) params.cursor = cursor;
             const response = await fetchOrders(params);
@@ -573,8 +644,8 @@ const AdminInfoDashboard2 = ({
           let safety = 0;
           while (true) {
             const params = { take: MAX_ORDER_FETCH };
-            if (paramKey && currentUser?.id) {
-              params[paramKey] = currentUser.id;
+            if (paramKey && currentUserId) {
+              params[paramKey] = currentUserId;
             }
             if (cursor) params.cursor = cursor;
             const response = await fetchVoidLogs(params);
@@ -601,7 +672,7 @@ const AdminInfoDashboard2 = ({
 
         const [orderList, rawVoidLogs] = await Promise.all([
           fetchPaginatedOrders(),
-          currentUser?.id
+          currentUserId
             ? (async () => {
                 const [cashierLogs, managerLogs] = await Promise.all([
                   fetchPaginatedVoidLogs("cashierId"),
@@ -650,11 +721,11 @@ const AdminInfoDashboard2 = ({
             }
           })
           .filter(Boolean);
-        const relevantOrders = currentUser?.id
+        const relevantOrders = currentUserId
           ? mapped.filter(
               (tx) =>
                 String(tx.cashierId ?? tx.cashier?.id ?? "") ===
-                String(currentUser.id)
+                String(currentUserId)
             )
           : mapped;
         const totalTransactions = relevantOrders.length;
@@ -674,7 +745,7 @@ const AdminInfoDashboard2 = ({
         }, 0);
         const filteredVoidLogs = filterVoidLogsForUser(
           rawVoidLogs,
-          currentUser?.id ?? null
+          currentUserId ?? null
         );
         const totalVoids = filteredVoidLogs.length;
         const avgPerTransaction = totalTransactions
@@ -753,17 +824,13 @@ const AdminInfoDashboard2 = ({
   const schoolId =
     currentUser?.schoolId || currentUser?.employeeId || currentUser?.username || "";
 
-  const recentRestocks = useMemo(
-    () => (restockNotificationsRef.current || []).slice(0, 3),
-    [restockVersion]
-  );
-
-  const restockSignature = useMemo(() => {
-    if (!recentRestocks.length) return "";
-    return recentRestocks.map((entry) => entry.id).join("::");
-  }, [recentRestocks]);
+  const recentRestocks = useMemo(() => {
+    void restockVersion;
+    return (restockNotificationsRef.current || []).slice(0, 3);
+  }, [restockVersion]);
 
   const bellNotifications = useMemo(() => {
+    void restockVersion;
     const restocks = restockNotificationsRef.current || [];
     const merged = mergeNotificationLists(restocks, displayNotifications || []);
     return normalizeNotifications(merged).slice(0, 8);
@@ -820,6 +887,33 @@ const AdminInfoDashboard2 = ({
     stockAlertCounts.low > 0 || stockAlertCounts.out > 0 || hasRestockAlert;
 
   useEffect(() => {
+    if (!enableStockAlerts) return;
+    if (!stockAlertStateLoaded) return;
+    if (!currentUserId) return;
+    if (!stockAlertSignature) return;
+    const matchesServer = lastSeenStockSignature === stockAlertSignature;
+    if (matchesServer) {
+      if (!stockAlertSeen) {
+        storeStockAlertSeen(currentUser);
+        setStockAlertSeen(true);
+      }
+      return;
+    }
+    if (stockAlertSeen) {
+      clearStockAlertSeen(currentUser);
+      setStockAlertSeen(false);
+    }
+  }, [
+    enableStockAlerts,
+    stockAlertStateLoaded,
+    stockAlertSignature,
+    lastSeenStockSignature,
+    stockAlertSeen,
+    currentUser,
+    currentUserId,
+  ]);
+
+  useEffect(() => {
     if (!enableStockAlerts) {
       setShowStockAlert(false);
       return;
@@ -829,22 +923,17 @@ const AdminInfoDashboard2 = ({
       setShowStockAlert(false);
       return;
     }
-    const lowOutChanged =
-      stockAlertSignature &&
-      stockAlertSignature !== lastSeenStockSignature;
-    const restockChanged =
-      restockSignature && restockSignature !== lastRestockSignature;
-    if (lowOutChanged || restockChanged) {
-      setShowStockAlert(true);
+    if (stockAlertSeen) {
+      setShowStockAlert(false);
+      return;
     }
+    setShowStockAlert(true);
   }, [
     enableStockAlerts,
     hasStockAlert,
-    stockAlertSignature,
-    lastSeenStockSignature,
-    restockSignature,
-    lastRestockSignature,
     stockAlertStateLoaded,
+    stockAlertSeen,
+    currentUser,
   ]);
 
   useEffect(() => {
@@ -886,6 +975,7 @@ const AdminInfoDashboard2 = ({
 
   const handleSignOut = useCallback(async () => {
     setShowProfile(false);
+    clearStockAlertSeen(currentUser);
     if (logout) {
       try {
         await logout();
@@ -895,7 +985,7 @@ const AdminInfoDashboard2 = ({
     }
     navigate("/user-login", { replace: true });
     window.location.reload();
-  }, [logout, navigate]);
+  }, [logout, navigate, currentUser]);
 
   const markStockAlertAsHandled = useCallback(() => {
     setShowStockAlert(false);
@@ -904,10 +994,17 @@ const AdminInfoDashboard2 = ({
     } else {
       persistStockAlertSignature("");
     }
-    if (restockSignature) {
-      setLastRestockSignature(restockSignature);
+    storeStockAlertSeen(currentUser);
+    setStockAlertSeen(true);
+  }, [stockAlertSignature, persistStockAlertSignature, currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setStockAlertSeen(false);
+      return;
     }
-  }, [stockAlertSignature, restockSignature, persistStockAlertSignature]);
+    setStockAlertSeen(hasSeenStockAlertOnce(currentUser));
+  }, [currentUser]);
 
   const handleStockAlertView = useCallback(() => {
     markStockAlertAsHandled();
@@ -985,6 +1082,8 @@ const AdminInfoDashboard2 = ({
           if (prev.has(key)) return prev;
           const next = new Set(prev);
           next.add(key);
+          readStoreRef.current = next;
+          persistReadStore(next, readScope);
           return next;
         });
         try {
@@ -1004,7 +1103,7 @@ const AdminInfoDashboard2 = ({
         );
       }
     },
-    []
+    [readScope]
   );
 
   const renderStockAlertModal = () => {
@@ -1150,6 +1249,8 @@ const AdminInfoDashboard2 = ({
     setReadIds((prev) => {
       const next = new Set(prev);
       unreadKeys.forEach((key) => next.add(key));
+      readStoreRef.current = next;
+      persistReadStore(next, readScope);
       return next;
     });
 
@@ -1158,7 +1259,7 @@ const AdminInfoDashboard2 = ({
     } catch (err) {
       console.warn("Failed to mark notifications read:", err);
     }
-  }, [displayNotifications, readIds]);
+  }, [displayNotifications, readIds, readScope]);
 
   return (
     <>
@@ -1242,7 +1343,7 @@ const AdminInfoDashboard2 = ({
             className="flex items-center space-x-3 cursor-pointer select-none"
           >
             <img
-              src={avatarSrc}
+              src={displayAvatar || avatarSrc}
               alt="Admin Avatar"
               loading="lazy"
               decoding="async"
@@ -1290,7 +1391,7 @@ const AdminInfoDashboard2 = ({
           show={showProfile}
           userName={adminName}
           schoolId={schoolId}
-          avatarUrl={avatarSrc}
+          avatarUrl={displayAvatar || avatarSrc}
           analytics={analytics}
           onAvatarUpload={handleAvatarUpload}
           onChangePassword={handleChangePassword}

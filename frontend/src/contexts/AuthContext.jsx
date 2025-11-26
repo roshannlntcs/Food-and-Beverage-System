@@ -13,12 +13,74 @@ import {
 } from "../api/profile";
 import { api, clearToken } from "../api/client";
 
+const CURRENT_USER_CACHE_KEY = "__posCurrentUser";
+
+const getStorageHandles = () => {
+  if (typeof window === "undefined") return [];
+  const handles = [];
+  try {
+    if (window.sessionStorage) handles.push(window.sessionStorage);
+  } catch (_err) {
+    // ignore access issues
+  }
+  try {
+    if (window.localStorage) handles.push(window.localStorage);
+  } catch (_err) {
+    // ignore access issues
+  }
+  return handles;
+};
+
+const readCachedCurrentUser = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const stores = getStorageHandles();
+    for (const store of stores) {
+      try {
+        const raw = store.getItem(CURRENT_USER_CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            return parsed;
+          }
+        }
+      } catch (_err) {
+        // ignore parsing/storage errors per store
+      }
+    }
+  } catch (err) {
+    console.warn("AuthContext: failed to read cached user", err);
+  }
+  return null;
+};
+
+const persistCachedCurrentUser = (user) => {
+  if (typeof window === "undefined") return;
+  try {
+    const stores = getStorageHandles();
+    const payload = user ? JSON.stringify(user) : null;
+    stores.forEach((store) => {
+      try {
+        if (!payload) {
+          store.removeItem(CURRENT_USER_CACHE_KEY);
+        } else {
+          store.setItem(CURRENT_USER_CACHE_KEY, payload);
+        }
+      } catch (_err) {
+        // ignore quota/storage exceptions
+      }
+    });
+  } catch (err) {
+    console.warn("AuthContext: failed to persist cached user", err);
+  }
+};
+
 const AuthCtx = createContext(null);
 
 export const useAuth = () => useContext(AuthCtx);
 
 export default function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => readCachedCurrentUser());
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
@@ -86,6 +148,10 @@ export default function AuthProvider({ children }) {
       refreshCurrentUser().catch(() => {});
     }
   }, [loaded, refreshCurrentUser]);
+
+  useEffect(() => {
+    persistCachedCurrentUser(currentUser);
+  }, [currentUser]);
 
   const value = useMemo(
     () => ({

@@ -91,7 +91,7 @@ export default function CardPaymentModal({
   const validateForm = () => {
     const e = {};
     const digits = onlyDigits(cardNumber);
-    if (digits.length < 16) e.cardNumber = "Card number must be 16 digits";
+    if (digits.length !== 16) e.cardNumber = "Card number must be 16 digits";
     if (!cardName.trim()) e.cardName = "Cardholder name required";
     if (!expiryValid(expiry)) e.expiry = "Expiry invalid or expired";
     if (!(cvv.length === 3 || cvv.length === 4)) e.cvv = "CVV must be 3 or 4 digits";
@@ -147,7 +147,10 @@ export default function CardPaymentModal({
   };
 
   // Handlers
-  const onCardNumberChange = (e) => setCardNumber(e.target.value);
+  const onCardNumberChange = (e) => {
+    const digits = onlyDigits(e.target.value).slice(0, 16);
+    setCardNumber(digits);
+  };
   const onNameChange = (e) => setCardName(e.target.value);
   const onExpiryChange = (e) => setExpiry(formatExpiryInput(e.target.value));
   const onCvvChange = (e) => setCvv(onlyDigits(e.target.value).slice(0, 4));

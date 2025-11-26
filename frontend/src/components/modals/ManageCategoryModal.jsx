@@ -1,8 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaTrash, FaEdit, FaCheckCircle } from "react-icons/fa";
 import { useCategories } from "../../contexts/CategoryContext";
+import { useInventory } from "../../contexts/InventoryContext";
 
 const DEFAULT_ICON = "/icons/pizza.png";
+const FALLBACK_CATEGORY_NAME = "Others";
+const DELETE_BEHAVIORS = {
+  DELETE_ITEMS: "delete-items",
+  REASSIGN: "reassign",
+};
 
 const DEFAULT_CATEGORIES = [
   { key: "Main Dish", icon: "/icons/rice_bowl.png", locked: true },
@@ -55,6 +61,7 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
     removeCategory,
     refresh,
   } = useCategories() || {};
+  const { inventory = [] } = useInventory() || {};
 
   const [categories, setCategories] = useState([]);
   const [categoryName, setCategoryName] = useState("");
@@ -68,6 +75,9 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   const [selectedOptionals, setSelectedOptionals] = useState([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteBehavior, setDeleteBehavior] = useState(DELETE_BEHAVIORS.REASSIGN);
+  const [deleteHasItems, setDeleteHasItems] = useState(false);
+  const [affectedItemCount, setAffectedItemCount] = useState(0);
 
   const defaultsLookup = useMemo(() => {
     const map = new Map();
@@ -78,31 +88,32 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
   }, []);
 
   const syncCategories = useCallback(() => {
-    const merged = [];
-    const seen = new Set();
-
-    contextCategories.forEach((cat) => {
+    const merged = (contextCategories || []).map((cat) => {
       const canonical = canonicalKey(cat.name);
       const defaultPreset = defaultsLookup.get(canonical);
-      merged.push({
+      return {
         id: cat.id ?? null,
         key: cat.name,
         icon: cat.icon || cat.iconUrl || defaultPreset?.icon || DEFAULT_ICON,
         locked: Boolean(defaultPreset),
-      });
-      seen.add(canonical);
-    });
-
-    DEFAULT_CATEGORIES.forEach((cat) => {
-      const canonical = canonicalKey(cat.key);
-      if (!seen.has(canonical)) {
-        merged.push({ ...cat, id: null });
-      }
+      };
     });
 
     merged.sort((a, b) => a.key.localeCompare(b.key));
     setCategories(merged);
   }, [contextCategories, defaultsLookup]);
+
+  const categoryItemCounts = useMemo(() => {
+    const counts = new Map();
+    (inventory || []).forEach((item) => {
+      const canonical = canonicalKey(
+        item?.category || item?.categoryName || item?.categoryKey || ""
+      );
+      if (!canonical) return;
+      counts.set(canonical, (counts.get(canonical) || 0) + 1);
+    });
+    return counts;
+  }, [inventory]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -127,6 +138,9 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
       setShowConfirm(false);
       setShowEditModal(false);
       setPendingDelete(null);
+      setDeleteBehavior(DELETE_BEHAVIORS.REASSIGN);
+      setDeleteHasItems(false);
+      setAffectedItemCount(0);
     }
   }, [isOpen]);
 
@@ -154,6 +168,13 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
 
   const handleDeleteClick = (category) => {
     setPendingDelete(category);
+    const canonical = canonicalKey(category?.key);
+    const count = categoryItemCounts.get(canonical) || 0;
+    setAffectedItemCount(count);
+    setDeleteHasItems(count > 0);
+    setDeleteBehavior(
+      count > 0 ? DELETE_BEHAVIORS.REASSIGN : DELETE_BEHAVIORS.DELETE_ITEMS
+    );
     setShowConfirm(true);
   };
 
@@ -162,9 +183,21 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
     setDeleting(true);
     try {
       if (pendingDelete.id) {
-        await removeCategory?.(pendingDelete.id);
+        const payload =
+          deleteBehavior === DELETE_BEHAVIORS.REASSIGN
+            ? {
+                behavior: DELETE_BEHAVIORS.REASSIGN,
+                fallbackName: FALLBACK_CATEGORY_NAME,
+              }
+            : { behavior: DELETE_BEHAVIORS.DELETE_ITEMS };
+        await removeCategory?.(pendingDelete.id, payload);
         await refresh?.();
       }
+      setCategories((prev) =>
+        prev.filter(
+          (cat) => canonicalKey(cat.key) !== canonicalKey(pendingDelete.key)
+        )
+      );
       setSuccessMessage("Category removed successfully!");
       setShowSuccess(true);
     } catch (err) {
@@ -174,12 +207,18 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
       setDeleting(false);
       setShowConfirm(false);
       setPendingDelete(null);
+      setDeleteBehavior(DELETE_BEHAVIORS.REASSIGN);
+      setDeleteHasItems(false);
+      setAffectedItemCount(0);
     }
   };
 
   const cancelDelete = () => {
     setShowConfirm(false);
     setPendingDelete(null);
+    setDeleteBehavior(DELETE_BEHAVIORS.REASSIGN);
+    setDeleteHasItems(false);
+    setAffectedItemCount(0);
   };
 
   const handleSave = async () => {
@@ -435,11 +474,54 @@ const ManageCategoryModal = ({ isOpen = true, onClose }) => {
             </div>
           </div>
           <h3 className="text-lg font-semibold mb-2">Remove category warning</h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-4">
             Are you sure you want to remove this category?
             <br />
-            This will remove all items in this category.
+            {deleteHasItems
+              ? `This category contains ${affectedItemCount} item${
+                  affectedItemCount === 1 ? "" : "s"
+                }.`
+              : "This action cannot be undone."}
           </p>
+          {deleteHasItems && (
+            <div className="space-y-3 text-left mb-4">
+              <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-red-400">
+                <input
+                  type="radio"
+                  className="mt-1 accent-red-600"
+                  name="delete-behavior"
+                  value={DELETE_BEHAVIORS.DELETE_ITEMS}
+                  checked={deleteBehavior === DELETE_BEHAVIORS.DELETE_ITEMS}
+                  onChange={() => setDeleteBehavior(DELETE_BEHAVIORS.DELETE_ITEMS)}
+                />
+                <div>
+                  <p className="text-sm font-semibold text-red-700">Delete items</p>
+                  <p className="text-xs text-gray-500">
+                    All items within this category will be removed from the POS.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-yellow-500">
+                <input
+                  type="radio"
+                  className="mt-1 accent-yellow-500"
+                  name="delete-behavior"
+                  value={DELETE_BEHAVIORS.REASSIGN}
+                  checked={deleteBehavior === DELETE_BEHAVIORS.REASSIGN}
+                  onChange={() => setDeleteBehavior(DELETE_BEHAVIORS.REASSIGN)}
+                />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    Keep items and move to "{FALLBACK_CATEGORY_NAME}"
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Items stay active and are relabeled as {FALLBACK_CATEGORY_NAME} so you can
+                    reassign them later.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
           <div className="flex justify-center gap-4">
             <button
               type="button"
